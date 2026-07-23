@@ -12,13 +12,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.github.chsiching.worddrill.ui.drill.DrillScreen
 import com.github.chsiching.worddrill.ui.library.LibraryScreen
+import com.github.chsiching.worddrill.ui.library.WordListScreen
 import com.github.chsiching.worddrill.ui.me.MeScreen
+
+/** 「库」Tab 二级页路由（Ticket #7）：navigate("library/$bookId") 与 composable route 共用。 */
+private const val WORD_LIST_ROUTE = "library/{bookId}"
 
 /**
  * 应用根 Composable：Scaffold + 底部导航 + NavHost。
@@ -66,7 +72,19 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(innerPadding),
         ) {
             composable(TopDestination.Drill.route) { DrillScreen() }
-            composable(TopDestination.Library.route) { LibraryScreen() }
+            composable(TopDestination.Library.route) {
+                LibraryScreen(
+                    onOpenBook = { bookId ->
+                        navController.navigate("library/$bookId")
+                    },
+                )
+            }
+            composable(
+                route = WORD_LIST_ROUTE,
+                arguments = listOf(navArgument("bookId") { type = NavType.StringType }),
+            ) {
+                WordListScreen(onBack = { navController.popBackStack() })
+            }
             composable(TopDestination.Me.route) { MeScreen() }
         }
     }

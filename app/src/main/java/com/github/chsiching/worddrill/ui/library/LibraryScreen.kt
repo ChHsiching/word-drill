@@ -1,5 +1,6 @@
 package com.github.chsiching.worddrill.ui.library
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +49,7 @@ import com.github.chsiching.worddrill.data.local.entity.Book
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
+    onOpenBook: (bookId: Long) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
@@ -93,7 +95,8 @@ fun LibraryScreen(
                     BookRow(
                         book = book,
                         isCurrent = book.bookId == state.currentBookId,
-                        onClick = { viewModel.selectBook(book.bookId) },
+                        onOpen = { onOpenBook(book.bookId) },
+                        onSelectCurrent = { viewModel.selectBook(book.bookId) },
                         onRename = { viewModel.openRenameDialog(book.bookId) },
                         onDelete = { viewModel.deleteBook(book.bookId) },
                     )
@@ -127,19 +130,27 @@ fun LibraryScreen(
 private fun BookRow(
     book: Book,
     isCurrent: Boolean,
-    onClick: () -> Unit,
+    onOpen: () -> Unit,
+    onSelectCurrent: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
     ListItem(
-        headlineContent = { Text(book.name) },
+        headlineContent = {
+            Text(
+                text = book.name,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpen),
+            )
+        },
         supportingContent = {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AssistChip(
-                    onClick = onClick,
+                    onClick = onSelectCurrent,
                     label = {
                         Text(
                             if (book.isPreset) stringResource(R.string.library_preset_badge)

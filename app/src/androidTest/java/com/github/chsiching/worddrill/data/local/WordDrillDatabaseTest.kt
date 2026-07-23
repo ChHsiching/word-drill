@@ -254,6 +254,39 @@ class WordDrillDatabaseTest {
         assertThat(result.senses).hasSize(3)
     }
 
+    // ---- Ticket #7: observe 词书词条（响应式，列表页订阅）----
+
+    @Test
+    fun observeWordsWithSensesByBook_emitsCurrentList() = runTest {
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        val w1 = wordDao.insert(Word(text = "apple"))
+        wordDao.insertSense(Sense(wordId = w1, pos = "n.", meaning = "苹果"))
+        bookDao.linkBookWord(BookWord(bookId, w1))
+
+        val result = wordDao.observeWordsWithSensesByBook(bookId).first()
+        assertThat(result.map { it.word.text }).containsExactly("apple")
+        assertThat(result.single().senses).hasSize(1)
+    }
+
+    @Test
+    fun observeWordsWithSensesByBook_isolatesByBook() = runTest {
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val b1 = bookDao.insert(Book(name = "b1"))
+        val b2 = bookDao.insert(Book(name = "b2"))
+        val w1 = wordDao.insert(Word(text = "apple"))
+        val w2 = wordDao.insert(Word(text = "banana"))
+        bookDao.linkBookWord(BookWord(b1, w1))
+        bookDao.linkBookWord(BookWord(b2, w2))
+
+        assertThat(wordDao.observeWordsWithSensesByBook(b1).first().map { it.word.text })
+            .containsExactly("apple")
+        assertThat(wordDao.observeWordsWithSensesByBook(b2).first().map { it.word.text })
+            .containsExactly("banana")
+    }
+
     // ---- 刷卡日志聚合 ----
 
     @Test

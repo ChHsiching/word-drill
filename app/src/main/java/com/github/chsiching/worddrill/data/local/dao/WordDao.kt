@@ -8,6 +8,7 @@ import androidx.room.Transaction
 import com.github.chsiching.worddrill.data.local.WordWithSenses
 import com.github.chsiching.worddrill.data.local.entity.Sense
 import com.github.chsiching.worddrill.data.local.entity.Word
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface WordDao {
@@ -47,6 +48,22 @@ interface WordDao {
         """
     )
     suspend fun getWordsWithSensesByBook(bookId: Long): List<WordWithSenses>
+
+    /**
+     * Ticket #7：按词书响应式查词条（含义项列表）。
+     * 词书列表页订阅，增删改后自动重发。
+     * @Transaction 保证 @Relation 两步查询读一致快照。
+     */
+    @Transaction
+    @Query(
+        """
+        SELECT w.* FROM word w
+        INNER JOIN book_word bw ON w.wordId = bw.wordId
+        WHERE bw.bookId = :bookId
+        ORDER BY w.text
+        """
+    )
+    fun observeWordsWithSensesByBook(bookId: Long): Flow<List<WordWithSenses>>
 
     @Query("UPDATE sense SET pos = :pos, meaning = :meaning WHERE senseId = :senseId")
     suspend fun updateSense(senseId: Long, pos: String, meaning: String)

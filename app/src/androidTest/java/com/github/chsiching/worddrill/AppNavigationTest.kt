@@ -42,7 +42,13 @@ class AppNavigationTest {
         // 「库」Tab 内容自 Ticket #6 起渲染词书列表（顶部标题「词书」），
         // 故「库」字仍只在导航栏出现 1 次（内容区是「词书」/具体词书名）。
         composeRule.onAllNodesWithText("库").assertCountEquals(1)
-        // 列表标题「词书」证明页面正常渲染
+        // 列表标题「词书」证明页面正常渲染。
+        // waitUntil 兜住预置词库首启异步导入：导入完成前 books 为空，空状态也含
+        // 「词书」，与标题重名凑出 2 个节点让 onNodeWithText 失败；等预置词书
+        // 出现即代表导入完成、列表进入非空态，标题「词书」回到唯一。
+        composeRule.waitUntil(10_000L) {
+            composeRule.onAllNodesWithText("CET-4").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithText("词书").assertIsDisplayed()
     }
 

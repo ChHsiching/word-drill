@@ -20,4 +20,12 @@
     <string name="library_name_hint">词书名称</string>
     <string name="library_cancel">取消</string>
     <string name="library_confirm">确定</string>
+    <!-- 「库」Tab 词书内词条列表（Ticket #7）-->
+    <string name="word_list_add">新增词条</string>
+    <string name="word_list_edit">编辑释义</string>
+    <string name="word_list_remove">从词书移除</string>
+    <string name="word_list_text_hint">单词</string>
+    <string name="word_list_pos_hint">词性</string>
+    <string name="word_list_meaning_hint">释义</string>
+    <string name="word_list_preset_readonly">预置词书不可编辑</string>
 </resources>
