@@ -28,6 +28,7 @@
 4. **采样点选纯背景区**（避开文字/icon）。深色主题内容区背景 ≈ `[18,19,24]`，浅色 ≈ `[250,248,255]`，对比即可断言主题切换生效。
 5. ⚠️ `analyze_image` MCP 只支持远程 URL，本地截图用不了；像素法是替代。
 6. ⚠️ `js_reset` 后 `js_add_node_module_dir` 的路径会丢，需重新加（`true`=新增，`false`=已存在，都正常）。
+7. ⚠️ **node_repl 的 `import()` 写错会污染整个 kernel**：若 `import('pkg')` 的 catch 返回 `null`（如 `await import('/dev/null').catch(()=>({PNG:null}))` 这种占位写法），`PNG` 绑定变成 `null`，后续 `PNG.sync.read(...)` 全报 `Cannot read properties of null`。而 `const PNG` 不能重复声明，**只能 `js_reset` 全部重来**（丢失所有绑定，包括 fs、`js_add_node_module_dir` 路径都要重加）。应对：import 直接写对（`const { PNG } = await import('pngjs')`），别用 `/dev/null` 之类占位兜底；若绑定已坏，直接 `js_reset` 重来，别试图覆盖。
 
 
 ## 验证 UI
