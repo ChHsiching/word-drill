@@ -1,6 +1,6 @@
 # Android Emulator MCP — 操作备忘
 
-用 `android-emulator` MCP 辅助开发时反复踩的工具层坑。代码层的红线（别启用 Hilt Plugin、别升级 AndroidX 等）在各自代码注释里，不在此重复。
+用 `android-emulator` MCP 辅助开发时反复踩的工具层坑，外加少数**跨文件、无法在单处代码注释承载**的代码层约定（见末节「代码层约定」）。其余代码层红线（别启用 Hilt Plugin、别升级 AndroidX 等）在各自代码注释里，不在此重复。
 
 ## 环境
 
@@ -56,3 +56,11 @@ adb shell "run-as com.github.chsiching.worddrill sh -c 'cat files/datastore/word
 - **`onNodeWithText` 默认做子串匹配**（错误信息原文 "contains '...'"）。`onNodeWithText("统计")` 会同时命中"统计数据""今日统计"等，报 "found N nodes"。要么用更长更精确的文案，要么 `onNodeWithText("统计", substring = false)`。
 - **`performTextInput` 是追加，不是替换**：对已有值的 TextField 调 `performTextInput("X")` 会把 "苹果" 变成 "苹果X"。要整段替换用 `performTextReplacement("X")`。
 - `IconButton` 的点击入口在测试里要用 `onNodeWithContentDescription(...)`（匹配 `contentDescription`），不是 `onNodeWithText`（后者匹配显示文本，IconButton 通常只有 icon 没文本）。
+- **`= runBlocking { }` 表达式体的测试方法若最后一条语句返回非 Unit，JUnit4 报 `InvalidTestClassError: Method should be void`**。典型陷阱：`fun foo() = runBlocking { ... onNodeWithText(x).assertIsDisplayed() }` —— `assertIsDisplayed()` 返回 `SemanticsNodeInteraction`，`runBlocking` 推断方法返回类型非 Unit，JUnit4 拒绝。改用**块体** `fun foo() { runBlocking { ... }; ... }`，或保证表达式体最后一条返回 Unit（`assertThat(...).isEqualTo()` 返回 Unit，安全）。
+- **`someStateFlow.first()` 拿到的是 `initialValue`，不是解析后的值**。`stateIn(WhileSubscribed, initialValue = X)` 首次订阅先发 `X` 再异步解析上游；`.first()` 立即返回首条 = `X`。要等解析后的值，用带条件的 `.first { predicate }`（如 `.first { it.bookName.isNotEmpty() }`），或用 Turbine 收集多帧。
+
+## 代码层约定
+
+跨文件、无法在单处注释承载的反复踩坑（code-review Standards 轴抓出来的）。
+
+- **所有用户可见文案走 `stringResource(R.string.*)`，别硬编码中文字面量**（含含变量的拼接，用格式资源 `%1$s` / `%1$d`）。repo 所有 Composable（`DrillScreen` / `LibraryScreen` / `WordListScreen` / `MeScreen`）都走 `stringResource`；本地拼接字符串（如 `"$bookName：$x / $y"`）看似省事，实则在 i18n、文案一致性检查、code-review 上反复翻车。含变量用格式资源：`<string name="me_progress_line">%1$s：%2$d / %3$d（%4$d%%）</string>` + `stringResource(R.string.me_progress_line, bookName, x, y, percent)`。
