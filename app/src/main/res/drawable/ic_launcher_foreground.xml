@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 简单的卡片堆叠图标，呼应「刷卡」核心动作 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,34 h48 a4,4 0 0 1 4,4 v32 a4,4 0 0 1 -4,4 h-48 a4,4 0 0 1 -4,-4 v-32 a4,4 0 0 1 4,-4 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,44 h32 M38,52 h24 M38,60 h28"
+        android:strokeColor="#3F51B5"
+        android:strokeWidth="3" />
+</vector>

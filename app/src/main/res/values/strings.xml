@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">WordDrill</string>
+    <!-- 底部导航三 Tab：严格按规格单字风格 -->
+    <string name="tab_drill">刷</string>
+    <string name="tab_library">库</string>
+    <string name="tab_me">我的</string>
+</resources>
