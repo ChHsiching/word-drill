@@ -12,9 +12,11 @@
 
 1. `android_preflight` 确认环境。
 2. 构建：`JAVA_HOME=C:/jdk17 ./gradlew :app:assembleDebug`。
-3. 装：`android_install_app`；启动：`android_launch_app`。
-   - **别用 `android_build_and_run`**：monkey 启动手动 Hilt 会报 "No activities found"，不是 bug。
+3. 装：`android_install_app`；启动：**`adb shell am start -n com.github.chsiching.worddrill/.MainActivity`**。
+   - `android_launch_app` / `android_build_and_run` 都走 monkey，手动 Hilt（无 Gradle Plugin）会报 "No activities found to run, monkey aborted"。`am start` 直起 Activity，可靠。
 4. 清数据做干净态验证：**先 `android_install_app` 再 `pm clear`**（反过来 `pm clear` 可能 "Failed"，因旧安装态失效）。
+   - `pm clear` 直接调有时返回非零退出码但实际成功；包一层看退出码：`adb shell "pm clear com.github.chsiching.worddrill; echo done=$?"`，`done=0` 即成功。
+   - connectedAndroidTest 跑完会卸载 app，下次手验前先 `adb shell pm list packages | grep word` 确认还在，不在就重新 `android_install_app`。
 
 ## 验证 UI
 
@@ -50,3 +52,7 @@ adb shell "run-as com.github.chsiching.worddrill sh -c 'cat files/datastore/word
 
 - `createComposeRule` / `createAndroidComposeRule` 有 v2 deprecation 警告，**别迁移**。保持 v1（与既有测试一致），warning 无害。v2 用 StandardTestDispatcher，行为不同，要重写同步逻辑。
 - 带写副作用的 Flow `collect` 务必 `distinctUntilChanged`，否则重复 emit 重复写库（`HorizontalPager` 的 `settledPage`、列表刷新回调都会对同一值重复 emit）。
+- **断言用 `Truth.assertThat`，别用 `kotlin.assert`**：Kotlin 的 `assert` 在 JVM 上靠 `-ea` flag，JUnit4 默认不设，所以 `assert(x)` 永远通过（no-op），测了等于没测。repo 约定是 `com.google.common.truth.Truth.assertThat`（见 `WordDrillDatabaseTest` / `BookNameValidationTest`）。
+- **`onNodeWithText` 默认做子串匹配**（错误信息原文 "contains '...'"）。`onNodeWithText("统计")` 会同时命中"统计数据""今日统计"等，报 "found N nodes"。要么用更长更精确的文案，要么 `onNodeWithText("统计", substring = false)`。
+- **`performTextInput` 是追加，不是替换**：对已有值的 TextField 调 `performTextInput("X")` 会把 "苹果" 变成 "苹果X"。要整段替换用 `performTextReplacement("X")`。
+- `IconButton` 的点击入口在测试里要用 `onNodeWithContentDescription(...)`（匹配 `contentDescription`），不是 `onNodeWithText`（后者匹配显示文本，IconButton 通常只有 icon 没文本）。
