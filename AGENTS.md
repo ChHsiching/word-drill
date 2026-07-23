@@ -77,3 +77,7 @@ Using the default five canonical triage labels. See `docs/agents/triage-labels.m
 ### Domain docs
 
 Single-context layout: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Android emulator MCP
+
+用 `android-emulator` MCP 辅助开发时的工具层坑（IME 输入、数据库查询、构建/验证路径）。See `docs/agents/android-mcp-notes.md`.
