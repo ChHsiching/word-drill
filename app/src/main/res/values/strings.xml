@@ -1,0 +1,71 @@
+<resources>
+    <string name="app_name">WordDrill</string>
+    <!-- 底部导航三 Tab：严格按规格单字风格 -->
+    <string name="tab_drill">刷</string>
+    <string name="tab_library">库</string>
+    <string name="tab_me">我的</string>
+    <!-- 「刷」Tab 卡片浏览 -->
+    <string name="drill_empty">这个词书是空的</string>
+    <string name="drill_loading">加载中…</string>
+    <string name="drill_first_card">已是第一张</string>
+    <string name="drill_last_card">已是最后一张</string>
+    <!-- 「库」Tab 词书列表 -->
+    <string name="library_title">词书</string>
+    <string name="library_preset_badge">预置</string>
+    <string name="library_custom_badge">自定义</string>
+    <string name="library_current_badge">当前</string>
+    <string name="library_create">新建词书</string>
+    <string name="library_rename">重命名</string>
+    <string name="library_delete">删除</string>
+    <string name="library_name_hint">词书名称</string>
+    <string name="library_cancel">取消</string>
+    <string name="library_confirm">确定</string>
+    <!-- 「库」Tab 词书内词条列表（Ticket #7）-->
+    <string name="word_list_add">新增词条</string>
+    <string name="word_list_edit">编辑释义</string>
+    <string name="word_list_remove">从词书移除</string>
+    <string name="word_list_text_hint">单词</string>
+    <string name="word_list_pos_hint">词性</string>
+    <string name="word_list_meaning_hint">释义</string>
+    <string name="word_list_preset_readonly">预置词书不可编辑</string>
+    <!-- 输入校验错误文案（Ticket #12：不硬编码到 Kotlin，走 R.string）-->
+    <string name="validation_word_empty">单词不能为空</string>
+    <string name="validation_pos_empty">词性不能为空</string>
+    <string name="validation_meaning_empty">释义不能为空</string>
+    <string name="validation_book_name_empty">名称不能为空</string>
+    <string name="validation_book_name_duplicate">已存在同名词书</string>
+    <!-- 「我的」Tab 统计（Ticket #8）-->
+    <string name="me_today">今日刷卡</string>
+    <string name="me_total">累计刷卡</string>
+    <string name="me_progress">当前词书进度</string>
+    <string name="me_no_current_book">未选择词书</string>
+    <string name="me_progress_line">%1$s：%2$d / %3$d（%4$d%%）</string>
+    <!-- 「我的」Tab 软件设置（Ticket #9）-->
+    <string name="me_settings">软件设置</string>
+    <string name="me_theme">主题</string>
+    <string name="me_theme_light">浅色</string>
+    <string name="me_theme_dark">深色</string>
+    <string name="me_theme_system">跟随系统</string>
+    <string name="me_about">关于</string>
+    <string name="me_about_title">关于 WordDrill</string>
+    <string name="me_about_app_name">WordDrill</string>
+    <string name="me_about_version">版本 %1$s</string>
+    <string name="me_about_close">关闭</string>
+    <!-- 「我的」Tab 数据导出/导入（Ticket #10）-->
+    <string name="me_data">数据</string>
+    <string name="me_export">导出</string>
+    <string name="me_import">导入</string>
+    <string name="me_export_title">导出数据</string>
+    <string name="me_export_message">将整库（词条池、词书、刷卡日志）导出为 JSON 文件，用于换机迁移。</string>
+    <string name="me_export_nickname_hint">可选昵称标签</string>
+    <string name="me_export_confirm">导出</string>
+    <string name="me_import_title">确认导入</string>
+    <string name="me_import_message">导入将覆盖当前所有数据，此操作不可撤销。</string>
+    <string name="me_import_confirm">覆盖导入</string>
+    <string name="me_cancel">取消</string>
+    <string name="me_export_done">导出完成</string>
+    <string name="me_import_done">导入完成</string>
+    <string name="me_export_failed">导出失败</string>
+    <string name="me_import_failed">导入失败</string>
+    <string name="me_working">处理中…</string>
+</resources>
