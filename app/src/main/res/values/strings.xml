@@ -4,4 +4,9 @@
     <string name="tab_drill">刷</string>
     <string name="tab_library">库</string>
     <string name="tab_me">我的</string>
+    <!-- 「刷」Tab 卡片浏览 -->
+    <string name="drill_empty">这个词书是空的</string>
+    <string name="drill_loading">加载中…</string>
+    <string name="drill_first_card">已是第一张</string>
+    <string name="drill_last_card">已是最后一张</string>
 </resources>

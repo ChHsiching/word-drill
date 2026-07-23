@@ -14,9 +14,9 @@ import org.junit.runner.RunWith
  * 验证三 Tab 存在、可切换、切换不崩溃。
  * 同时隐式验证 Hilt @HiltAndroidApp + @AndroidEntryPoint 启动不崩溃。
  *
- * 骨架阶段三个 Tab 均为空白占位页面，内容区文案与导航 label 同名，
- * 故用 onAllNodesWithText + assertCountEquals 断言：
- * 当前 Tab 的文案在导航栏 + 内容区各一处（共 2 个节点）。
+ * 「刷」Tab 内容自 Ticket #5 起为真实卡片浏览（不再渲染占位文案 "刷"），
+ * 故三个 Tab 文案均仅出现在导航栏（各 1 个节点）。
+ * 「刷」Tab 的卡片渲染由 DrillScreenTest 覆盖。
  */
 @RunWith(AndroidJUnit4::class)
 class AppNavigationTest {
@@ -26,9 +26,8 @@ class AppNavigationTest {
 
     @Test
     fun bottomNavigationShowsAllTabs() {
-        // 默认「刷」选中：内容区 + 导航栏 = 2 个节点
-        composeRule.onAllNodesWithText("刷").assertCountEquals(2)
-        // 未选中 Tab 只有导航栏 1 个节点
+        // 三个 Tab 文案各自仅出现在底部导航栏（各 1 个节点）
+        composeRule.onAllNodesWithText("刷").assertCountEquals(1)
         composeRule.onAllNodesWithText("库").assertCountEquals(1)
         composeRule.onAllNodesWithText("我的").assertCountEquals(1)
     }
