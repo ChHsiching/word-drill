@@ -51,4 +51,18 @@ interface SwipeLogDao {
         """
     )
     fun observeDistinctWordCountForBook(bookId: Long): Flow<Int>
+
+    // ---- Ticket #10：整库导出/导入 ----
+
+    /** 全量读所有刷卡日志（导出快照用；含引用已删词书/词条的孤立日志）。 */
+    @Query("SELECT * FROM swipe_log")
+    suspend fun getAll(): List<SwipeLog>
+
+    /** 清空刷卡日志表（导入覆盖前清理）。 */
+    @Query("DELETE FROM swipe_log")
+    suspend fun deleteAll()
+
+    /** 批量插入刷卡日志（带原始 logId，导入覆盖恢复用）。 */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(logs: List<SwipeLog>)
 }

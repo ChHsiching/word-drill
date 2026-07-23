@@ -1,0 +1,146 @@
+package com.github.chsiching.worddrill.data.backup
+
+import com.github.chsiching.worddrill.data.local.entity.Book
+import com.github.chsiching.worddrill.data.local.entity.BookWord
+import com.github.chsiching.worddrill.data.local.entity.Sense
+import com.github.chsiching.worddrill.data.local.entity.SwipeLog
+import com.github.chsiching.worddrill.data.local.entity.Word
+import org.json.JSONArray
+import org.json.JSONObject
+
+/**
+ * [DatabaseSnapshot] 的 JSON 序列化/反序列化（副接缝）。
+ *
+ * 与 [com.github.chsiching.worddrill.data.PresetWordsParser] 同样用 Android 自带的 org.json，
+ * 无新增依赖。两个函数都是纯函数（输入数据 → 输出字符串 / 输入字符串 → 输出数据），
+ * 不依赖 Android 文件系统，便于在 JVM 单测里喂入数据与字符串验证往返。
+ *
+ * JSON 结构：
+ * ```
+ * {
+ *   "version": 1,
+ *   "nickname": "可选昵称",            // 空白/省略视为无昵称
+ *   "books":   [ { "bookId":1, "name":"CET-4", "isPreset":true } ],
+ *   "words":   [ { "wordId":10, "text":"apple" } ],
+ *   "senses":  [ { "senseId":100, "wordId":10, "pos":"n.", "meaning":"苹果" } ],
+ *   "bookWords":[ { "bookId":1, "wordId":10 } ],
+ *   "swipeLogs":[ { "logId":1000, "bookId":2, "wordId":10, "timestamp":1700000000000 } ]
+ * }
+ * ```
+ *
+ * 反序列化对缺省字段做安全回退：version 缺省为 1，nickname 缺省/空白为 null；
+ * 但 books/words/senses/bookWords/swipeLogs 数组缺省时抛 [org.json.JSONException]
+ *（与 [com.github.chsiching.worddrill.data.PresetWordsParser] 的策略一致：缺关键字段视为损坏文件）。
+ */
+object DatabaseJsonSerializer {
+
+    /** 当前 schema 版本号，导出时写入。 */
+    const val CURRENT_VERSION = 1
+
+    fun serialize(snapshot: DatabaseSnapshot): String {
+        val root = JSONObject()
+        root.put("version", snapshot.version)
+        // 空白昵称不写入（导出文件里不留空标签）
+        val nick = snapshot.nickname?.trim()
+        if (!nick.isNullOrEmpty()) root.put("nickname", nick)
+
+        root.put("books", JSONArray().apply {
+            snapshot.books.forEach { b ->
+                put(JSONObject().apply {
+                    put("bookId", b.bookId)
+                    put("name", b.name)
+                    put("isPreset", b.isPreset)
+                })
+            }
+        })
+        root.put("words", JSONArray().apply {
+            snapshot.words.forEach { w ->
+                put(JSONObject().apply {
+                    put("wordId", w.wordId)
+                    put("text", w.text)
+                })
+            }
+        })
+        root.put("senses", JSONArray().apply {
+            snapshot.senses.forEach { s ->
+                put(JSONObject().apply {
+                    put("senseId", s.senseId)
+                    put("wordId", s.wordId)
+                    put("pos", s.pos)
+                    put("meaning", s.meaning)
+                })
+            }
+        })
+        root.put("bookWords", JSONArray().apply {
+            snapshot.bookWords.forEach { bw ->
+                put(JSONObject().apply {
+                    put("bookId", bw.bookId)
+                    put("wordId", bw.wordId)
+                })
+            }
+        })
+        root.put("swipeLogs", JSONArray().apply {
+            snapshot.swipeLogs.forEach { l ->
+                put(JSONObject().apply {
+                    put("logId", l.logId)
+                    put("bookId", l.bookId)
+                    put("wordId", l.wordId)
+                    put("timestamp", l.timestamp)
+                })
+            }
+        })
+        return root.toString()
+    }
+
+    fun deserialize(json: String): DatabaseSnapshot {
+        val root = JSONObject(json)
+        val version = if (root.has("version")) root.getInt("version") else 1
+        // 空白昵称视为无昵称
+        val nickname = root.optString("nickname").trim().ifEmpty { null }
+
+        val books = root.getJSONArray("books").toList { b ->
+            Book(
+                bookId = b.getLong("bookId"),
+                name = b.getString("name"),
+                isPreset = b.getBoolean("isPreset"),
+            )
+        }
+        val words = root.getJSONArray("words").toList { w ->
+            Word(wordId = w.getLong("wordId"), text = w.getString("text"))
+        }
+        val senses = root.getJSONArray("senses").toList { s ->
+            Sense(
+                senseId = s.getLong("senseId"),
+                wordId = s.getLong("wordId"),
+                pos = s.getString("pos"),
+                meaning = s.getString("meaning"),
+            )
+        }
+        val bookWords = root.getJSONArray("bookWords").toList { bw ->
+            BookWord(bookId = bw.getLong("bookId"), wordId = bw.getLong("wordId"))
+        }
+        val swipeLogs = root.getJSONArray("swipeLogs").toList { l ->
+            SwipeLog(
+                logId = l.getLong("logId"),
+                bookId = l.getLong("bookId"),
+                wordId = l.getLong("wordId"),
+                timestamp = l.getLong("timestamp"),
+            )
+        }
+        return DatabaseSnapshot(
+            version = version,
+            nickname = nickname,
+            books = books,
+            words = words,
+            senses = senses,
+            bookWords = bookWords,
+            swipeLogs = swipeLogs,
+        )
+    }
+
+    /** 把 JSONArray 映射成 List<T>，块里拿到的是已解包的 JSONObject。 */
+    private inline fun <T> JSONArray.toList(block: (JSONObject) -> T): List<T> =
+        buildList {
+            for (i in 0 until length()) add(block(getJSONObject(i)))
+        }
+}

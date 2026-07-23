@@ -74,6 +74,8 @@ adb shell "run-as com.github.chsiching.worddrill sh -c 'cat files/datastore/word
 - **in-memory Room + 异步 Flow query 的 connectedAndroidTest 偶发 "connection pool has been closed"**（#9 重跑时撞到 #8 的 `progress_followsNewCurrentBook_afterSwitch`）。原因：`tearDown` 的 `db.close()` 在某测试的异步 query 还在跑时执行。**重跑即过，不是回归**。应对：测试里 `runBlocking` 同步等 query 完成再 close，或接受偶发重跑。
 - **测试断言版本号会硬编码 `onNodeWithText("版本 0.1.0")`**：bump `versionName` 时同步改测试。曾尝试前缀 `onNodeWithText("版本 ")` 避免 bump 碎裂，但 Compose substring 匹配在 "版本 "（带尾空格）上失败，回退硬编码。
 - **`onNodeWithText("X")` 在弹窗里 X 同时出现在标题和正文时风险**（substring=true 默认同时命中两者）。`AlertDialog` 的 title 语义节点处理特殊，实测可能只命中正文（第一版通过），但 code-review 会抓。稳妥：正文用 `substring=false` 精确匹配。
+- **ViewModel 里的用户可见文案也要走 `R.string`**（#10 code-review 抓）。VM 不是 Composable 不能直接 `stringResource`，但若把中文/英文写死在 VM（如 `error("无法打开文件")`、`State("导出完成")`），文案会在 UI 展示 → 违反"用户可见文案走 R.string"约定。**正确模式：sealed status 携带 `@StringRes Int`**，VM 只传资源 id（`Done(R.string.me_export_done)` / `Failed(R.string.me_export_failed, e.message)`），Composable 用 `stringResource(status.messageRes)` 解析。附带好处：同一 sealed 类型用不同 id 区分导出/导入完成，避免"导入后显示导出完成"的正确性泄漏。
+- **SAF（Storage Access Framework）文件选择可用 MCP 驱动端到端验证**（#10）。Compose 用 `rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json"))` / `OpenDocument()`，点确认后系统弹 DocumentsUI（包名 `com.google.android.documentsui`，不在 app 内）。MCP `android_ui_describe` 能拿到 SAVE 按钮（`android:id/button1`）、文件名输入框、CardView 列表项的坐标，`android_ui_tap` 点文件 → 回调 Uri 给 VM → 写库。**整库导出验证用 `adb exec-out "cat /sdcard/Download/worddrill-backup.json"`** 读真实 JSON 确认内容（像素法不适用于文件内容）。
 
 
 ## 代码层约定
@@ -82,3 +84,4 @@ adb shell "run-as com.github.chsiching.worddrill sh -c 'cat files/datastore/word
 
 - **所有用户可见文案走 `stringResource(R.string.*)`，别硬编码中文字面量**（含含变量的拼接，用格式资源 `%1$s` / `%1$d`）。repo 所有 Composable（`DrillScreen` / `LibraryScreen` / `WordListScreen` / `MeScreen`）都走 `stringResource`；本地拼接字符串（如 `"$bookName：$x / $y"`）看似省事，实则在 i18n、文案一致性检查、code-review 上反复翻车。含变量用格式资源：`<string name="me_progress_line">%1$s：%2$d / %3$d（%4$d%%）</string>` + `stringResource(R.string.me_progress_line, bookName, x, y, percent)`。
 - **别给 Composable/函数加"便于测试/预览"的投机参数**（AGENTS.md §2 Simplicity First）。#9 给 `WordDrillTheme` 加了 `systemDarkTheme: Boolean = isSystemInDarkTheme()` 参数，KDoc 写"便于测试/预览"，但**无任何测试或 `@Preview` 用到它**，code-review 抓为 Speculative Generality 删掉。测试要注入就显式传真实依赖（如 ViewModel），别在生产 Composable 签名上开投机口子。
+- **导入覆盖（整库清空重插）要用 Room `@Transaction`，且清表顺序先子后父**（#10）。`sense`/`book_word` 有 CASCADE 外键挂 `word`/`book`，`swipe_log` 无外键（保留孤立日志用于累计统计）。清表先 `deleteAllSenses`/`deleteAllLinks`/`deleteAll(swipe_log)` 再 `deleteAll(book)`/`deleteAll(word)`；重插反之。`BackupService.import` 用 `db.withTransaction { ... }` 包住，失败回滚不留半导入态。**按原始主键恢复**（`@Insert(onConflict=REPLACE)` 带原 id）保证跨表引用与孤立日志完整。

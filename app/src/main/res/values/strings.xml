@@ -45,4 +45,21 @@
     <string name="me_about_app_name">WordDrill</string>
     <string name="me_about_version">版本 %1$s</string>
     <string name="me_about_close">关闭</string>
+    <!-- 「我的」Tab 数据导出/导入（Ticket #10）-->
+    <string name="me_data">数据</string>
+    <string name="me_export">导出</string>
+    <string name="me_import">导入</string>
+    <string name="me_export_title">导出数据</string>
+    <string name="me_export_message">将整库（词条池、词书、刷卡日志）导出为 JSON 文件，用于换机迁移。</string>
+    <string name="me_export_nickname_hint">可选昵称标签</string>
+    <string name="me_export_confirm">导出</string>
+    <string name="me_import_title">确认导入</string>
+    <string name="me_import_message">导入将覆盖当前所有数据，此操作不可撤销。</string>
+    <string name="me_import_confirm">覆盖导入</string>
+    <string name="me_cancel">取消</string>
+    <string name="me_export_done">导出完成</string>
+    <string name="me_import_done">导入完成</string>
+    <string name="me_export_failed">导出失败</string>
+    <string name="me_import_failed">导入失败</string>
+    <string name="me_working">处理中…</string>
 </resources>

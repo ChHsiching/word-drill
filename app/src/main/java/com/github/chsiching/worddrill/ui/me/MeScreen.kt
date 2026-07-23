@@ -1,5 +1,8 @@
 package com.github.chsiching.worddrill.ui.me
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,12 +11,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,24 +35,29 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.BuildConfig
 import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.settings.ThemeMode
+import kotlinx.coroutines.delay
 
 /**
- * 「我的」Tab（Ticket #8 + #9）：统计展示 + 软件设置。
+ * 「我的」Tab（Ticket #8 + #9 + #10）：统计展示 + 软件设置 + 数据导出/导入。
  *
  * 统计（#8）：从 swipe_log 聚合的三个数字，全部响应式 Flow 驱动（[MeViewModel]）。
  * 在「刷」Tab 刷卡后切回本 Tab，数字立即更新；切换当前词书后进度对应新词书。
  *
  * 设置（#9）：主题切换（浅色/深色/跟随系统）+ 关于入口。主题写入 DataStore，
  * [com.github.chsiching.worddrill.MainActivity] 同样订阅 → 全局配色立即生效。
+ *
+ * 数据（#10）：整库导出/导入（SAF 选文件，JSON 格式）。导入默认覆盖，用于换机迁移。
  */
 @Composable
 fun MeScreen(
     modifier: Modifier = Modifier,
     viewModel: MeViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel(),
+    exportImportViewModel: ExportImportViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
+    val exportStatus by exportImportViewModel.status.collectAsStateWithLifecycle()
     var showAbout by remember { mutableStateOf(false) }
 
     Column(
@@ -60,6 +72,7 @@ fun MeScreen(
             onThemeSelected = settingsViewModel::setTheme,
             onAboutClick = { showAbout = true },
         )
+        MeDataContent(status = exportStatus, viewModel = exportImportViewModel)
     }
 
     if (showAbout) {
@@ -153,6 +166,157 @@ private fun MeSettingsContent(
         }
         TextButton(onClick = onAboutClick, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.me_about))
+        }
+    }
+}
+
+/**
+ * 数据导出/导入区（Ticket #10）。
+ *
+ * SAF 文件选择由本 Composable 内的 launcher 发起：
+ * - 导出：先弹昵称输入框（可选），确认后 launch [ActivityResultContracts.CreateDocument]；
+ *   SAF 回调 uri → [ExportImportViewModel.exportTo]。
+ * - 导入：先弹覆盖确认框，确认后 launch [ActivityResultContracts.OpenDocument]；
+ *   SAF 回调 uri → [ExportImportViewModel.importFrom]。
+ *
+ * 状态：[ExportImportStatus]，Done/Failed 展示几秒后自动清回 Idle（[LaunchedEffect]）。
+ */
+@Composable
+private fun MeDataContent(
+    status: ExportImportStatus,
+    viewModel: ExportImportViewModel,
+) {
+    // SAF 导出：pendingNickname 在 dialog 确认时记下，SAF 回调时取用
+    var pendingNickname by remember { mutableStateOf<String?>(null) }
+    var showExportDialog by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri: Uri? ->
+        if (uri != null) viewModel.exportTo(uri, pendingNickname)
+        pendingNickname = null
+    }
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri != null) viewModel.importFrom(uri)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.me_data),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // 坑 G：用 substring=false 或完整文案消歧；这里按钮文案独立无重复，无歧义
+            Button(
+                onClick = { showExportDialog = true },
+                enabled = status !is ExportImportStatus.Working,
+                modifier = Modifier.weight(1f),
+            ) { Text(stringResource(R.string.me_export)) }
+            OutlinedButton(
+                onClick = { showImportDialog = true },
+                enabled = status !is ExportImportStatus.Working,
+                modifier = Modifier.weight(1f),
+            ) { Text(stringResource(R.string.me_import)) }
+        }
+        StatusLine(status = status, onClear = viewModel::clearStatus)
+    }
+
+    if (showExportDialog) {
+        var nicknameInput by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text(stringResource(R.string.me_export_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.me_export_message))
+                    OutlinedTextField(
+                        value = nicknameInput,
+                        onValueChange = { nicknameInput = it },
+                        label = { Text(stringResource(R.string.me_export_nickname_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExportDialog = false
+                    // 记下昵称（空白视为无昵称），SAF 回调时取用
+                    pendingNickname = nicknameInput.trim().ifEmpty { null }
+                    exportLauncher.launch("worddrill-backup.json")
+                }) { Text(stringResource(R.string.me_export_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExportDialog = false }) {
+                    Text(stringResource(R.string.me_cancel))
+                }
+            },
+        )
+    }
+
+    if (showImportDialog) {
+        AlertDialog(
+            onDismissRequest = { showImportDialog = false },
+            title = { Text(stringResource(R.string.me_import_title)) },
+            text = { Text(stringResource(R.string.me_import_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showImportDialog = false
+                    importLauncher.launch(arrayOf("application/json", "*/*"))
+                }) { Text(stringResource(R.string.me_import_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportDialog = false }) {
+                    Text(stringResource(R.string.me_cancel))
+                }
+            },
+        )
+    }
+}
+
+/** 导出/导入状态行：Working/Failed 展示文案；Done 短暂展示后自动清回 Idle。 */
+@Composable
+private fun StatusLine(status: ExportImportStatus, onClear: () -> Unit) {
+    when (status) {
+        ExportImportStatus.Idle -> Unit
+        ExportImportStatus.Working -> {
+            Text(
+                text = stringResource(R.string.me_working),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        is ExportImportStatus.Done -> {
+            Text(
+                text = stringResource(status.messageRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            LaunchedEffect(status) {
+                delay(2_000)
+                onClear()
+            }
+        }
+        is ExportImportStatus.Failed -> {
+            // 失败文案：失败标签 + 异常详情（若有）；详情多为英文/路径，仅辅助排障
+            val message = status.detail?.let { "${stringResource(status.messageRes)}：$it" }
+                ?: stringResource(status.messageRes)
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            LaunchedEffect(status) {
+                delay(4_000)
+                onClear()
+            }
         }
     }
 }

@@ -73,4 +73,30 @@ interface WordDao {
 
     @Query("DELETE FROM word WHERE wordId = :wordId")
     suspend fun deleteWord(wordId: Long)
+
+    // ---- Ticket #10：整库导出/导入 ----
+
+    /** 全量读所有词条（导出快照用）。 */
+    @Query("SELECT * FROM word")
+    suspend fun getAll(): List<Word>
+
+    /** 全量读所有义项（导出快照用）。 */
+    @Query("SELECT * FROM sense")
+    suspend fun getAllSenses(): List<Sense>
+
+    /** 清空义项表（导入覆盖前清理）。 */
+    @Query("DELETE FROM sense")
+    suspend fun deleteAllSenses()
+
+    /** 清空词条表（导入覆盖前清理）。 */
+    @Query("DELETE FROM word")
+    suspend fun deleteAll()
+
+    /** 批量插入词条（带原始 wordId，导入覆盖恢复用）。 */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(words: List<Word>)
+
+    /** 批量插入义项（带原始 senseId，导入覆盖恢复用）。 */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllSenses(senses: List<Sense>)
 }

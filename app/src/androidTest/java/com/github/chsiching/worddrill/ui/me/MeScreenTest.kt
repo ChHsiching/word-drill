@@ -2,12 +2,14 @@ package com.github.chsiching.worddrill.ui.me
 
 import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.chsiching.worddrill.data.backup.BackupService
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
@@ -84,6 +86,12 @@ class MeScreenTest {
 
     private fun settingsVm(): SettingsViewModel = SettingsViewModel(settings)
 
+    private fun exportImportVm(): ExportImportViewModel {
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val app = ctx.applicationContext as android.app.Application
+        return ExportImportViewModel(app, BackupService(db, db.bookDao(), db.wordDao(), db.swipeLogDao()))
+    }
+
     /**
      * 等待 ViewModel 把上游 combine 解析稳定后取首条解析值。
      * stateIn(WhileSubscribed) 首值是空 MeStatsUiState()（bookName=""）；
@@ -92,11 +100,19 @@ class MeScreenTest {
     private suspend fun stableState(viewModel: MeViewModel): MeStatsUiState =
         viewModel.uiState.first { it.bookName.isNotEmpty() }
 
-    private fun renderWithVm(viewModel: MeViewModel, settingsViewModel: SettingsViewModel = settingsVm()) {
+    private fun renderWithVm(
+        viewModel: MeViewModel,
+        settingsViewModel: SettingsViewModel = settingsVm(),
+        exportImportViewModel: ExportImportViewModel = exportImportVm(),
+    ) {
         composeRule.setContent {
             WordDrillTheme {
                 Surface {
-                    MeScreen(viewModel = viewModel, settingsViewModel = settingsViewModel)
+                    MeScreen(
+                        viewModel = viewModel,
+                        settingsViewModel = settingsViewModel,
+                        exportImportViewModel = exportImportViewModel,
+                    )
                 }
             }
         }
@@ -218,5 +234,46 @@ class MeScreenTest {
         composeRule.onNodeWithText("WordDrill", substring = false).assertIsDisplayed()
         // 版本号行：与 build.gradle.kts 的 versionName 一致；bump 时同步更新。
         composeRule.onNodeWithText("版本 0.1.0").assertIsDisplayed()
+    }
+
+    // ---- Ticket #10：数据导出/导入入口 ----
+
+    @Test
+    fun dataSection_showsExportImportEntries() {
+        renderWithVm(vm())
+        // 数据区标题 + 导出/导入按钮（坑 G：用 substring=false 精确匹配短按钮文案）
+        composeRule.onNodeWithText("数据", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("导出", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("导入", substring = false).assertIsDisplayed()
+    }
+
+    @Test
+    fun exportDialog_showsNicknameField_whenExportClicked() {
+        renderWithVm(vm())
+        composeRule.onNodeWithText("导出", substring = false).performClick()
+        composeRule.waitForIdle()
+        // 导出弹窗：标题 + 说明 + 昵称输入框 + 确认/取消
+        composeRule.onNodeWithText("导出数据").assertIsDisplayed()
+        composeRule.onNodeWithText("将整库（词条池、词书、刷卡日志）导出为 JSON 文件，用于换机迁移。").assertIsDisplayed()
+        composeRule.onNodeWithText("可选昵称标签").assertIsDisplayed()
+        // 点取消后弹窗关闭（坑 M：避重复词，用 substring=false 精确匹配）
+        composeRule.onNodeWithText("取消", substring = false).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("导出数据").assertIsNotDisplayed()
+    }
+
+    @Test
+    fun importDialog_showsOverwriteWarning_whenImportClicked() {
+        renderWithVm(vm())
+        composeRule.onNodeWithText("导入", substring = false).performClick()
+        composeRule.waitForIdle()
+        // 导入弹窗：标题 + 覆盖警告 + 确认/取消
+        composeRule.onNodeWithText("确认导入").assertIsDisplayed()
+        composeRule.onNodeWithText("导入将覆盖当前所有数据，此操作不可撤销。").assertIsDisplayed()
+        composeRule.onNodeWithText("覆盖导入").assertIsDisplayed()
+        // 点取消后弹窗关闭
+        composeRule.onNodeWithText("取消", substring = false).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("确认导入").assertIsNotDisplayed()
     }
 }

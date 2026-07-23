@@ -45,4 +45,30 @@ interface BookDao {
 
     @Query("SELECT COUNT(*) FROM book_word WHERE bookId = :bookId")
     fun observeWordCountInBook(bookId: Long): Flow<Int>
+
+    // ---- Ticket #10：整库导出/导入 ----
+
+    /** 全量读所有词书（导出快照用）。 */
+    @Query("SELECT * FROM book")
+    suspend fun getAll(): List<Book>
+
+    /** 全量读所有词书-词条关联（导出快照用）。 */
+    @Query("SELECT * FROM book_word")
+    suspend fun getAllLinks(): List<BookWord>
+
+    /** 清空词书表（导入覆盖前清理）。 */
+    @Query("DELETE FROM book")
+    suspend fun deleteAll()
+
+    /** 清空词书-词条关联表（导入覆盖前清理）。 */
+    @Query("DELETE FROM book_word")
+    suspend fun deleteAllLinks()
+
+    /** 批量插入词书（带原始 bookId，导入覆盖恢复用）。 */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(books: List<Book>)
+
+    /** 批量建立词书-词条关联（导入恢复用）。 */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun linkAll(links: List<BookWord>)
 }
