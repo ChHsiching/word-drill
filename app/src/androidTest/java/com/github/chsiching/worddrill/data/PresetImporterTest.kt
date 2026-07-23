@@ -28,20 +28,35 @@ class PresetImporterTest {
             PresetWords.Book(
                 name = "CET-4",
                 words = listOf(
-                    PresetWords.Word("apple", listOf(PresetWords.Sense("n.", "苹果"))),
-                    // 同一词多词性：导入后应在一个 word 行下产生两条 sense
-                    PresetWords.Word("run", listOf(
-                        PresetWords.Sense("vi.", "跑"),
-                        PresetWords.Sense("vt.", "经营"),
-                    )),
+                    PresetWords.Word(
+                        text = "apple",
+                        phonetic = "/ˈæpl/",
+                        senses = listOf(PresetWords.Sense("n.", "苹果")),
+                    ),
+                    // 同一词多词性：导入后应在一个 word 行下产生两条 sense；phonetic 缺省（验证可空）
+                    PresetWords.Word(
+                        text = "run",
+                        senses = listOf(
+                            PresetWords.Sense("vi.", "跑"),
+                            PresetWords.Sense("vt.", "经营"),
+                        ),
+                    ),
                 ),
             ),
             PresetWords.Book(
                 name = "CET-6",
                 words = listOf(
                     // apple 跨词书重复 —— 应复用同一 word 行，各自 linkBookWord
-                    PresetWords.Word("apple", listOf(PresetWords.Sense("n.", "苹果"))),
-                    PresetWords.Word("balance", listOf(PresetWords.Sense("n.", "平衡"))),
+                    PresetWords.Word(
+                        text = "apple",
+                        phonetic = "/ˈæpl/",
+                        senses = listOf(PresetWords.Sense("n.", "苹果")),
+                    ),
+                    PresetWords.Word(
+                        text = "balance",
+                        phonetic = "/ˈbæləns/",
+                        senses = listOf(PresetWords.Sense("n.", "平衡")),
+                    ),
                 ),
             ),
         ),
@@ -137,5 +152,54 @@ class PresetImporterTest {
         assertThat(words.map { it.word.text }).containsExactly("apple", "run")
         assertThat(words.first { it.word.text == "apple" }.senses).hasSize(1)
         assertThat(words.first { it.word.text == "run" }.senses).hasSize(2)
+    }
+
+    // ---- Ticket #14: phonetic（IPA 音标，导入写库）----
+
+    @Test
+    fun import_writesPhonetic_whenPresent() = runTest {
+        importer.importWords(sample)
+        val apple = db.wordDao().getByText("apple")
+        assertThat(apple!!.phonetic).isEqualTo("/ˈæpl/")
+    }
+
+    @Test
+    fun import_phoneticIsNull_whenAbsent() = runTest {
+        importer.importWords(sample)
+        val run = db.wordDao().getByText("run")
+        assertThat(run!!.phonetic).isNull()
+    }
+
+    @Test
+    fun import_getByIdReturnsPhonetic() = runTest {
+        importer.importWords(sample)
+        val apple = db.wordDao().getByText("apple")!!
+        val byId = db.wordDao().getById(apple.wordId)!!
+        assertThat(byId.phonetic).isEqualTo("/ˈæpl/")
+    }
+
+    @Test
+    fun import_phoneticSurvivesIdempotentReimport() = runTest {
+        // 重复导入不应清空已有行的 phonetic（findIdByText 命中后不覆盖）
+        importer.importWords(sample)
+        importer.importWords(sample)
+        val apple = db.wordDao().getByText("apple")
+        assertThat(apple!!.phonetic).isEqualTo("/ˈæpl/")
+    }
+
+    @Test
+    fun import_phoneticIsNull_notStringNull_whenJsonNull() = runTest {
+        // ⚠️ 回归防护：assets 里 JSON 显式 "phonetic": null 的情况。
+        // 在 Android 真实 org.json 下，optString(key, "") 对 JSON null 会返回字符串 "null"
+        // （与 JVM 单测的 org.json:json 行为不同），曾导致落库 "null" 字符串（实机踩到）。
+        // 这里跑 Android org.json 验证 PresetWordsParser 的 isNull 挡板真的生效。
+        val json = """
+            {"source":"x","books":[{"name":"b","words":[
+              {"text":"ghost","phonetic":null,"senses":[{"pos":"n.","meaning":"鬼"}]}
+            ]}]}
+        """.trimIndent()
+        importer.importWords(PresetWordsParser.parse(json))
+        val ghost = db.wordDao().getByText("ghost")
+        assertThat(ghost!!.phonetic).isNull()
     }
 }

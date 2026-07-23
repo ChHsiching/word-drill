@@ -9,10 +9,12 @@ package com.github.chsiching.worddrill.data
  *   "source": "ECDICT (MIT License, ...)",
  *   "books": [
  *     { "name": "CET-4", "words": [
- *        { "text": "apple", "senses": [ {"pos":"n.","meaning":"苹果"} ] }
+ *        { "text": "apple", "phonetic": "/ˈæpl/", "senses": [ {"pos":"n.","meaning":"苹果"} ] }
  *     ]}
  *   ]
  * }
+ *
+ * Ticket #14：phonetic 可空（部分预置词词典缺音标，或用户手输词无音标）。
  */
 data class PresetWords(
     val source: String,
@@ -25,6 +27,7 @@ data class PresetWords(
 
     data class Word(
         val text: String,
+        val phonetic: String? = null,
         val senses: List<Sense>,
     )
 

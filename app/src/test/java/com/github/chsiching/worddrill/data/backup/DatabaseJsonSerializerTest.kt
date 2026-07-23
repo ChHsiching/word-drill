@@ -112,4 +112,57 @@ class DatabaseJsonSerializerTest {
     fun deserialize_missingBooksArray_throws() {
         DatabaseJsonSerializer.deserialize("""{"version":1}""")
     }
+
+    // ---- Ticket #14：word.phonetic 往返（导出/导入不丢音标）----
+
+    @Test
+    fun roundTrip_preservesPhonetic() {
+        val withPhonetic = snapshot.copy(
+            words = listOf(
+                Word(wordId = 10, text = "apple", phonetic = "/ˈæpl/"),
+                Word(wordId = 20, text = "run"),
+            )
+        )
+        val restored = DatabaseJsonSerializer.deserialize(
+            DatabaseJsonSerializer.serialize(withPhonetic)
+        )
+        assertThat(restored.words.first { it.text == "apple" }.phonetic).isEqualTo("/ˈæpl/")
+        // 无音标的词保持 null
+        assertThat(restored.words.first { it.text == "run" }.phonetic).isNull()
+    }
+
+    @Test
+    fun deserialize_phonetic_defaultsNull_whenMissing() {
+        // 兼容 Ticket #14 之前的导出文件（words 里没有 phonetic 字段）
+        val json = """
+            {"version":1,"books":[],"words":[
+              {"wordId":1,"text":"legacy"}
+            ],"senses":[],"bookWords":[],"swipeLogs":[]}
+        """.trimIndent()
+        val restored = DatabaseJsonSerializer.deserialize(json)
+        assertThat(restored.words.single().phonetic).isNull()
+    }
+
+    @Test
+    fun serialize_omitsPhonetic_whenNull() {
+        val noPhonetic = snapshot.copy(
+            words = listOf(Word(wordId = 10, text = "apple", phonetic = null))
+        )
+        val json = DatabaseJsonSerializer.serialize(noPhonetic)
+        // null phonetic 不出现在导出 JSON 里（避免空标签）
+        // 匹配 "phonetic" 作为键名出现（注意不要误匹配到 "phonetic" 的值）
+        assertThat(json.contains("\"phonetic\"")).isFalse()
+    }
+
+    @Test
+    fun deserialize_phonetic_isNull_whenJsonNullLiteral() {
+        // ⚠️ 回归防护：显式 "phonetic": null 必须解析为 Kotlin null（PresetWordsParser 同款坑）。
+        val json = """
+            {"version":1,"books":[],"words":[
+              {"wordId":1,"text":"x","phonetic":null}
+            ],"senses":[],"bookWords":[],"swipeLogs":[]}
+        """.trimIndent()
+        val restored = DatabaseJsonSerializer.deserialize(json)
+        assertThat(restored.words.single().phonetic).isNull()
+    }
 }
