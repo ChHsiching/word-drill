@@ -18,6 +18,18 @@
    - `pm clear` 直接调有时返回非零退出码但实际成功；包一层看退出码：`adb shell "pm clear com.github.chsiching.worddrill; echo done=$?"`，`done=0` 即成功。
    - connectedAndroidTest 跑完会卸载 app，下次手验前先 `adb shell pm list packages | grep word` 确认还在，不在就重新 `android_install_app`。
 
+## 像素级验证（#9 起用）
+
+`android_screenshot` 是肉眼真相，但要断言"深色主题生效"这种**颜色变化**，肉眼不够客观。**用 adb 抓 PNG + node_repl + pngjs 读像素 RGB**：
+
+1. 抓屏：`adb exec-out screencap -p > /tmp/x.png`（MCP 的 `android_screenshot` 返回的是 MCP 内部路径，raw adb 更可控）。
+2. 读像素：node_repl 里 `const { PNG } = await import('pngjs'); const png = PNG.sync.read(fs.readFileSync(path)); const [r,g,b] = px(x,y)`。
+3. pngjs 已装在 `C:/Users/Administrator/AppData/Local/Temp/node_modules`，node_repl 先 `js_add_node_module_dir` 加该目录。
+4. **采样点选纯背景区**（避开文字/icon）。深色主题内容区背景 ≈ `[18,19,24]`，浅色 ≈ `[250,248,255]`，对比即可断言主题切换生效。
+5. ⚠️ `analyze_image` MCP 只支持远程 URL，本地截图用不了；像素法是替代。
+6. ⚠️ `js_reset` 后 `js_add_node_module_dir` 的路径会丢，需重新加（`true`=新增，`false`=已存在，都正常）。
+
+
 ## 验证 UI
 
 - `android_screenshot` 看真相；`android_ui_describe` 拿元素树坐标；`android_ui_resolve` 查具体元素。
@@ -58,9 +70,14 @@ adb shell "run-as com.github.chsiching.worddrill sh -c 'cat files/datastore/word
 - `IconButton` 的点击入口在测试里要用 `onNodeWithContentDescription(...)`（匹配 `contentDescription`），不是 `onNodeWithText`（后者匹配显示文本，IconButton 通常只有 icon 没文本）。
 - **`= runBlocking { }` 表达式体的测试方法若最后一条语句返回非 Unit，JUnit4 报 `InvalidTestClassError: Method should be void`**。典型陷阱：`fun foo() = runBlocking { ... onNodeWithText(x).assertIsDisplayed() }` —— `assertIsDisplayed()` 返回 `SemanticsNodeInteraction`，`runBlocking` 推断方法返回类型非 Unit，JUnit4 拒绝。改用**块体** `fun foo() { runBlocking { ... }; ... }`，或保证表达式体最后一条返回 Unit（`assertThat(...).isEqualTo()` 返回 Unit，安全）。
 - **`someStateFlow.first()` 拿到的是 `initialValue`，不是解析后的值**。`stateIn(WhileSubscribed, initialValue = X)` 首次订阅先发 `X` 再异步解析上游；`.first()` 立即返回首条 = `X`。要等解析后的值，用带条件的 `.first { predicate }`（如 `.first { it.bookName.isNotEmpty() }`），或用 Turbine 收集多帧。
+- **in-memory Room + 异步 Flow query 的 connectedAndroidTest 偶发 "connection pool has been closed"**（#9 重跑时撞到 #8 的 `progress_followsNewCurrentBook_afterSwitch`）。原因：`tearDown` 的 `db.close()` 在某测试的异步 query 还在跑时执行。**重跑即过，不是回归**。应对：测试里 `runBlocking` 同步等 query 完成再 close，或接受偶发重跑。
+- **测试断言版本号会硬编码 `onNodeWithText("版本 0.1.0")`**：bump `versionName` 时同步改测试。曾尝试前缀 `onNodeWithText("版本 ")` 避免 bump 碎裂，但 Compose substring 匹配在 "版本 "（带尾空格）上失败，回退硬编码。
+- **`onNodeWithText("X")` 在弹窗里 X 同时出现在标题和正文时风险**（substring=true 默认同时命中两者）。`AlertDialog` 的 title 语义节点处理特殊，实测可能只命中正文（第一版通过），但 code-review 会抓。稳妥：正文用 `substring=false` 精确匹配。
+
 
 ## 代码层约定
 
 跨文件、无法在单处注释承载的反复踩坑（code-review Standards 轴抓出来的）。
 
 - **所有用户可见文案走 `stringResource(R.string.*)`，别硬编码中文字面量**（含含变量的拼接，用格式资源 `%1$s` / `%1$d`）。repo 所有 Composable（`DrillScreen` / `LibraryScreen` / `WordListScreen` / `MeScreen`）都走 `stringResource`；本地拼接字符串（如 `"$bookName：$x / $y"`）看似省事，实则在 i18n、文案一致性检查、code-review 上反复翻车。含变量用格式资源：`<string name="me_progress_line">%1$s：%2$d / %3$d（%4$d%%）</string>` + `stringResource(R.string.me_progress_line, bookName, x, y, percent)`。
+- **别给 Composable/函数加"便于测试/预览"的投机参数**（AGENTS.md §2 Simplicity First）。#9 给 `WordDrillTheme` 加了 `systemDarkTheme: Boolean = isSystemInDarkTheme()` 参数，KDoc 写"便于测试/预览"，但**无任何测试或 `@Preview` 用到它**，code-review 抓为 Speculative Generality 删掉。测试要注入就显式传真实依赖（如 ViewModel），别在生产 Composable 签名上开投机口子。
