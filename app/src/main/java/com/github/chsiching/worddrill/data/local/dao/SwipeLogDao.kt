@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.github.chsiching.worddrill.data.local.entity.SwipeLog
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SwipeLogDao {
@@ -31,4 +32,23 @@ interface SwipeLogDao {
         """
     )
     suspend fun distinctWordCountForBook(bookId: Long): Int
+
+    // ---- Ticket #8: 响应式版本（「我的」Tab 统计随刷卡实时刷新）----
+
+    /** 累计刷卡数（响应式）：swipe_log 任意写操作后自动重发。 */
+    @Query("SELECT COUNT(*) FROM swipe_log")
+    fun observeTotalCount(): Flow<Int>
+
+    /** 今日刷卡数（响应式）：传入今日 0 点毫秒。 */
+    @Query("SELECT COUNT(*) FROM swipe_log WHERE timestamp >= :dayStartMillis")
+    fun observeCountSince(dayStartMillis: Long): Flow<Int>
+
+    /** 某词书已刷词数（响应式）。 */
+    @Query(
+        """
+        SELECT COUNT(DISTINCT wordId) FROM swipe_log
+        WHERE bookId = :bookId
+        """
+    )
+    fun observeDistinctWordCountForBook(bookId: Long): Flow<Int>
 }

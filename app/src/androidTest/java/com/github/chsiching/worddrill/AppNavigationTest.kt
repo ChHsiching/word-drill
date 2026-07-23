@@ -56,6 +56,10 @@ class AppNavigationTest {
     fun clickingMeTabDoesNotCrash() {
         composeRule.onAllNodesWithText("我的")[0].performClick()
         composeRule.waitForIdle()
-        composeRule.onAllNodesWithText("我的").assertCountEquals(2)
+        // Ticket #8 起「我的」Tab 内容区为统计卡片（今日/累计/进度），
+        // 不再渲染占位文案「我的」，故「我的」字仅出现在底部导航栏（1 个节点）。
+        composeRule.onAllNodesWithText("我的").assertCountEquals(1)
+        // 统计区标签证明页面正常渲染
+        composeRule.onNodeWithText("今日刷卡").assertIsDisplayed()
     }
 }

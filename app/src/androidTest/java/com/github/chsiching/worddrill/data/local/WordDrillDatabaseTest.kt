@@ -336,4 +336,47 @@ class WordDrillDatabaseTest {
         assertThat(logDao.distinctWordCountForBook(b1)).isEqualTo(2)
         assertThat(logDao.distinctWordCountForBook(b2)).isEqualTo(1)
     }
+
+    // ---- Ticket #8: observe 版本（响应式，「我的」Tab 统计随刷卡刷新）----
+
+    @Test
+    fun observeTotalCount_emitsCurrentCount() = runTest {
+        val logDao = db.swipeLogDao()
+        val bookId = db.bookDao().insert(Book(name = "b1"))
+        logDao.insert(SwipeLog(bookId = bookId, wordId = 1, timestamp = 1L))
+        logDao.insert(SwipeLog(bookId = bookId, wordId = 2, timestamp = 2L))
+        assertThat(logDao.observeTotalCount().first()).isEqualTo(2)
+    }
+
+    @Test
+    fun observeCountSince_emitsFilteredByTimestamp() = runTest {
+        val logDao = db.swipeLogDao()
+        val bookId = db.bookDao().insert(Book(name = "b1"))
+        logDao.insert(SwipeLog(bookId = bookId, wordId = 1, timestamp = 500L))
+        logDao.insert(SwipeLog(bookId = bookId, wordId = 2, timestamp = 1500L))
+        logDao.insert(SwipeLog(bookId = bookId, wordId = 3, timestamp = 2500L))
+        assertThat(logDao.observeCountSince(1000L).first()).isEqualTo(2)
+    }
+
+    @Test
+    fun observeDistinctWordCountForBook_emitsUniqueCount() = runTest {
+        val logDao = db.swipeLogDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        logDao.insert(SwipeLog(bookId = bookId, wordId = 1, timestamp = 1L))
+        logDao.insert(SwipeLog(bookId = bookId, wordId = 1, timestamp = 2L))
+        logDao.insert(SwipeLog(bookId = bookId, wordId = 2, timestamp = 3L))
+        assertThat(logDao.observeDistinctWordCountForBook(bookId).first()).isEqualTo(2)
+    }
+
+    @Test
+    fun observeTotalCount_reflectsNewInserts() = runTest {
+        // 响应式核心：插入后再次 .first() 应读到新值
+        val logDao = db.swipeLogDao()
+        val bookId = db.bookDao().insert(Book(name = "b1"))
+        assertThat(logDao.observeTotalCount().first()).isEqualTo(0)
+        logDao.insert(SwipeLog(bookId = bookId, wordId = 1, timestamp = 1L))
+        logDao.insert(SwipeLog(bookId = bookId, wordId = 2, timestamp = 2L))
+        assertThat(logDao.observeTotalCount().first()).isEqualTo(2)
+    }
 }

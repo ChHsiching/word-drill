@@ -28,4 +28,10 @@
     <string name="word_list_pos_hint">词性</string>
     <string name="word_list_meaning_hint">释义</string>
     <string name="word_list_preset_readonly">预置词书不可编辑</string>
+    <!-- 「我的」Tab 统计（Ticket #8）-->
+    <string name="me_today">今日刷卡</string>
+    <string name="me_total">累计刷卡</string>
+    <string name="me_progress">当前词书进度</string>
+    <string name="me_no_current_book">未选择词书</string>
+    <string name="me_progress_line">%1$s：%2$d / %3$d（%4$d%%）</string>
 </resources>
