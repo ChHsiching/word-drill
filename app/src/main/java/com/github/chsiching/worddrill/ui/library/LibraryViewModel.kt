@@ -105,7 +105,7 @@ class LibraryViewModel @Inject constructor(
         _dialog.value = LibraryDialog.Rename(bookId = bookId, name = book.name)
     }
 
-    /** 提交重命名：排除自身后查重；通过校验才写库。 */
+    /** 提交重命名：排除自身后查重；通过校验才写库。DAO 层对预置词书兜底拒绝（返回 0）。 */
     fun submitRename() {
         val d = _dialog.value as? LibraryDialog.Rename ?: return
         if (d.error != null) return // validateBookName 已在 trim 后校验，通过即非空

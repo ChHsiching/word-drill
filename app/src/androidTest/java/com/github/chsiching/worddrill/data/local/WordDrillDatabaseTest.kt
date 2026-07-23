@@ -148,6 +148,17 @@ class WordDrillDatabaseTest {
     }
 
     @Test
+    fun rename_refusesPresetBook() = runTest {
+        // Ticket #11：预置词书不可重命名（DAO 层兜底，与 deleteCustom 的 isPreset=0 同模式）
+        val bookDao = db.bookDao()
+        val id = bookDao.insert(Book(name = "CET-4", isPreset = true))
+        val affected = bookDao.rename(id, "hacked")
+        // WHERE isPreset = 0 不匹配，受影响行数为 0，原行保留
+        assertThat(affected).isEqualTo(0)
+        assertThat(bookDao.getById(id)!!.name).isEqualTo("CET-4")
+    }
+
+    @Test
     fun deleteCustom_removesNonPresetBook() = runTest {
         val bookDao = db.bookDao()
         val id = bookDao.insert(Book(name = "mybook", isPreset = false))

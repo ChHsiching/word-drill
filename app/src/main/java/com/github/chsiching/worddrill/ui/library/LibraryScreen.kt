@@ -44,7 +44,7 @@ import com.github.chsiching.worddrill.data.local.entity.Book
  *
  * - 列表项：词书名 + 预置/自定义标识 + 当前选中高亮 + 重命名/删除入口
  * - 点击项设为当前词书（写 DataStore，「刷」Tab 监听同源 Flow 立即重载）
- * - 预置词书不显示删除按钮（isPreset 判定，DAO 层也有 isPreset=0 兜底）
+ * - 预置词书不显示重命名/删除按钮（isPreset 判定，DAO 层 rename/deleteCustom 也有 isPreset=0 兜底）
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -170,13 +170,13 @@ private fun BookRow(
         },
         trailingContent = {
             Row {
-                IconButton(onClick = onRename) {
-                    Icon(
-                        imageVector = Icons.Outlined.Edit,
-                        contentDescription = stringResource(R.string.library_rename),
-                    )
-                }
                 if (!book.isPreset) {
+                    IconButton(onClick = onRename) {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = stringResource(R.string.library_rename),
+                        )
+                    }
                     IconButton(onClick = onDelete) {
                         Icon(
                             imageVector = Icons.Outlined.Delete,

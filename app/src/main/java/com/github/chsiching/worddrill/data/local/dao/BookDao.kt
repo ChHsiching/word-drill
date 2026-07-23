@@ -26,8 +26,12 @@ interface BookDao {
     @Query("SELECT * FROM book WHERE name = :name LIMIT 1")
     suspend fun getByName(name: String): Book?
 
-    @Query("UPDATE book SET name = :name WHERE bookId = :bookId")
-    suspend fun rename(bookId: Long, name: String)
+    /**
+     * 重命名词书。返回受影响行数：自定义词书返回 1，预置词书被 WHERE isPreset = 0 拒绝（返回 0）。
+     * 与 [deleteCustom] 同模式：预置词书在 DAO 层兜底只读，UI 入口也隐藏。
+     */
+    @Query("UPDATE book SET name = :name WHERE bookId = :bookId AND isPreset = 0")
+    suspend fun rename(bookId: Long, name: String): Int
 
     @Query("DELETE FROM book WHERE bookId = :bookId AND isPreset = 0")
     suspend fun deleteCustom(bookId: Long): Int
