@@ -34,4 +34,15 @@
     <string name="me_progress">当前词书进度</string>
     <string name="me_no_current_book">未选择词书</string>
     <string name="me_progress_line">%1$s：%2$d / %3$d（%4$d%%）</string>
+    <!-- 「我的」Tab 软件设置（Ticket #9）-->
+    <string name="me_settings">软件设置</string>
+    <string name="me_theme">主题</string>
+    <string name="me_theme_light">浅色</string>
+    <string name="me_theme_dark">深色</string>
+    <string name="me_theme_system">跟随系统</string>
+    <string name="me_about">关于</string>
+    <string name="me_about_title">关于 WordDrill</string>
+    <string name="me_about_app_name">WordDrill</string>
+    <string name="me_about_version">版本 %1$s</string>
+    <string name="me_about_close">关闭</string>
 </resources>

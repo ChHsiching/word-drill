@@ -39,6 +39,8 @@ android {
 
     buildFeatures {
         compose = true
+        // Ticket #9：关于页读取 BuildConfig.VERSION_NAME 显示版本号
+        buildConfig = true
     }
 }
 

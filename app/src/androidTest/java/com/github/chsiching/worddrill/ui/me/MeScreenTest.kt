@@ -4,6 +4,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -13,6 +14,7 @@ import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.SwipeLog
 import com.github.chsiching.worddrill.data.local.entity.Word
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
+import com.github.chsiching.worddrill.data.settings.ThemeMode
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
@@ -80,6 +82,8 @@ class MeScreenTest {
         settings = settings,
     )
 
+    private fun settingsVm(): SettingsViewModel = SettingsViewModel(settings)
+
     /**
      * 等待 ViewModel 把上游 combine 解析稳定后取首条解析值。
      * stateIn(WhileSubscribed) 首值是空 MeStatsUiState()（bookName=""）；
@@ -88,11 +92,11 @@ class MeScreenTest {
     private suspend fun stableState(viewModel: MeViewModel): MeStatsUiState =
         viewModel.uiState.first { it.bookName.isNotEmpty() }
 
-    private fun renderWithVm(viewModel: MeViewModel) {
+    private fun renderWithVm(viewModel: MeViewModel, settingsViewModel: SettingsViewModel = settingsVm()) {
         composeRule.setContent {
             WordDrillTheme {
                 Surface {
-                    MeScreen(viewModel = viewModel)
+                    MeScreen(viewModel = viewModel, settingsViewModel = settingsViewModel)
                 }
             }
         }
@@ -175,5 +179,44 @@ class MeScreenTest {
         assertThat(state.total).isEqualTo(2)
         assertThat(state.percent).isEqualTo(50)
         assertThat(state.bookName).isEqualTo("另一本")
+    }
+
+    // ---- Ticket #9：主题切换 + 关于页 ----
+
+    @Test
+    fun settingsSection_showsThemeOptions_andAboutEntry() {
+        renderWithVm(vm())
+        // 三个主题选项 + 关于入口都在（坑 G：用完整文案避免子串误匹配）
+        composeRule.onNodeWithText("软件设置").assertIsDisplayed()
+        composeRule.onNodeWithText("浅色").assertIsDisplayed()
+        composeRule.onNodeWithText("深色").assertIsDisplayed()
+        composeRule.onNodeWithText("跟随系统").assertIsDisplayed()
+        composeRule.onNodeWithText("关于").assertIsDisplayed()
+    }
+
+    @Test
+    fun selectDarkTheme_persistsToDataStore() = runBlocking {
+        renderWithVm(vm())
+        // 点"深色"选项 → 落库
+        composeRule.onNodeWithText("深色").performClick()
+        composeRule.waitForIdle()
+        // 等 setTheme 协程落库 + Flow 刷新
+        val mode = settings.themePreference.first { it == ThemeMode.DARK }
+        assertThat(mode).isEqualTo(ThemeMode.DARK)
+        Unit
+    }
+
+    @Test
+    fun aboutDialog_showsAppNameAndVersion_whenOpened() {
+        renderWithVm(vm())
+        // 点"关于"入口 → 弹窗显示 App 名 + 版本号
+        composeRule.onNodeWithText("关于").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("关于 WordDrill").assertIsDisplayed()
+        // 坑 G：onNodeWithText 默认子串匹配，"WordDrill" 会同时命中标题"关于 WordDrill"
+        // 与正文"WordDrill"。正文用 substring=false 精确匹配唯一节点。
+        composeRule.onNodeWithText("WordDrill", substring = false).assertIsDisplayed()
+        // 版本号行：与 build.gradle.kts 的 versionName 一致；bump 时同步更新。
+        composeRule.onNodeWithText("版本 0.1.0").assertIsDisplayed()
     }
 }

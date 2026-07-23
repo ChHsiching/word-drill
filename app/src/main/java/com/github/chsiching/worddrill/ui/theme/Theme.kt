@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import com.github.chsiching.worddrill.data.settings.ThemeMode
 
 private val LightColors = lightColorScheme(
     primary = PrimaryLight,
@@ -25,15 +26,26 @@ private val DarkColors = darkColorScheme(
 )
 
 /**
- * 应用主题。当前跟随系统深浅色；后续「主题切换」ticket 会从 DataStore 读取用户偏好。
- * 支持 Android 12+ 的动态取色（Material You）。
+ * 应用主题（Ticket #9）：根据 [themeMode] 选择 Material3 配色方案。
+ *
+ * - [ThemeMode.LIGHT] / [ThemeMode.DARK]：强制浅色 / 深色，覆盖系统设置。
+ * - [ThemeMode.SYSTEM]：跟随系统深浅色（[isSystemInDarkTheme]）。
+ *
+ * 支持 Android 12+ 的动态取色（Material You）。调用方（[com.github.chsiching.worddrill.MainActivity]）
+ * 订阅 [com.github.chsiching.worddrill.data.settings.SettingsRepository.themePreference]
+ * 并把结果传入此处；切换后全局配色立即生效。
  */
 @Composable
 fun WordDrillTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    val darkTheme = when (themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    }
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
