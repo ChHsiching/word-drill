@@ -9,4 +9,15 @@
     <string name="drill_loading">加载中…</string>
     <string name="drill_first_card">已是第一张</string>
     <string name="drill_last_card">已是最后一张</string>
+    <!-- 「库」Tab 词书列表 -->
+    <string name="library_title">词书</string>
+    <string name="library_preset_badge">预置</string>
+    <string name="library_custom_badge">自定义</string>
+    <string name="library_current_badge">当前</string>
+    <string name="library_create">新建词书</string>
+    <string name="library_rename">重命名</string>
+    <string name="library_delete">删除</string>
+    <string name="library_name_hint">词书名称</string>
+    <string name="library_cancel">取消</string>
+    <string name="library_confirm">确定</string>
 </resources>

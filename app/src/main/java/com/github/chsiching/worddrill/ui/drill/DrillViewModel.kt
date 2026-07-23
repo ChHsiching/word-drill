@@ -13,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -34,8 +35,11 @@ sealed interface DrillUiState {
 /**
  * 「刷」Tab 的 ViewModel。
  *
- * 启动时按 DataStore 记住的 currentBookId 加载词书；首次（无记录）默认选第一本（预置 CET-4）。
- * 卡片列表一次性加载（词书切换由「库」Tab 负责，本 Tab 只读当前词书）。
+ * 监听 DataStore 的 [SettingsRepository.currentBookId]：词书在「库」Tab 被切换后，
+ * 本 Tab 自动重载新词书的卡片列表（规格验收：「刷」Tab 刷卡内容立即切换）。
+ *
+ * bookId 解析：null（首次启动）或记录值已失效（词书被删）→ 回退到第一本（预置 CET-4）。
+ * 卡片为空的词书也显示 Empty 态。
  *
  * 计数逻辑：UI 监听 pager 页面 settled 事件，调用 [onPageSettled]；
  * 是否写 swipe_log 由纯函数 [shouldLogSwipe] 决策，保证可单测。
@@ -55,13 +59,21 @@ class DrillViewModel @Inject constructor(
     private var currentBookId: Long? = null
 
     init {
-        viewModelScope.launch { loadCurrentBook() }
+        // 监听 currentBookId 变化（首次启动 + 「库」Tab 切换词书都会触发）：
+        // distinctUntilChanged 避免相同 bookId 重复重载（见交接链坑 A）。
+        viewModelScope.launch {
+            settings.currentBookId
+                .distinctUntilChanged()
+                .collect { recorded -> loadBookFor(recorded) }
+        }
     }
 
-    private suspend fun loadCurrentBook() {
-        // 先看 DataStore 记住的 bookId；未记录或记录的词书已被删除，则回退到第一本。
-        // 词书切换的唯一入口是「库」Tab，这里只在首次（无记录）/失效时定一个默认值。
-        val recorded = settings.currentBookId.first()
+    /**
+     * 把 bookId 解析成 UI 态：
+     * - 记录值有效 → 直接加载该词书
+     * - 记录值无效（已删）/ 未记录（null）→ 回退第一本，并写回 DataStore 保持一致
+     */
+    private suspend fun loadBookFor(recorded: Long?) {
         val book = recorded?.let { bookDao.getById(it) }
             ?: firstBookOrNull()?.also { settings.setCurrentBookId(it.bookId) }
 

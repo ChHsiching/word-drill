@@ -1,8 +1,10 @@
 package com.github.chsiching.worddrill
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
@@ -15,6 +17,7 @@ import org.junit.runner.RunWith
  * 同时隐式验证 Hilt @HiltAndroidApp + @AndroidEntryPoint 启动不崩溃。
  *
  * 「刷」Tab 内容自 Ticket #5 起为真实卡片浏览（不再渲染占位文案 "刷"），
+ * 「库」Tab 内容自 Ticket #6 起为词书列表（顶部标题「词书」）。
  * 故三个 Tab 文案均仅出现在导航栏（各 1 个节点）。
  * 「刷」Tab 的卡片渲染由 DrillScreenTest 覆盖。
  */
@@ -36,8 +39,11 @@ class AppNavigationTest {
     fun clickingLibraryTabDoesNotCrash() {
         composeRule.onAllNodesWithText("库")[0].performClick()
         composeRule.waitForIdle()
-        // 切换到「库」后：内容区 + 导航栏 = 2 个节点，证明 App 未崩溃
-        composeRule.onAllNodesWithText("库").assertCountEquals(2)
+        // 「库」Tab 内容自 Ticket #6 起渲染词书列表（顶部标题「词书」），
+        // 故「库」字仍只在导航栏出现 1 次（内容区是「词书」/具体词书名）。
+        composeRule.onAllNodesWithText("库").assertCountEquals(1)
+        // 列表标题「词书」证明页面正常渲染
+        composeRule.onNodeWithText("词书").assertIsDisplayed()
     }
 
     @Test
