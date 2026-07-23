@@ -28,6 +28,12 @@
     <string name="word_list_pos_hint">词性</string>
     <string name="word_list_meaning_hint">释义</string>
     <string name="word_list_preset_readonly">预置词书不可编辑</string>
+    <!-- 输入校验错误文案（Ticket #12：不硬编码到 Kotlin，走 R.string）-->
+    <string name="validation_word_empty">单词不能为空</string>
+    <string name="validation_pos_empty">词性不能为空</string>
+    <string name="validation_meaning_empty">释义不能为空</string>
+    <string name="validation_book_name_empty">名称不能为空</string>
+    <string name="validation_book_name_duplicate">已存在同名词书</string>
     <!-- 「我的」Tab 统计（Ticket #8）-->
     <string name="me_today">今日刷卡</string>
     <string name="me_total">累计刷卡</string>

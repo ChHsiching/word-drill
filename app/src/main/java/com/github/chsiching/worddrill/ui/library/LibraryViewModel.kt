@@ -1,5 +1,6 @@
 package com.github.chsiching.worddrill.ui.library
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.chsiching.worddrill.data.local.dao.BookDao
@@ -20,8 +21,8 @@ import javax.inject.Inject
  */
 sealed interface LibraryDialog {
     data object None : LibraryDialog
-    data class Create(val name: String = "", val error: String? = null) : LibraryDialog
-    data class Rename(val bookId: Long, val name: String = "", val error: String? = null) : LibraryDialog
+    data class Create(val name: String = "", @StringRes val error: Int? = null) : LibraryDialog
+    data class Rename(val bookId: Long, val name: String = "", @StringRes val error: Int? = null) : LibraryDialog
 }
 
 /**

@@ -1,5 +1,6 @@
 package com.github.chsiching.worddrill.ui.library
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -32,14 +33,14 @@ sealed interface WordListDialog {
         val text: String = "",
         val pos: String = "",
         val meaning: String = "",
-        val error: String? = null,
+        @StringRes val error: Int? = null,
     ) : WordListDialog
     data class Edit(
         val senseId: Long,
         val wordText: String,
         val pos: String = "",
         val meaning: String = "",
-        val error: String? = null,
+        @StringRes val error: Int? = null,
     ) : WordListDialog
 }
 

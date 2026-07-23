@@ -1,5 +1,6 @@
 package com.github.chsiching.worddrill.ui.library
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -196,7 +197,7 @@ private fun BookRow(
 private fun BookNameDialog(
     title: String,
     name: String,
-    error: String?,
+    @StringRes error: Int?,
     onNameInput: (String) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
@@ -212,7 +213,7 @@ private fun BookNameDialog(
                     label = { Text(stringResource(R.string.library_name_hint)) },
                     singleLine = true,
                     isError = error != null,
-                    supportingText = if (error != null) ({ Text(error) }) else null,
+                    supportingText = if (error != null) ({ Text(stringResource(error)) }) else null,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

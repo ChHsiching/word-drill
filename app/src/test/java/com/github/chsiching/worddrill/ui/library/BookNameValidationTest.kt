@@ -1,17 +1,20 @@
 package com.github.chsiching.worddrill.ui.library
 
+import com.github.chsiching.worddrill.R
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
- * 新建/重命名词书时的名称校验（纯函数，无 Android 依赖）。
+ * 新建/重命名词书时的名称校验（纯函数，无 Android 运行时依赖）。
  *
  * 规格：
  * - 新建词书输入名称（is_preset = false）
  * - 重命名词书
  * - 不允许重名（交接链坑 C：@Insert(REPLACE)+autoGenerate 不会按 name 去重，需显式查重）
  *
- * 拆成纯函数便于 JVM 单测（无 Android 依赖、无 Room/DataStore 耦合）。
+ * 拆成纯函数便于 JVM 单测（无 Android 运行时依赖、无 Room/DataStore 耦合）。
+ *
+ * Ticket #12：返回值由 String? 改为 @StringRes Int?，断言对应资源 id。
  */
 class BookNameValidationTest {
 
@@ -21,19 +24,22 @@ class BookNameValidationTest {
 
     @Test
     fun emptyName_isInvalid() {
-        assertThat(validateBookName("", existingNames)).isNotNull()
+        assertThat(validateBookName("", existingNames))
+            .isEqualTo(R.string.validation_book_name_empty)
     }
 
     @Test
     fun blankName_isInvalid() {
-        assertThat(validateBookName("   ", existingNames)).isNotNull()
+        assertThat(validateBookName("   ", existingNames))
+            .isEqualTo(R.string.validation_book_name_empty)
     }
 
     // ---- 重名 → 报错（大小写敏感，与 SQLite 默认一致）----
 
     @Test
     fun duplicateName_isInvalid() {
-        assertThat(validateBookName("CET-4", existingNames)).isNotNull()
+        assertThat(validateBookName("CET-4", existingNames))
+            .isEqualTo(R.string.validation_book_name_duplicate)
     }
 
     @Test
@@ -53,7 +59,8 @@ class BookNameValidationTest {
     @Test
     fun paddedDuplicate_isInvalid_afterTrim() {
         // 写库时会 trim，校验必须在 trim 后的基准上，否则带空格的重名会漏过。
-        assertThat(validateBookName("  CET-4  ", existingNames)).isNotNull()
+        assertThat(validateBookName("  CET-4  ", existingNames))
+            .isEqualTo(R.string.validation_book_name_duplicate)
     }
 
     @Test

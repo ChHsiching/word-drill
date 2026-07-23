@@ -202,7 +202,7 @@ private fun AddWordDialog(
                     label = { Text(stringResource(R.string.word_list_meaning_hint)) },
                     singleLine = true,
                     isError = state.error != null,
-                    supportingText = if (state.error != null) ({ Text(state.error) }) else null,
+                    supportingText = if (state.error != null) ({ Text(stringResource(state.error)) }) else null,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -249,7 +249,7 @@ private fun EditSenseDialog(
                     label = { Text(stringResource(R.string.word_list_meaning_hint)) },
                     singleLine = true,
                     isError = state.error != null,
-                    supportingText = if (state.error != null) ({ Text(state.error) }) else null,
+                    supportingText = if (state.error != null) ({ Text(stringResource(state.error)) }) else null,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
