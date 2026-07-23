@@ -22,6 +22,10 @@ interface BookDao {
     @Query("SELECT * FROM book WHERE bookId = :bookId")
     suspend fun getById(bookId: Long): Book?
 
+    /** 按名字查词书。导入幂等用：重名预置词书复用既有行，不新建重复行。 */
+    @Query("SELECT * FROM book WHERE name = :name LIMIT 1")
+    suspend fun getByName(name: String): Book?
+
     @Query("UPDATE book SET name = :name WHERE bookId = :bookId")
     suspend fun rename(bookId: Long, name: String)
 

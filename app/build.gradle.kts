@@ -77,8 +77,15 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    // DataStore（首启导入幂等标记 / 后续当前词书等设置）
+    implementation(libs.androidx.datastore.preferences)
+
     // 测试
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.truth)
+    // org.json 随 Android 运时提供；JVM 单测需显式引入以验证 JSON 解析逻辑
+    testImplementation("org.json:json:20240303")
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.espresso.core)
