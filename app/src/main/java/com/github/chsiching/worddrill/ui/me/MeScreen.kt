@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.BrightnessAuto
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material3.AlertDialog
@@ -408,22 +409,18 @@ private fun nextThemeMode(current: ThemeMode): ThemeMode = when (current) {
     ThemeMode.DARK -> ThemeMode.SYSTEM
 }
 
-/** 判断某主题当前是否深色（SYSTEM 取系统当前）。@Composable 因为 isSystemInDarkTheme 是。 */
-@Composable
-private fun isDarkMode(mode: ThemeMode): Boolean = when (mode) {
-    ThemeMode.LIGHT -> false
-    ThemeMode.DARK -> true
-    ThemeMode.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
-}
-
 @Composable
 private fun ThemeToggleIcon(
     themeMode: ThemeMode,
     onToggle: (targetMode: ThemeMode) -> Unit,
 ) {
-    val isDark = isDarkMode(themeMode)
     val trigger = LocalThemeRevealTrigger.current
-    val iconVector = if (isDark) Icons.Outlined.DarkMode else Icons.Outlined.LightMode
+    // 三态各有 icon：LIGHT=太阳，DARK=月亮，SYSTEM=自动（A 带圈）
+    val iconVector = when (themeMode) {
+        ThemeMode.LIGHT -> Icons.Outlined.LightMode
+        ThemeMode.DARK -> Icons.Outlined.DarkMode
+        ThemeMode.SYSTEM -> Icons.Outlined.BrightnessAuto
+    }
 
     var iconPos by remember { mutableStateOf(Offset.Zero) }
     var iconSize by remember { mutableStateOf(0) }
@@ -442,12 +439,8 @@ private fun ThemeToggleIcon(
                     iconPos.x + iconSize / 2f,
                     iconPos.y + iconSize / 2f,
                 )
-                // 三态循环的目标
                 val target = nextThemeMode(themeMode)
-                trigger(center) { setOverlayTheme ->
-                    setOverlayTheme(target)
-                    onToggle(target)
-                }
+                trigger(center) { onToggle(target) }
             },
         ) {
             Icon(

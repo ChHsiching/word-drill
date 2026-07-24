@@ -1,8 +1,11 @@
 package com.github.chsiching.worddrill.ui.navigation
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -107,7 +110,11 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
         NavHost(
             navController = navController,
             startDestination = TopDestination.Drill.route,
@@ -270,16 +277,15 @@ private fun PillNav(
                 .padding(6.dp)
                 .onGloballyPositioned { rowWidth = it.size.width.toFloat() }
                 .drawBehind {
-                    // 画黑色胶囊指示器（审核反馈 4：原高度填满 Row 显得太圆，
-                    // 改为高度比 Row 小一点、垂直居中，圆角半径 = 指示器高度/2 → 胶囊形）。
+                    // 画黑色指示器：高度 = Row 高度，圆角半径 = 高度/2（两端完整半圆）。
+                    // 简约状态（compactNav）Row 矮 → 指示器自然呈圆形，合理，不动。
+                    // 非简约状态的高度缩减通过 NavItem 的 padding 实现（见下方），不改这里。
                     if (itemWidth > 0f) {
-                        val indicatorHeight = size.height - 10.dp.toPx() // 上下各留 5dp
-                        val verticalOffset = (size.height - indicatorHeight) / 2f
                         drawRoundRect(
                             color = indicatorColor,
-                            topLeft = androidx.compose.ui.geometry.Offset(animatedX, verticalOffset),
-                            size = androidx.compose.ui.geometry.Size(itemWidth, indicatorHeight),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(indicatorHeight / 2f),
+                            topLeft = androidx.compose.ui.geometry.Offset(animatedX, 0f),
+                            size = androidx.compose.ui.geometry.Size(itemWidth, size.height),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f),
                         )
                     }
                 },
@@ -353,7 +359,14 @@ private fun NavItem(
                 indication = null,
                 onClick = onNavigate,
             )
-            .padding(horizontal = if (compactNav) 18.dp else 22.dp, vertical = 8.dp),
+            // 简约 ↔ 非简约过渡（审核反馈）：用 animateContentSize 让 Column 高度变化
+            // （标签出现/消失导致的高度差）平滑过渡。tween 200ms FastOutSlowIn —— 干脆不晃，
+            // 固定时长比 spring 可预测（spring MediumLow 太软像在晃）。
+            .animateContentSize(
+                animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+            )
+            // 非简约 vertical=4dp（指示器胶囊形），简约 vertical=8dp（指示器圆形，不动）
+            .padding(horizontal = if (compactNav) 18.dp else 22.dp, vertical = if (compactNav) 8.dp else 4.dp),
     ) {
         Icon(
             imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,

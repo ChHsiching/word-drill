@@ -4,10 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.data.settings.ThemeMode
@@ -20,21 +23,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
-/**
- * 单 Activity 入口。承载 Compose 根 UI 与底部导航。
- * @AndroidEntryPoint 让 Hilt 能向此 Activity 及其挂载的 Composable 注入依赖。
- *
- * 注意：本项目未启用 Hilt Gradle Plugin（它要求 AGP 9，与规格的 AGP 8.13.x 冲突）。
- * 因此 @AndroidEntryPoint 需显式指定 base class，且 extend Hilt 生成的 Hilt_<类名>。
- *
- * Ticket #9：订阅 [SettingsRepository.themePreference] 并把当前 [ThemeMode] 传给
- * [WordDrillTheme]，用户在「我的」Tab 切换主题后全局配色立即生效。
- *
- * 审核反馈 5：主题切换用 circular reveal 扩散效果（ThemeRevealBox）。
- * - 用户点 MeScreen 右上角的日/月 icon → LocalThemeRevealTrigger 触发
- * - reveal 圆以 icon 为圆心扩展，中点时切 ColorScheme（瞬间切，被圆覆盖看不见接缝）
- * - targetBg：切到深色时圆是黑色（BgDark），切到浅色时圆是白色（BgLight）
- */
 @AndroidEntryPoint(ComponentActivity::class)
 class MainActivity : Hilt_MainActivity() {
 
@@ -51,15 +39,33 @@ class MainActivity : Hilt_MainActivity() {
         )
         setContent {
             val themeMode by themeState.collectAsStateWithLifecycle()
+            // renderedTheme 跟踪 themeMode（DataStore 异步刷新后两者同步）。
+            // reveal 动画期间 DataStore 写完 → themeMode 变 → renderedTheme 跟着变 → 底层切。
+            // 截图 overlay 盖住旧主题，动画揭示新主题底层。
+            var renderedTheme by remember { mutableStateOf(themeMode) }
 
-            // content lambda 接收「用哪个主题渲染」，ThemeRevealContent 自动处理
-            // 底层（当前主题）+ overlay（新主题，clip 成圆形扩散）
-            ThemeRevealContent(currentTheme = themeMode) { renderTheme ->
-                WordDrillTheme(themeMode = renderTheme) {
+            // themeMode 变了就同步到 renderedTheme（DataStore 写完后 themeMode 更新，这里跟上）
+            androidx.compose.runtime.LaunchedEffect(themeMode) {
+                renderedTheme = themeMode
+            }
+
+            WordDrillTheme(themeMode = renderedTheme) {
+                val darkBg = when (renderedTheme) {
+                    ThemeMode.LIGHT -> false
+                    ThemeMode.DARK -> true
+                    ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                }
+                SideEffect {
+                    WindowCompat.getInsetsController(window, window.decorView)
+                        .isAppearanceLightStatusBars = !darkBg
+                }
+
+                ThemeRevealContent(
+                    onThemeApplied = {},
+                ) {
                     WordDrillRoot()
                 }
             }
         }
     }
 }
-
