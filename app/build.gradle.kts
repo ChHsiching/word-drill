@@ -13,8 +13,8 @@ android {
         applicationId = "com.github.chsiching.worddrill"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.1.0-dev24"
+        versionCode = 11
+        versionName = "0.1.0-dev25"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -1,6 +1,7 @@
 package com.github.chsiching.worddrill
 
 import android.app.Application
+import com.github.chsiching.worddrill.data.DictionaryImportOrchestrator
 import com.github.chsiching.worddrill.data.PresetImportOrchestrator
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +22,7 @@ import javax.inject.Inject
 class WordDrillApp : Hilt_WordDrillApp() {
 
     @Inject lateinit var presetImportOrchestrator: PresetImportOrchestrator
+    @Inject lateinit var dictionaryImportOrchestrator: DictionaryImportOrchestrator
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -28,5 +30,8 @@ class WordDrillApp : Hilt_WordDrillApp() {
         super.onCreate()
         // 首启在后台幂等导入预置词库；已导入则立即返回，无重复开销。
         appScope.launch { presetImportOrchestrator.ensurePresetImported() }
+        // Ticket #19：首启后台幂等导入内置词典（ECDICT 10 万词，只读参考数据）。
+        // 与预置词库导入并行；dictionary 失败不影响用户词书使用。
+        appScope.launch { dictionaryImportOrchestrator.ensureDictionaryImported() }
     }
 }

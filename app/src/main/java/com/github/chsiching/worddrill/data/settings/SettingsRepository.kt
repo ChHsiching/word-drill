@@ -29,6 +29,7 @@ class SettingsRepository @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     private val presetImportedKey = booleanPreferencesKey("preset_imported")
+    private val dictionaryImportedKey = booleanPreferencesKey("dictionary_imported")
     private val currentBookIdKey = longPreferencesKey("current_book_id")
     private val themeKey = stringPreferencesKey("theme_mode")
     private val hidePhoneticKey = booleanPreferencesKey("hide_phonetic")
@@ -41,6 +42,17 @@ class SettingsRepository @Inject constructor(
     /** 标记预置词库导入完成。导入流程成功后调用一次，后续启动跳过导入。 */
     suspend fun markPresetImported() {
         context.appDataStore.edit { it[presetImportedKey] = true }
+    }
+
+    // ---- Ticket #19：内置词典首启导入幂等标记 ----
+
+    /** 内置词典（ECDICT）是否已导入完成。未读过时默认 false。 */
+    val dictionaryImported: Flow<Boolean> =
+        context.appDataStore.data.map { it[dictionaryImportedKey] ?: false }
+
+    /** 标记内置词典导入完成。导入流程成功后调用一次，后续启动跳过导入。 */
+    suspend fun markDictionaryImported() {
+        context.appDataStore.edit { it[dictionaryImportedKey] = true }
     }
 
     /** 当前选中的词书 id。未设置过时为 null（首次启动，调用方应默认选第一本）。 */
