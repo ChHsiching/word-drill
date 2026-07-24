@@ -1,7 +1,11 @@
 package com.github.chsiching.worddrill.ui.drill
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,11 +30,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -122,7 +129,8 @@ internal fun DrillPager(
             onSkip = {
                 // 跳过 = 前进一张（不循环，到头不动）；spec 明确「跳过逻辑（加入复习词书）」
                 // 属于另一 ticket，本按钮只负责翻页。
-                if (!locked && pagerState.currentPage < cards.lastIndex) {
+                // #17 审核反馈 #3：锁定状态下跳过仍可用。锁定只隐藏导航栏，不影响跳过。
+                if (pagerState.currentPage < cards.lastIndex) {
                     scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                 }
             },
@@ -184,12 +192,25 @@ private fun DrillTopBar(
             // 跳过 + 锁定（右）
             // 审核反馈 4：锁定时不隐藏跳过按钮（锁定只隐藏导航栏，跳过仍可用）。
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // #17 审核反馈 #5：跳过按钮无 ripple 方框，按下时 alpha 0.4→1.0 反馈。
+                val skipInteraction = remember { MutableInteractionSource() }
+                val skipPressed by skipInteraction.collectIsPressedAsState()
+                val skipAlpha by animateFloatAsState(
+                    targetValue = if (skipPressed) 0.4f else 1f,
+                    animationSpec = spring(),
+                    label = "skipAlpha",
+                )
                 Text(
                     text = stringResource(R.string.drill_skip),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier
-                        .clickable(onClick = onSkip)
+                        .alpha(skipAlpha)
+                        .clickable(
+                            interactionSource = skipInteraction,
+                            indication = null,
+                            onClick = onSkip,
+                        )
                         .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
                 )
                 Spacer(Modifier.width(10.dp))
@@ -205,17 +226,33 @@ private fun DrillTopBar(
     }
 }
 
-/** 锁定按钮：默认透明 + tertiary 图标；锁定态反色背景（onSurface）+ background 图标。 */
+/**
+ * 锁定按钮：默认透明 + tertiary 图标；锁定态反色背景（onSurface）+ background 图标。
+ *
+ * #17 审核反馈 #6：无 ripple 方框。按下时图标 scale 0.9 反馈（pointer-down 即反馈，
+ * 不等 release）。
+ */
 @Composable
 private fun LockButton(locked: Boolean, onClick: () -> Unit) {
     val bg = if (locked) MaterialTheme.colorScheme.onSurface else Color.Transparent
     val fg = if (locked) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.onSurfaceVariant
+    val lockInteraction = remember { MutableInteractionSource() }
+    val pressed by lockInteraction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.9f else 1f,
+        animationSpec = spring(),
+        label = "lockScale",
+    )
     Surface(
         shape = CircleShape,
         color = bg,
         modifier = Modifier
             .size(30.dp)
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = lockInteraction,
+                indication = null,
+                onClick = onClick,
+            ),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
@@ -224,7 +261,9 @@ private fun LockButton(locked: Boolean, onClick: () -> Unit) {
                     if (locked) R.string.drill_unlock else R.string.drill_lock
                 ),
                 tint = fg,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier
+                    .size(16.dp)
+                    .graphicsLayer { scaleX = scale; scaleY = scale },
             )
         }
     }

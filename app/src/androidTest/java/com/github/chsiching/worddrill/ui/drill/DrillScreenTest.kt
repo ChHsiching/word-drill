@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.room.Room
@@ -81,7 +82,7 @@ class DrillScreenTest {
         db.wordDao().getWordsWithSensesByBook(bookId)
     }
 
-    private fun composeDrillPager() {
+    private fun composeDrillPager(locked: Boolean = false) {
         composeRule.setContent {
             WordDrillTheme {
                 Surface {
@@ -89,7 +90,7 @@ class DrillScreenTest {
                         bookName = "测试词书",
                         cards = cards(),
                         onPageSettled = { _, _ -> },
-                        locked = false,
+                        locked = locked,
                         onToggleLock = {},
                         hidePhonetic = false,
                     )
@@ -127,5 +128,24 @@ class DrillScreenTest {
         composeRule.onNodeWithText("circle").assertIsDisplayed()
         // 计数器显示 3 / 3（替代原「已是最后一张」边界提示）
         composeRule.onNodeWithText("3 / 3").assertIsDisplayed()
+    }
+
+    /**
+     * #17 (审核反馈 #3)：锁定状态下跳过按钮仍可点击翻页。
+     * 回归：早期实现里 onSkip 内含 `!locked` 守卫，锁定后跳过无效。验收要求锁定只隐藏
+     * 导航栏，不影响跳过。这里通过点击「跳过」按钮验证：从第 1 张 → 第 2 张。
+     */
+    @Test
+    fun skipButtonWorksWhileLocked() {
+        composeDrillPager(locked = true)
+
+        // 起始：第 1 张
+        composeRule.onNodeWithText("apple").assertIsDisplayed()
+        // 点击「跳过」
+        composeRule.onNodeWithText("跳过").performClick()
+        composeRule.waitForIdle()
+        // 锁定状态下仍翻到第 2 张
+        composeRule.onNodeWithText("balance").assertIsDisplayed()
+        composeRule.onNodeWithText("2 / 3").assertIsDisplayed()
     }
 }
