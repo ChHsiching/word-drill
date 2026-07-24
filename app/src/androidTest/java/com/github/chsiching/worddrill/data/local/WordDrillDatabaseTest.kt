@@ -544,4 +544,45 @@ class WordDrillDatabaseTest {
         val book = bookDao.observeAllWithCounts().first().single()
         assertThat(book.wordCount).isEqualTo(1)
     }
+
+    @Test
+    fun unskipWordEverywhere_clearsSkippedAcrossAllBooks() = runTest {
+        // 恢复语义(issue #1):一个词可能在 CET-4 和 CET-6 都被跳过,恢复要全清
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val cet4 = bookDao.insert(Book(name = "CET-4", isPreset = true))
+        val cet6 = bookDao.insert(Book(name = "CET-6", isPreset = true))
+        val wApple = wordDao.insert(Word(text = "apple"))
+        bookDao.linkBookWord(BookWord(cet4, wApple))
+        bookDao.linkBookWord(BookWord(cet6, wApple))
+        // 两本词书都跳过 apple
+        bookDao.setSkipped(cet4, wApple, skipped = true)
+        bookDao.setSkipped(cet6, wApple, skipped = true)
+
+        bookDao.unskipWordEverywhere(wApple)
+
+        // 两本词书的 apple 关联都恢复未跳过
+        assertThat(bookDao.getSkipped(cet4, wApple)).isFalse()
+        assertThat(bookDao.getSkipped(cet6, wApple)).isFalse()
+    }
+
+    @Test
+    fun unskipWordEverywhere_doesNotAffectOtherWords() = runTest {
+        // 只清目标词,不动其他词的 skipped 状态
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        val wApple = wordDao.insert(Word(text = "apple"))
+        val wRun = wordDao.insert(Word(text = "run"))
+        bookDao.linkBookWord(BookWord(bookId, wApple))
+        bookDao.linkBookWord(BookWord(bookId, wRun))
+        bookDao.setSkipped(bookId, wApple, skipped = true)
+        bookDao.setSkipped(bookId, wRun, skipped = true)
+
+        bookDao.unskipWordEverywhere(wApple)
+
+        assertThat(bookDao.getSkipped(bookId, wApple)).isFalse()
+        // run 仍处于跳过态,不被波及
+        assertThat(bookDao.getSkipped(bookId, wRun)).isTrue()
+    }
 }

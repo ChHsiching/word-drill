@@ -101,6 +101,16 @@ interface BookDao {
     @Query("SELECT skipped FROM book_word WHERE bookId = :bookId AND wordId = :wordId LIMIT 1")
     suspend fun getSkipped(bookId: Long, wordId: Long): Boolean?
 
+    /**
+     * 把该词在**所有词书**的 skipped 标记全置 0（恢复）。
+     *
+     * 恢复语义（issue #1）：一个词可能在 CET-4 和 CET-6 都被跳过，恢复时一次性全清，
+     * 词回到所有原词书可刷。与 [setSkipped]（词书级，只改一条）互补：setSkipped 用于
+     * 跳过（单本），unskipWordEverywhere 用于恢复（全局）。
+     */
+    @Query("UPDATE book_word SET skipped = 0 WHERE wordId = :wordId")
+    suspend fun unskipWordEverywhere(wordId: Long)
+
     // ---- Ticket #10：整库导出/导入 ----
 
     /** 全量读所有词书（导出快照用）。 */

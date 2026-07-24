@@ -86,15 +86,19 @@ class DrillScreenTest {
     private fun composeDrillPager(
         locked: Boolean = false,
         onSkip: (Int) -> Unit = {},
+        isReviewBook: Boolean = false,
+        onRestore: (Int) -> Unit = {},
     ) {
         composeRule.setContent {
             WordDrillTheme {
                 Surface {
                     DrillPager(
-                        bookName = "测试词书",
+                        bookName = if (isReviewBook) "复习" else "测试词书",
                         cards = cards(),
                         onPageSettled = { _, _ -> },
                         onSkip = onSkip,
+                        isReviewBook = isReviewBook,
+                        onRestore = onRestore,
                         locked = locked,
                         onToggleLock = {},
                         hidePhonetic = false,
@@ -167,5 +171,41 @@ class DrillScreenTest {
         composeRule.onNodeWithText("跳过").performClick()
         composeRule.waitForIdle()
         assertThat(skippedPage).isEqualTo(0)
+    }
+
+    /**
+     * issue #1：复习词书态显示「恢复」按钮（替代「跳过」），点击触发 onRestore 而非 onSkip。
+     * 回归：之前复习词书也是「跳过」按钮，点了会把词从复习词书也 skipped → 永久丢词。
+     */
+    @Test
+    fun reviewBook_showsRestoreButton_notSkip() {
+        var skipCalled = false
+        var restoreCalled = false
+        composeDrillPager(
+            isReviewBook = true,
+            onSkip = { skipCalled = true },
+            onRestore = { restoreCalled = true },
+        )
+
+        // 复习词书显示「恢复」，不显示「跳过」
+        composeRule.onNodeWithText("恢复").assertIsDisplayed()
+        composeRule.onNodeWithText("跳过").assertDoesNotExist()
+
+        // 点击「恢复」触发 onRestore，不触发 onSkip
+        composeRule.onNodeWithText("恢复").performClick()
+        composeRule.waitForIdle()
+        assertThat(restoreCalled).isTrue()
+        assertThat(skipCalled).isFalse()
+    }
+
+    /**
+     * issue #1：普通词书仍显示「跳过」（回归保护，确保 isReviewBook 切换没破坏普通词书）。
+     */
+    @Test
+    fun normalBook_showsSkipButton_notRestore() {
+        composeDrillPager(isReviewBook = false)
+
+        composeRule.onNodeWithText("跳过").assertIsDisplayed()
+        composeRule.onNodeWithText("恢复").assertDoesNotExist()
     }
 }

@@ -32,6 +32,12 @@ sealed interface DrillUiState {
         val bookName: String,
         /** 卡片列表：一张卡 = 一个 word 的全部 sense。 */
         val cards: List<WordWithSenses>,
+        /**
+         * 当前词书是不是「复习」词书（issue #1）。
+         * true 时顶部按钮显示「恢复」并走 [DrillViewModel.restoreCurrentWord]；
+         * false 时显示「跳过」走 [DrillViewModel.skipCurrentWord]。
+         */
+        val isReviewBook: Boolean = false,
     ) : DrillUiState
 }
 
@@ -103,7 +109,11 @@ class DrillViewModel @Inject constructor(
             _uiState.value = DrillUiState.Empty
             return
         }
-        _uiState.value = DrillUiState.Ready(bookName = bookName, cards = cards)
+        _uiState.value = DrillUiState.Ready(
+            bookName = bookName,
+            cards = cards,
+            isReviewBook = bookName == REVIEW_BOOK_NAME,
+        )
     }
 
     /**
@@ -140,6 +150,9 @@ class DrillViewModel @Inject constructor(
     fun skipCurrentWord(currentPage: Int) {
         val bookId = currentBookId ?: return
         val ready = _uiState.value as? DrillUiState.Ready ?: return
+        // 复习词书不跳过（UI 不该显示跳过按钮，这里兜底防误触）。
+        // 复习词书里的词用 restoreCurrentWord 恢复，不是再跳过。
+        if (ready.isReviewBook) return
         val wordId = ready.cards.getOrNull(currentPage)?.word?.wordId ?: return
         viewModelScope.launch {
             db.withTransaction {
@@ -151,17 +164,45 @@ class DrillViewModel @Inject constructor(
                 bookDao.linkBookWord(BookWord(bookId = reviewBookId, wordId = wordId))
             }
             // 重载卡片：被跳过的词从列表消失；列表空了则转 Empty 态
-            reloadCards(bookId, ready.bookName)
+            reloadCards(bookId, ready)
         }
     }
 
-    /** 跳过后重载当前词书的卡片列表（skipped=0 过滤已生效）。 */
-    private suspend fun reloadCards(bookId: Long, bookName: String) {
+    /**
+     * 复习词书的「恢复」操作（issue #1）。
+     *
+     * 在一个事务里：
+     * 1. [BookDao.unskipWordEverywhere] —— 该词在所有原词书的 skipped 全置 0，词回到原词书可刷
+     * 2. [BookDao.unlinkBookWord] —— 从复习词书移除关联（复习词书是「当前跳过中」动态集合）
+     * 然后重载复习词书卡片（被恢复的词从复习词书消失，pager 停在同 index 指向下一张）。
+     *
+     * @param currentPage 当前 pager 页码，定位要恢复的 word
+     */
+    fun restoreCurrentWord(currentPage: Int) {
+        val bookId = currentBookId ?: return
+        val ready = _uiState.value as? DrillUiState.Ready ?: return
+        // 只在复习词书响应恢复（普通词书没有恢复入口，兜底防误触）
+        if (!ready.isReviewBook) return
+        val wordId = ready.cards.getOrNull(currentPage)?.word?.wordId ?: return
+        viewModelScope.launch {
+            db.withTransaction {
+                // 1) 该词在所有原词书恢复未跳过
+                bookDao.unskipWordEverywhere(wordId)
+                // 2) 从复习词书移除（复习词书只保留当前跳过中的词）
+                bookDao.unlinkBookWord(bookId, wordId)
+            }
+            // 重载复习词书卡片：被恢复的词从列表消失
+            reloadCards(bookId, ready)
+        }
+    }
+
+    /** 跳过/恢复后重载当前词书的卡片列表（skipped=0 过滤已生效）。保留 isReviewBook 标志。 */
+    private suspend fun reloadCards(bookId: Long, ready: DrillUiState.Ready) {
         val cards = wordDao.getWordsWithSensesByBook(bookId)
         if (cards.isEmpty()) {
             _uiState.value = DrillUiState.Empty
         } else {
-            _uiState.value = DrillUiState.Ready(bookName = bookName, cards = cards)
+            _uiState.value = ready.copy(cards = cards)
         }
     }
 

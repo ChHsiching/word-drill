@@ -75,6 +75,8 @@
     <string name="drill_skip">跳过</string>
     <string name="drill_lock">锁定</string>
     <string name="drill_unlock">解锁</string>
+    <!-- issue #1: 复习词书的恢复按钮（替代跳过，恢复 = 词回到所有原词书 + 从复习词书移除）-->
+    <string name="drill_restore">恢复</string>
     <string name="drill_swipe_hint">← 左右滑动切换 →</string>
     <!-- 「库」Tab 重写 -->
     <string name="library_large_title">词库</string>
