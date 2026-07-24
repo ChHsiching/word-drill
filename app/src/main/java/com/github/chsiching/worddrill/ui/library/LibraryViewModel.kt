@@ -18,12 +18,13 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * 「库」Tab 对话框状态：未打开 / 新建 / 重命名（带目标 bookId）。
+ * 「库」Tab 对话框状态：未打开 / 新建 / 重命名 / 删除确认（带目标 bookId + 书名）。
  */
 sealed interface LibraryDialog {
     data object None : LibraryDialog
     data class Create(val name: String = "", @StringRes val error: Int? = null) : LibraryDialog
     data class Rename(val bookId: Long, val name: String = "", @StringRes val error: Int? = null) : LibraryDialog
+    data class Delete(val bookId: Long, val name: String) : LibraryDialog
 }
 
 /**
@@ -43,7 +44,7 @@ data class LibraryUiState(
  * - 当前选中由 [SettingsRepository.currentBookId] 标记，切换写入 DataStore
  *   → 「刷」Tab 监听同源 Flow 自动重载（规格：「刷」Tab 刷卡内容立即切换）
  * - 新建：显式查重（不靠 @Insert REPLACE 去重，交接链坑 C）
- * - 删除：[BookDao.deleteCustom] 仅删自定义（预置由 SQL 的 isPreset=0 兜底）
+ * - 删除：二次确认后走 [BookDao.deleteCustom]（预置由 SQL 的 isPreset=0 兜底）
  */
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
@@ -86,6 +87,7 @@ class LibraryViewModel @Inject constructor(
         _dialog.value = when (val d = _dialog.value) {
             is LibraryDialog.Create -> d.copy(name = name, error = error)
             is LibraryDialog.Rename -> d.copy(name = name, error = error)
+            is LibraryDialog.Delete -> d // 删除确认对话框无输入框，不响应名称输入
             LibraryDialog.None -> d
         }
     }
@@ -117,11 +119,21 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    // ---- 删除（仅自定义）----
+    // ---- 删除（仅自定义，带二次确认 #18）----
 
-    /** 删除词书：DAO 层已用 isPreset=0 兜底，预置词书不会被删。 */
-    fun deleteBook(bookId: Long) {
-        viewModelScope.launch { bookDao.deleteCustom(bookId) }
+    /** 打开删除确认对话框（书名用于对话框文案）。 */
+    fun openDeleteDialog(bookId: Long) {
+        val book = uiState.value.books.firstOrNull { it.bookId == bookId } ?: return
+        _dialog.value = LibraryDialog.Delete(bookId = bookId, name = book.name)
+    }
+
+    /** 确认删除：DAO 层已用 isPreset=0 兜底，预置词书不会被删。 */
+    fun submitDelete() {
+        val d = _dialog.value as? LibraryDialog.Delete ?: return
+        viewModelScope.launch {
+            bookDao.deleteCustom(d.bookId)
+            _dialog.value = LibraryDialog.None
+        }
     }
 
     fun dismissDialog() { _dialog.value = LibraryDialog.None }

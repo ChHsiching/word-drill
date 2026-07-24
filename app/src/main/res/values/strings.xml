@@ -18,6 +18,10 @@
     <string name="library_name_hint">词书名称</string>
     <string name="library_cancel">取消</string>
     <string name="library_confirm">确定</string>
+    <!-- Ticket #18：删除词书二次确认 -->
+    <string name="library_delete_title">删除词书</string>
+    <string name="library_delete_message">确定删除「%1$s」？此操作不可撤销。</string>
+    <string name="library_delete_confirm">删除</string>
     <!-- 「库」Tab 词书内词条列表（Ticket #7）-->
     <string name="word_list_add">新增词条</string>
     <string name="word_list_edit">编辑释义</string>
