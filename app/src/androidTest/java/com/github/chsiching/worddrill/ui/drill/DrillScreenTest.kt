@@ -11,6 +11,7 @@ import androidx.compose.ui.test.swipeLeft
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
@@ -82,7 +83,10 @@ class DrillScreenTest {
         db.wordDao().getWordsWithSensesByBook(bookId)
     }
 
-    private fun composeDrillPager(locked: Boolean = false) {
+    private fun composeDrillPager(
+        locked: Boolean = false,
+        onSkip: (Int) -> Unit = {},
+    ) {
         composeRule.setContent {
             WordDrillTheme {
                 Surface {
@@ -90,6 +94,7 @@ class DrillScreenTest {
                         bookName = "测试词书",
                         cards = cards(),
                         onPageSettled = { _, _ -> },
+                        onSkip = onSkip,
                         locked = locked,
                         onToggleLock = {},
                         hidePhonetic = false,
@@ -131,21 +136,36 @@ class DrillScreenTest {
     }
 
     /**
-     * #17 (审核反馈 #3)：锁定状态下跳过按钮仍可点击翻页。
+     * #17 (审核反馈 #3) + #20：锁定状态下跳过按钮仍可点击触发回调。
      * 回归：早期实现里 onSkip 内含 `!locked` 守卫，锁定后跳过无效。验收要求锁定只隐藏
-     * 导航栏，不影响跳过。这里通过点击「跳过」按钮验证：从第 1 张 → 第 2 张。
+     * 导航栏，不影响跳过。Ticket #20 改为回调式 onSkip(page)，这里验证锁定态回调仍触发。
      */
     @Test
     fun skipButtonWorksWhileLocked() {
-        composeDrillPager(locked = true)
+        var skippedPage: Int? = null
+        composeDrillPager(locked = true, onSkip = { page -> skippedPage = page })
 
-        // 起始：第 1 张
+        // 起始：第 1 张（page=0）
         composeRule.onNodeWithText("apple").assertIsDisplayed()
-        // 点击「跳过」
+        // 锁定状态下点击「跳过」仍触发回调
         composeRule.onNodeWithText("跳过").performClick()
         composeRule.waitForIdle()
-        // 锁定状态下仍翻到第 2 张
-        composeRule.onNodeWithText("balance").assertIsDisplayed()
-        composeRule.onNodeWithText("2 / 3").assertIsDisplayed()
+        assertThat(skippedPage).isEqualTo(0)
+    }
+
+    /**
+     * Ticket #20：跳过按钮回调会拿到当前页码（pagerState.currentPage）。
+     * 这是 ViewModel.skipCurrentWord 定位要跳过哪个 word 的依据。用捕获回调验证：
+     * 在第 1 张点跳过 → 回调收到 page=0。
+     */
+    @Test
+    fun skipButton_passesCurrentPageToCallback() {
+        var skippedPage: Int? = null
+        composeDrillPager(onSkip = { page -> skippedPage = page })
+
+        // 第 1 张（page=0）点跳过
+        composeRule.onNodeWithText("跳过").performClick()
+        composeRule.waitForIdle()
+        assertThat(skippedPage).isEqualTo(0)
     }
 }

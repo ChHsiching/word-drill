@@ -24,7 +24,7 @@ import com.github.chsiching.worddrill.data.local.entity.Word
         SwipeLog::class,
         DictionaryEntry::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class WordDrillDatabase : RoomDatabase() {
@@ -73,6 +73,24 @@ abstract class WordDrillDatabase : RoomDatabase() {
                 )
                 db.execSQL(
                     "CREATE UNIQUE INDEX IF NOT EXISTS `index_dictionary_word_pos` ON `dictionary` (`word`, `pos`)"
+                )
+            }
+        }
+
+        /**
+         * Ticket #20：v3 → v4 给 book_word 表加 skipped 列（跳过标记，词书级独立）。
+         *
+         * ALTER TABLE ADD COLUMN 在 SQLite 上保留旧关联行，新列默认 0（未跳过）。
+         * Room Boolean 映射 INTEGER（0/1），migration 显式写 INTEGER NOT NULL DEFAULT 0
+         * 与 Room codegen 的列定义一致（否则 schema 校验会抛 IllegalStateException）。
+         *
+         * 跳过语义：[BookWord.skipped]。词书级独立 = 每条 (bookId, wordId) 关联单独标记，
+         * CET-4 跳过不影响 CET-6 同词的关联。老数据全部 skipped=0（未跳过），行为不变。
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE book_word ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0"
                 )
             }
         }

@@ -87,6 +87,7 @@ fun DrillScreen(
             bookName = state.bookName,
             cards = state.cards,
             onPageSettled = viewModel::onPageSettled,
+            onSkip = { page -> viewModel.skipCurrentWord(page) },
             locked = locked,
             onToggleLock = onToggleLock,
             hidePhonetic = hidePhonetic,
@@ -100,13 +101,13 @@ internal fun DrillPager(
     bookName: String,
     cards: List<WordWithSenses>,
     onPageSettled: (previousPage: Int, currentPage: Int) -> Unit,
+    onSkip: (currentPage: Int) -> Unit,
     locked: Boolean,
     onToggleLock: () -> Unit,
     hidePhonetic: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val pagerState = rememberPagerState(pageCount = { cards.size })
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(pagerState) {
         var previousSettled = pagerState.settledPage
@@ -127,12 +128,11 @@ internal fun DrillPager(
             locked = locked,
             onToggleLock = onToggleLock,
             onSkip = {
-                // 跳过 = 前进一张（不循环，到头不动）；spec 明确「跳过逻辑（加入复习词书）」
-                // 属于另一 ticket，本按钮只负责翻页。
-                // #17 审核反馈 #3：锁定状态下跳过仍可用。锁定只隐藏导航栏，不影响跳过。
-                if (pagerState.currentPage < cards.lastIndex) {
-                    scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
-                }
+                // Ticket #20：跳过当前词 —— 标记 book_word.skipped=1 + 加入复习词书 + 重载卡片。
+                // 重载后被跳过的词从列表消失，pager 停在同一 index 自然指向下一张未跳过的卡
+                // （若跳过的是最后一张，pageCount 缩小后 pager 自动 clamp 到新的末页）。
+                // #17：锁定状态下跳过仍可用（锁定只隐藏导航栏）。
+                onSkip(pagerState.currentPage)
             },
         )
 
@@ -170,6 +170,8 @@ private fun DrillTopBar(
     onToggleLock: () -> Unit,
     onSkip: () -> Unit,
 ) {
+    // onSkip 已在 DrillPager 内包装成无参闭包（捕获 pagerState.currentPage 传给 ViewModel），
+    // 这里原样透传给「跳过」按钮即可。
     Box(
         modifier = Modifier
             .fillMaxWidth()

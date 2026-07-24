@@ -22,8 +22,8 @@ import org.json.JSONObject
  *   "nickname": "可选昵称",            // 空白/省略视为无昵称
  *   "books":   [ { "bookId":1, "name":"CET-4", "isPreset":true } ],
  *   "words":   [ { "wordId":10, "text":"apple", "phonetic":"/ˈæpl/" } ],
- *   "senses":  [ { "senseId":100, "wordId":10, "pos":"n.", "meaning":"苹果" } ],
- *   "bookWords":[ { "bookId":1, "wordId":10 } ],
+ *   "senses":  [ { "senseId":100, "wordId":10, "pos":"n.", "meaning":"书" } ],
+ *   "bookWords":[ { "bookId":1, "wordId":10, "skipped":false } ],
  *   "swipeLogs":[ { "logId":1000, "bookId":2, "wordId":10, "timestamp":1700000000000 } ]
  * }
  * ```
@@ -80,6 +80,9 @@ object DatabaseJsonSerializer {
                 put(JSONObject().apply {
                     put("bookId", bw.bookId)
                     put("wordId", bw.wordId)
+                    // Ticket #20：跳过标记写入导出（true = 已跳过，重导回不丢跳过状态）。
+                    // 默认 false 的行也写，保持字段齐全，反序列化无须猜测缺省。
+                    put("skipped", bw.skipped)
                 })
             }
         })
@@ -129,7 +132,12 @@ object DatabaseJsonSerializer {
             )
         }
         val bookWords = root.getJSONArray("bookWords").toList { bw ->
-            BookWord(bookId = bw.getLong("bookId"), wordId = bw.getLong("wordId"))
+            // Ticket #20：skipped 可空，兼容 #20 之前的导出文件（缺省 → false，未跳过）。
+            BookWord(
+                bookId = bw.getLong("bookId"),
+                wordId = bw.getLong("wordId"),
+                skipped = bw.optBoolean("skipped", false),
+            )
         }
         val swipeLogs = root.getJSONArray("swipeLogs").toList { l ->
             SwipeLog(

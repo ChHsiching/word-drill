@@ -30,6 +30,7 @@ class SettingsRepository @Inject constructor(
 ) {
     private val presetImportedKey = booleanPreferencesKey("preset_imported")
     private val dictionaryImportedKey = booleanPreferencesKey("dictionary_imported")
+    private val reviewBookCreatedKey = booleanPreferencesKey("review_book_created")
     private val currentBookIdKey = longPreferencesKey("current_book_id")
     private val themeKey = stringPreferencesKey("theme_mode")
     private val hidePhoneticKey = booleanPreferencesKey("hide_phonetic")
@@ -53,6 +54,25 @@ class SettingsRepository @Inject constructor(
     /** 标记内置词典导入完成。导入流程成功后调用一次，后续启动跳过导入。 */
     suspend fun markDictionaryImported() {
         context.appDataStore.edit { it[dictionaryImportedKey] = true }
+    }
+
+    // ---- Ticket #20：预置复习词书首启创建幂等标记 ----
+
+    /** 预置「复习」词书是否已创建。未读过时默认 false。 */
+    val reviewBookCreated: Flow<Boolean> =
+        context.appDataStore.data.map { it[reviewBookCreatedKey] ?: false }
+
+    /** 标记复习词书已创建。首次创建后调用一次，后续启动跳过。 */
+    suspend fun markReviewBookCreated() {
+        context.appDataStore.edit { it[reviewBookCreatedKey] = true }
+    }
+
+    /**
+     * 清除复习词书创建标记（置 false）。供测试隔离用：内存 Room 库每次新建为空，
+     * 配合清标记让 [com.github.chsiching.worddrill.data.ReviewBookInitializer] 从干净起点执行。
+     */
+    suspend fun clearReviewBookCreated() {
+        context.appDataStore.edit { it[reviewBookCreatedKey] = false }
     }
 
     /** 当前选中的词书 id。未设置过时为 null（首次启动，调用方应默认选第一本）。 */

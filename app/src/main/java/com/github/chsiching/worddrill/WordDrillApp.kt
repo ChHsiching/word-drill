@@ -3,6 +3,7 @@ package com.github.chsiching.worddrill
 import android.app.Application
 import com.github.chsiching.worddrill.data.DictionaryImportOrchestrator
 import com.github.chsiching.worddrill.data.PresetImportOrchestrator
+import com.github.chsiching.worddrill.data.ReviewBookInitializer
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +24,7 @@ class WordDrillApp : Hilt_WordDrillApp() {
 
     @Inject lateinit var presetImportOrchestrator: PresetImportOrchestrator
     @Inject lateinit var dictionaryImportOrchestrator: DictionaryImportOrchestrator
+    @Inject lateinit var reviewBookInitializer: ReviewBookInitializer
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -33,5 +35,8 @@ class WordDrillApp : Hilt_WordDrillApp() {
         // Ticket #19：首启后台幂等导入内置词典（ECDICT 10 万词，只读参考数据）。
         // 与预置词库导入并行；dictionary 失败不影响用户词书使用。
         appScope.launch { dictionaryImportOrchestrator.ensureDictionaryImported() }
+        // Ticket #20：首启幂等创建预置「复习」词书（跳过的词汇入此处，默认空）。
+        // 独立协程，与词库/词典导入并行；建书本身只一行 INSERT，开销可忽略。
+        appScope.launch { reviewBookInitializer.ensureReviewBookCreated() }
     }
 }
