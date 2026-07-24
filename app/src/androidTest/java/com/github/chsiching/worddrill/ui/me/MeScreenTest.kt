@@ -250,7 +250,8 @@ class MeScreenTest {
     @Test
     fun selectDarkTheme_persistsToDataStore() = runBlocking {
         renderWithVm(vm())
-        // 点「主题」行打开选择对话框，再点"深色"
+        // 「主题」行在屏外（通用组在底部），先 scroll 到它再点开对话框
+        composeRule.onNodeWithText("主题", substring = false).performScrollTo()
         composeRule.onNodeWithText("主题", substring = false).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("深色").performClick()
@@ -273,7 +274,7 @@ class MeScreenTest {
         // 与正文"WordDrill"。正文用 substring=false 精确匹配唯一节点。
         composeRule.onNodeWithText("WordDrill", substring = false).assertIsDisplayed()
         // 版本号行：与 build.gradle.kts 的 versionName 一致；bump 时同步更新。
-        composeRule.onNodeWithText("版本 0.1.0-dev18").assertIsDisplayed()
+        composeRule.onNodeWithText("版本 0.1.0-dev19").assertIsDisplayed()
     }
 
     // ---- Ticket #10/#16：数据导出/导入入口（通用组下两行）----

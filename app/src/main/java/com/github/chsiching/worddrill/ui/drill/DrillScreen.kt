@@ -134,7 +134,9 @@ internal fun DrillPager(
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
-            userScrollEnabled = !locked,
+            // 审核反馈 3：锁定不禁用卡片滑动。锁定只隐藏导航栏 + 跳过按钮（见 WordDrillRoot
+            // 的 BottomNavOverlay.hidden 和 DrillTopBar 的 AnimatedVisibility），
+            // 用户锁定后仍可左右滑卡片浏览。
         ) { pageIndex ->
             WordCard(
                 word = cards[pageIndex],
