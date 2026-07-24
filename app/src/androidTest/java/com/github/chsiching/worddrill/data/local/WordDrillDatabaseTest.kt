@@ -63,6 +63,43 @@ class WordDrillDatabaseTest {
         assertThat(db.wordDao().findIdByText("ghost")).isNull()
     }
 
+    // ---- Ticket #14：word.phonetic（IPA 音标，可空）----
+
+    @Test
+    fun insertWord_withPhonetic_persists() = runTest {
+        val wordDao = db.wordDao()
+        val id = wordDao.insert(Word(text = "apple", phonetic = "/ˈæpl/"))
+        assertThat(wordDao.getById(id)!!.phonetic).isEqualTo("/ˈæpl/")
+    }
+
+    @Test
+    fun insertWord_withoutPhonetic_defaultsNull() = runTest {
+        val wordDao = db.wordDao()
+        val id = wordDao.insert(Word(text = "run"))
+        assertThat(wordDao.getById(id)!!.phonetic).isNull()
+    }
+
+    @Test
+    fun getByText_returnsPhonetic() = runTest {
+        val wordDao = db.wordDao()
+        wordDao.insert(Word(text = "balance", phonetic = "/ˈbæləns/"))
+        assertThat(wordDao.getByText("balance")!!.phonetic).isEqualTo("/ˈbæləns/")
+    }
+
+    @Test
+    fun getWordsWithSensesByBook_carriesPhonetic() = runTest {
+        // @Relation 回填的 Word 也应带 phonetic（验证 getWordsWithSensesByBook 的 SELECT w.*
+        // 覆盖新列，而非显式列清单漏掉 phonetic）
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        val wApple = wordDao.insert(Word(text = "apple", phonetic = "/ˈæpl/"))
+        bookDao.linkBookWord(BookWord(bookId, wApple))
+
+        val result = wordDao.getWordsWithSensesByBook(bookId).single()
+        assertThat(result.word.phonetic).isEqualTo("/ˈæpl/")
+    }
+
     @Test
     fun insertSense_persistsUnderWord() = runTest {
         val wordDao = db.wordDao()

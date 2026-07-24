@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.chsiching.worddrill.data.local.dao.BookDao
+import com.github.chsiching.worddrill.data.local.dao.BookWithCount
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,11 +27,11 @@ sealed interface LibraryDialog {
 }
 
 /**
- * 「库」Tab 的 UI 状态：词书列表 + 当前选中 + 对话框态。
+ * 「库」Tab 的 UI 状态：词书列表（含词条数）+ 当前选中 + 对话框态。
  * books 与 currentBookId 合并成一个 Flow，任一变化列表整体重渲染。
  */
 data class LibraryUiState(
-    val books: List<Book> = emptyList(),
+    val books: List<BookWithCount> = emptyList(),
     val currentBookId: Long? = null,
     val dialog: LibraryDialog = LibraryDialog.None,
 )
@@ -54,7 +55,7 @@ class LibraryViewModel @Inject constructor(
     val dialog: StateFlow<LibraryDialog> = _dialog.asStateFlow()
 
     val uiState: StateFlow<LibraryUiState> = combine(
-        bookDao.observeAll(),
+        bookDao.observeAllWithCounts(),
         settings.currentBookId,
         _dialog,
     ) { books, currentBookId, dialog ->

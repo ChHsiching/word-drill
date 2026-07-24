@@ -1,43 +1,74 @@
 package com.github.chsiching.worddrill.ui.drill
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.local.WordWithSenses
+import com.github.chsiching.worddrill.ui.theme.wordDrillColors
+import com.github.chsiching.worddrill.ui.theme.wordDrillTypography
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 
 /**
- * 「刷」Tab：全屏单卡片浏览。
+ * 「刷」Tab：全屏单卡片浏览（Ticket #5 + #16 重写）。
  *
- * - 顶部纯文字展示当前词书名（不可点击、不可交互）
- * - 中间 HorizontalPager：一页 = 一个 word 的全部 sense（pos + meaning）
- * - 向右滑切下一张并写 swipe_log（计数在 ViewModel，由 [DrillViewModel.onPageSettled] 处理）
- * - 向左滑切上一张，不计数
- * - 到头（第一张/最后一张）显示提示文案，不计数
+ * 顶部条（#16）：词书名（左） ↔ 跳过 + 锁定按钮（右）对称布局。
+ * 锁定态下隐藏跳过按钮；锁定按钮图标变体 + 反色背景。
+ * 切 Tab 自动解锁由 [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot] 负责
+ * （切 Tab 时 reset locked = false）。
+ *
+ * 卡片（#16）：单词 → 音标（若有，Charis SIL，可被「隐藏音标」设置关闭）→ 分割线
+ * → 义项列表（词性斜体 + 中文同行，一行一义项）。
+ *
+ * 计数：[DrillViewModel.onPageSettled]，沿用 Ticket #5 的纯函数 [shouldLogSwipe]。
+ *
+ * @param locked 顶部锁定态（hoisted at [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot]，
+ *   锁定时导航栏淡出、隐藏跳过、禁用 Pager 滑动）
+ * @param onToggleLock 锁定按钮点击回调
+ * @param hidePhonetic 「隐藏音标」设置生效时为 true，卡片不渲染音标行
  */
 @Composable
 fun DrillScreen(
     modifier: Modifier = Modifier,
+    locked: Boolean = false,
+    onToggleLock: () -> Unit = {},
+    hidePhonetic: Boolean = false,
     viewModel: DrillViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -49,6 +80,9 @@ fun DrillScreen(
             bookName = state.bookName,
             cards = state.cards,
             onPageSettled = viewModel::onPageSettled,
+            locked = locked,
+            onToggleLock = onToggleLock,
+            hidePhonetic = hidePhonetic,
             modifier = modifier,
         )
     }
@@ -59,20 +93,19 @@ internal fun DrillPager(
     bookName: String,
     cards: List<WordWithSenses>,
     onPageSettled: (previousPage: Int, currentPage: Int) -> Unit,
+    locked: Boolean,
+    onToggleLock: () -> Unit,
+    hidePhonetic: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    // 线性推进、不循环：pageCount 固定、initialPage = 0。
     val pagerState = rememberPagerState(pageCount = { cards.size })
+    val scope = rememberCoroutineScope()
 
-    // 监听 settled 页面变化：每次页面真正落定，回调 ViewModel 做计数决策。
-    // 用局部变量记住上一次落定的页码，配对成 (previous, current) 交给纯函数决策。
-    // drop(1) 跳过初始页（首次显示不算一次滑动）；
-    // distinctUntilChanged 防止 settledPage 在同一值上重复发射导致重复计数。
     LaunchedEffect(pagerState) {
         var previousSettled = pagerState.settledPage
         snapshotFlow { pagerState.settledPage }
             .distinctUntilChanged()
-            .drop(1) // 跳过初始值，首次落定不计数
+            .drop(1)
             .collect { current ->
                 onPageSettled(previousSettled, current)
                 previousSettled = current
@@ -80,77 +113,195 @@ internal fun DrillPager(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        // 顶部：当前词书名（纯文字，不可交互）
-        Text(
-            text = bookName,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        DrillTopBar(
+            bookName = bookName,
+            index = pagerState.currentPage,
+            total = cards.size,
+            locked = locked,
+            onToggleLock = onToggleLock,
+            onSkip = {
+                // 跳过 = 前进一张（不循环，到头不动）；spec 明确「跳过逻辑（加入复习词书）」
+                // 属于另一 ticket，本按钮只负责翻页。
+                if (!locked && pagerState.currentPage < cards.lastIndex) {
+                    scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                }
+            },
         )
 
-        // 中间：全屏卡片
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
+            // 审核反馈 3：锁定不禁用卡片滑动。锁定只隐藏导航栏 + 跳过按钮（见 WordDrillRoot
+            // 的 BottomNavOverlay.hidden 和 DrillTopBar 的 AnimatedVisibility），
+            // 用户锁定后仍可左右滑卡片浏览。
         ) { pageIndex ->
             WordCard(
                 word = cards[pageIndex],
-                isAtFirstBoundary = pageIndex == 0,
-                isAtLastBoundary = pageIndex == cards.lastIndex,
+                hidePhonetic = hidePhonetic,
             )
         }
     }
 }
 
+/**
+ * 顶部条：词书名（左） · 计数器（中） · 跳过+锁定（右）。
+ *
+ * 计数器要真正在屏幕水平中心，不能跟着 SpaceBetween 走（左右两块宽度不等时，
+ * SpaceBetween 会把中间元素挤偏 —— 审核反馈：跳过+锁定比词书名宽，计数器偏左）。
+ * 用 Box 叠加：底层 Row 用 SpaceBetween 放左右两块，叠加层 Text 计数器用
+ * Alignment.TopCenter 绝对居中（脱离 Row 的均分逻辑）。
+ *
+ * 锁定态隐藏跳过（AnimatedVisibility fade），锁定按钮反色背景 + LockOpen 图标。
+ */
+@Composable
+private fun DrillTopBar(
+    bookName: String,
+    index: Int,
+    total: Int,
+    locked: Boolean,
+    onToggleLock: () -> Unit,
+    onSkip: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 28.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        // 底层：左右两块 SpaceBetween
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // 词书名（左）
+            Text(
+                text = bookName,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelLarge,
+                letterSpacing = 1.sp,
+            )
+            // 跳过 + 锁定（右）
+            // 审核反馈 4：锁定时不隐藏跳过按钮（锁定只隐藏导航栏，跳过仍可用）。
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.drill_skip),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .clickable(onClick = onSkip)
+                        .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                LockButton(locked = locked, onClick = onToggleLock)
+            }
+        }
+        // 叠加层：计数器绝对居中（不被左右宽度差影响）
+        Text(
+            text = "${index + 1} / $total",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelSmall,
+        )
+    }
+}
+
+/** 锁定按钮：默认透明 + tertiary 图标；锁定态反色背景（onSurface）+ background 图标。 */
+@Composable
+private fun LockButton(locked: Boolean, onClick: () -> Unit) {
+    val bg = if (locked) MaterialTheme.colorScheme.onSurface else Color.Transparent
+    val fg = if (locked) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.onSurfaceVariant
+    Surface(
+        shape = CircleShape,
+        color = bg,
+        modifier = Modifier
+            .size(30.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = if (locked) Icons.Outlined.LockOpen else Icons.Outlined.Lock,
+                contentDescription = stringResource(
+                    if (locked) R.string.drill_unlock else R.string.drill_lock
+                ),
+                tint = fg,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+/**
+ * 单张卡片：单词 → 音标 → 分割线 → 义项列表。
+ * 卡片切换的 spring 入场由 HorizontalPager 的页面重组自然驱动（每页 Composable 独立实例）。
+ *
+ * 审核反馈：去掉「已是第一张 / 已是最后一张」提示 —— 顶部计数器「X / Y」已表达位置，
+ * 卡片内再重复提示冗余。
+ */
 @Composable
 private fun WordCard(
     word: WordWithSenses,
-    isAtFirstBoundary: Boolean,
-    isAtLastBoundary: Boolean,
+    hidePhonetic: Boolean,
 ) {
-    // 到头提示在当前页底部，提示不计数（计数只由 onPageSettled 决定）
-    val boundaryHint = when {
-        isAtFirstBoundary && isAtLastBoundary -> null // 仅一张卡：不提示到头
-        isAtFirstBoundary -> stringResource(R.string.drill_first_card)
-        isAtLastBoundary -> stringResource(R.string.drill_last_card)
-        else -> null
-    }
+    val typography = MaterialTheme.wordDrillTypography
+    val colors = MaterialTheme.colorScheme
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
+            .padding(horizontal = 28.dp),
+        contentAlignment = Alignment.TopCenter,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+            // 审核反馈 2：卡片原垂直居中显得太靠下，改靠上偏移约屏幕 12%
+            // （给一个合理的顶部呼吸空间，不顶到顶条，也不沉到中间）。
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 80.dp),
         ) {
-            // 英文单词（大字号居中）
+            // 英文单词 —— 44sp SemiBold
             Text(
                 text = word.word.text,
-                style = MaterialTheme.typography.displaySmall,
+                style = typography.word.copy(color = colors.onSurface),
                 textAlign = TextAlign.Center,
             )
-            // 每条释义一行：词性 + 中文释义
-            word.senses.forEach { sense ->
+            // 音标 —— Charis SIL，受 hidePhonetic 控制
+            if (!word.word.phonetic.isNullOrBlank() && !hidePhonetic) {
                 Text(
-                    text = "${sense.pos}  ${sense.meaning}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    text = word.word.phonetic,
+                    style = typography.phonetic.copy(color = colors.onSurfaceVariant),
+                    modifier = Modifier.padding(top = 10.dp),
                 )
             }
-            if (boundaryHint != null) {
-                Text(
-                    text = boundaryHint,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 16.dp),
-                )
+            // 分割线 —— 32×1 separatorStrong
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 20.dp)
+                    .width(32.dp)
+                    .height(1.dp)
+                    .background(MaterialTheme.wordDrillColors.separatorStrong),
+            )
+            // 义项列表 —— 一行一义项：词性斜体 + 中文同行
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                word.senses.forEach { sense ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = sense.pos,
+                            style = typography.partOfSpeech.copy(color = colors.onSurfaceVariant),
+                        )
+                        Text(
+                            text = sense.meaning,
+                            style = typography.meaning.copy(color = colors.onSurface),
+                        )
+                    }
+                }
             }
         }
     }

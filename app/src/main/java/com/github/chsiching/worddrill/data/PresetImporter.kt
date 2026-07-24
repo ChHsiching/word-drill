@@ -48,8 +48,10 @@ class PresetImporter @Inject constructor(
 
             for (wordSpec in bookSpec.words) {
                 // 1) 全局词条池去重：命中复用 wordId，未命中新建
+                // Ticket #14：新建时带上预置词库的 phonetic（IPA）。已有行不覆盖
+                // （跨词书重复或重复导入——音标本身按 text 全局唯一，无需回填）。
                 val wordId = wordDao.findIdByText(wordSpec.text)
-                    ?: wordDao.insert(Word(text = wordSpec.text)).let { id ->
+                    ?: wordDao.insert(Word(text = wordSpec.text, phonetic = wordSpec.phonetic)).let { id ->
                         if (id == -1L) wordDao.findIdByText(wordSpec.text)!! else id
                     }
 

@@ -21,7 +21,7 @@ import org.json.JSONObject
  *   "version": 1,
  *   "nickname": "可选昵称",            // 空白/省略视为无昵称
  *   "books":   [ { "bookId":1, "name":"CET-4", "isPreset":true } ],
- *   "words":   [ { "wordId":10, "text":"apple" } ],
+ *   "words":   [ { "wordId":10, "text":"apple", "phonetic":"/ˈæpl/" } ],
  *   "senses":  [ { "senseId":100, "wordId":10, "pos":"n.", "meaning":"苹果" } ],
  *   "bookWords":[ { "bookId":1, "wordId":10 } ],
  *   "swipeLogs":[ { "logId":1000, "bookId":2, "wordId":10, "timestamp":1700000000000 } ]
@@ -29,6 +29,7 @@ import org.json.JSONObject
  * ```
  *
  * 反序列化对缺省字段做安全回退：version 缺省为 1，nickname 缺省/空白为 null；
+ * word.phonetic 缺省/空白为 null（兼容 Ticket #14 之前的导出文件）；
  * 但 books/words/senses/bookWords/swipeLogs 数组缺省时抛 [org.json.JSONException]
  *（与 [com.github.chsiching.worddrill.data.PresetWordsParser] 的策略一致：缺关键字段视为损坏文件）。
  */
@@ -58,6 +59,9 @@ object DatabaseJsonSerializer {
                 put(JSONObject().apply {
                     put("wordId", w.wordId)
                     put("text", w.text)
+                    // Ticket #14：phonetic 为空不写入（与 nickname 同策略：导出文件不留空标签，
+                    // 反序列化时 optString 默认 "" → null）。
+                    if (!w.phonetic.isNullOrBlank()) put("phonetic", w.phonetic)
                 })
             }
         })
@@ -106,7 +110,15 @@ object DatabaseJsonSerializer {
             )
         }
         val words = root.getJSONArray("words").toList { w ->
-            Word(wordId = w.getLong("wordId"), text = w.getString("text"))
+            // Ticket #14：phonetic 可空。
+            // ⚠️ w.isNull 先挡 JSON null（见 PresetWordsParser 同款坑的说明）：
+            // Android org.json 的 optString 在值为 JSON null 时返回字符串 "null"。
+            Word(
+                wordId = w.getLong("wordId"),
+                text = w.getString("text"),
+                phonetic = if (w.isNull("phonetic")) null
+                else w.optString("phonetic", "").ifBlank { null },
+            )
         }
         val senses = root.getJSONArray("senses").toList { s ->
             Sense(

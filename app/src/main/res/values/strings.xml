@@ -7,8 +7,6 @@
     <!-- 「刷」Tab 卡片浏览 -->
     <string name="drill_empty">这个词书是空的</string>
     <string name="drill_loading">加载中…</string>
-    <string name="drill_first_card">已是第一张</string>
-    <string name="drill_last_card">已是最后一张</string>
     <!-- 「库」Tab 词书列表 -->
     <string name="library_title">词书</string>
     <string name="library_preset_badge">预置</string>
@@ -68,4 +66,25 @@
     <string name="me_export_failed">导出失败</string>
     <string name="me_import_failed">导入失败</string>
     <string name="me_working">处理中…</string>
+    <!-- Ticket #16：UI 重写新增文案 -->
+    <!-- 「刷」Tab：顶部条 -->
+    <string name="drill_skip">跳过</string>
+    <string name="drill_lock">锁定</string>
+    <string name="drill_unlock">解锁</string>
+    <string name="drill_swipe_hint">← 左右滑动切换 →</string>
+    <!-- 「库」Tab 重写 -->
+    <string name="library_large_title">词库</string>
+    <string name="library_word_count_format">%1$d 词 · %2$s</string>
+    <!-- 「我的」Tab 重写：设置分组 -->
+    <string name="me_group_display">显示</string>
+    <string name="me_group_navigation">导航</string>
+    <string name="me_group_general">通用</string>
+    <string name="me_setting_hide_phonetic">隐藏音标</string>
+    <string name="me_setting_nav_style">导航栏风格</string>
+    <string name="me_setting_nav_style_pill">浮动胶囊</string>
+    <string name="me_setting_nav_style_bar">底部栏</string>
+    <string name="me_setting_compact_nav">简约导航</string>
+    <string name="me_setting_export">导出数据</string>
+    <string name="me_setting_import">导入数据</string>
+    <string name="me_setting_about">关于</string>
 </resources>

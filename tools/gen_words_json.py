@@ -8,12 +8,14 @@
 - 三本预置词书的成员由 ECDICT 的 tag 字段确定：cet4 / cet6 / ky（考研）。
 - 词性 (POS) 与中文释义从 translation 字段逐行解析（cet4/cet6/ky 单词的 pos 列为空，
   词性嵌在 translation 每行行首，如 "vt. 放弃..."）。
+- Ticket #14：phonetic（IPA 音标）取自 ECDICT 的 phonetic 字段，归一化为标准 IPA
+  并包裹斜杠，输出为 "phonetic": "/əˈbændən/"。
 
 输出 JSON schema（与 Room 全局词条池对应）：
   {
     "source": "ECDICT (MIT)",
     "books": [
-      { "name": "CET-4", "words": [ { "text": "apple", "senses": [ {"pos":"n.","meaning":"苹果"} ] } ] },
+      { "name": "CET-4", "words": [ { "text": "apple", "phonetic": "/ˈæpl/", "senses": [ {"pos":"n.","meaning":"苹果"} ] } ] },
       ...
     ]
   }
@@ -25,6 +27,12 @@
 - 否则（如 "[经] 能力" 这类领域标注、或无前缀的补充行）→ 追加到上一条 sense 的 meaning
   （分号分隔），不另起 sense。
 - 一个 POS 下若多行（极少见），同样合并进同一条 meaning。
+
+音标归一化（normalize_phonetic）：
+- ECDICT 的 phonetic 用了几个非标准字符（西里尔字母 ә/є 代替 IPA schwa），重音用 "'" 而非 "ˈ"。
+  统一映射到标准 IPA：ә→ə、є→ə、'→ˈ，再去掉空白。
+- 包裹斜杠："buk" → "/buk/"，与 #14 acceptance 的 "/əˈbændən/" 格式一致。
+- 空字符串 → 返回 None（前端按 null 渲染"无音标"）。
 
 用法：python tools/gen_words_json.py <path/to/ecdict.csv>
 （默认读 ./ecdict.csv）
@@ -49,6 +57,32 @@ BOOK_TAGS = [
     ("cet6", "CET-6"),
     ("ky", "考研英语"),
 ]
+
+# ECDICT phonetic 字段里的非标准字符 → 标准 IPA（见模块 docstring 的字符普查依据）。
+# 注意 ә (U+04D9 西里尔 schwa) 和 є (U+0454 西里尔 ie) 在 ECDICT 里都代表 IPA ə (U+0259)。
+# "^" 在 ECDICT 里偶发作为重音标记出现（7 个 cet4/cet6/ky 词，如 "God"→"^ɔd"），
+# 与 "'" 同义（都表主重音）；统一映射成 IPA 主重音 ˈ。
+PHONETIC_CHARMAP = str.maketrans({
+    "'": "\u02C8",   # ASCII apostrophe → IPA 主重音 ˈ (U+02C8)
+    "^": "\u02C8",   # caret → IPA 主重音 ˈ（ECDICT 的非标准重音记号）
+    "\u04D9": "\u0259",  # ә Cyrillic schwa → ə IPA schwa
+    "\u0454": "\u0259",  # є Cyrillic ie      → ə IPA schwa
+})
+
+
+def normalize_phonetic(raw):
+    """
+    把 ECDICT phonetic 字段归一化为包裹斜杠的标准 IPA 字符串；空输入返回 None。
+    例："'bændәn" → "/ˈbændən/"，"buk" → "/buk/"，"" → None。
+    """
+    if not raw:
+        return None
+    cleaned = raw.strip().translate(PHONETIC_CHARMAP)
+    # 去掉字间空白（ECDICT 偶有 "kəm'pju:tə" 之类无空格，但保险起见统一去空格）
+    cleaned = re.sub(r"\s+", "", cleaned)
+    if not cleaned:
+        return None
+    return "/" + cleaned + "/"
 
 
 def parse_translation(translation):
@@ -103,8 +137,8 @@ def main():
     if not os.path.exists(csv_path):
         sys.exit(f"ERROR: ecdict.csv not found at {csv_path}")
 
-    # 每个单词只解析一次（多个词书共享），缓存 text -> senses
-    word_senses_cache = {}
+    # 每个单词只解析一次（多个词书共享），缓存 text -> (senses, phonetic)
+    word_cache = {}
     books_payload = []
 
     with open(csv_path, encoding="utf-8") as f:
@@ -125,12 +159,13 @@ def main():
             if not trans.strip():
                 skipped += 1
                 continue
-            if text not in word_senses_cache:
+            if text not in word_cache:
                 senses = parse_translation(trans)
                 if not senses:
                     skipped += 1
                     continue
-                word_senses_cache[text] = senses
+                phonetic = normalize_phonetic(row.get("phonetic") or "")
+                word_cache[text] = (senses, phonetic)
             for t, _ in BOOK_TAGS:
                 if t in tags:
                     by_tag[t].append(text)
@@ -139,11 +174,13 @@ def main():
         words = sorted(set(by_tag[tag]))
         book_words = []
         for text in words:
-            senses = word_senses_cache[text]
-            book_words.append({
+            senses, phonetic = word_cache[text]
+            entry = {
                 "text": text,
+                "phonetic": phonetic,
                 "senses": [{"pos": p, "meaning": m} for p, m in senses],
-            })
+            }
+            book_words.append(entry)
         books_payload.append({"name": book_name, "words": book_words})
 
     out = {
@@ -164,8 +201,9 @@ def main():
         n = len(next(b for b in books_payload if b["name"] == book_name)["words"])
         print(f"{book_name}: {n} words")
     # 全局唯一单词数
-    unique = len(word_senses_cache)
-    print(f"global unique words: {unique}")
+    unique = len(word_cache)
+    with_phonetic = sum(1 for _, ph in word_cache.values() if ph)
+    print(f"global unique words: {unique} (with phonetic: {with_phonetic})")
     print(f"skipped (no trans / phrase / empty): {skipped}")
     print(f"wrote {out_path} ({os.path.getsize(out_path)//1024} KB)")
 

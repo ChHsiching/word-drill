@@ -30,7 +30,10 @@ object DatabaseModule {
             context,
             WordDrillDatabase::class.java,
             "worddrill.db"
-        ).build()
+        )
+            // Ticket #14：显式注册 v1→v2，避免 fallbackToDestructiveMigration 清掉用户词书/刷卡记录。
+            .addMigrations(WordDrillDatabase.MIGRATION_1_2)
+            .build()
 
     @Provides
     fun provideWordDao(db: WordDrillDatabase): WordDao = db.wordDao()

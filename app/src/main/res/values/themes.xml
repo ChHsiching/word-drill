@@ -1,8 +1,9 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. 使用 Material3 Compose 主题，这里仅为 AndroidManifest 引用占位。 -->
-    <style name="Theme.WordDrill" parent="android:Theme.Material.Light.NoActionBar">
+    <!-- Base application theme. 颜色完全由 Compose WordDrillTheme 控制，
+         这里只用透明系统栏（edge-to-edge）。窗口背景设透明避免闪烁白色。 -->
+    <style name="Theme.WordDrill" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 </resources>
