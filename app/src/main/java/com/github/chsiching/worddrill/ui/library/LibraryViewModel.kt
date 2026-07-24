@@ -1,12 +1,18 @@
 package com.github.chsiching.worddrill.ui.library
 
+import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.local.dao.BookDao
 import com.github.chsiching.worddrill.data.local.dao.BookWithCount
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
+import com.github.chsiching.worddrill.data.wordimport.FileNotOpenableException
+import com.github.chsiching.worddrill.data.wordimport.FileWordImporter
+import com.github.chsiching.worddrill.data.wordimport.ImportSummary
+import com.github.chsiching.worddrill.data.wordimport.UnsupportedFileTypeException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,13 +24,26 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * 「库」Tab 对话框状态：未打开 / 新建 / 重命名 / 删除确认（带目标 bookId + 书名）。
+ * 「库」Tab 对话框状态：未打开 / 新建 / 重命名 / 删除确认 / 从文件导入 / 导入完成。
+ *
+ * - [Import]：选文件 + 输入词书名 → 提交（working=true 表示正在写库）
+ * - [ImportDone]：导入完成（带 [ImportSummary]），由 Composable 展示后 dismiss
  */
 sealed interface LibraryDialog {
     data object None : LibraryDialog
     data class Create(val name: String = "", @StringRes val error: Int? = null) : LibraryDialog
     data class Rename(val bookId: Long, val name: String = "", @StringRes val error: Int? = null) : LibraryDialog
     data class Delete(val bookId: Long, val name: String) : LibraryDialog
+    data class Import(
+        val uri: Uri? = null,
+        val filename: String? = null,
+        val name: String = "",
+        @StringRes val error: Int? = null,
+        val working: Boolean = false,
+        @StringRes val failureMessage: Int? = null,
+        val failureDetail: String? = null,
+    ) : LibraryDialog
+    data class ImportDone(val summary: ImportSummary) : LibraryDialog
 }
 
 /**
@@ -45,11 +64,13 @@ data class LibraryUiState(
  *   → 「刷」Tab 监听同源 Flow 自动重载（规格：「刷」Tab 刷卡内容立即切换）
  * - 新建：显式查重（不靠 @Insert REPLACE 去重，交接链坑 C）
  * - 删除：二次确认后走 [BookDao.deleteCustom]（预置由 SQL 的 isPreset=0 兜底）
+ * - 文件导入（#21）：SAF 选 Uri + 输入词书名 → [FileWordImporter.import] → ImportDone
  */
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val bookDao: BookDao,
     private val settings: SettingsRepository,
+    private val fileImporter: FileWordImporter,
 ) : ViewModel() {
 
     private val _dialog = MutableStateFlow<LibraryDialog>(LibraryDialog.None)
@@ -87,8 +108,9 @@ class LibraryViewModel @Inject constructor(
         _dialog.value = when (val d = _dialog.value) {
             is LibraryDialog.Create -> d.copy(name = name, error = error)
             is LibraryDialog.Rename -> d.copy(name = name, error = error)
+            is LibraryDialog.Import -> d.copy(name = name, error = error)
             is LibraryDialog.Delete -> d // 删除确认对话框无输入框，不响应名称输入
-            LibraryDialog.None -> d
+            LibraryDialog.None, is LibraryDialog.ImportDone -> d
         }
     }
 
@@ -133,6 +155,51 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             bookDao.deleteCustom(d.bookId)
             _dialog.value = LibraryDialog.None
+        }
+    }
+
+    // ---- 文件导入（Ticket #21）----
+
+    fun openImportDialog() { _dialog.value = LibraryDialog.Import() }
+
+    /** SAF 回调：用户选完文件后由 Composable 传入 Uri + 文件名（取自 Cursor DISPLAY_NAME）。 */
+    fun onFileSelected(uri: Uri, filename: String) {
+        val d = _dialog.value as? LibraryDialog.Import ?: return
+        _dialog.value = d.copy(uri = uri, filename = filename, failureMessage = null, failureDetail = null)
+    }
+
+    /** 提交导入：通过校验（名称 + 必须选文件）才走 [FileWordImporter.import]。 */
+    fun submitImport() {
+        val d = _dialog.value as? LibraryDialog.Import ?: return
+        if (d.error != null) return
+        val uri = d.uri ?: return
+        val filename = d.filename ?: return
+        val name = d.name.trim()
+        if (name.isEmpty()) return
+        viewModelScope.launch {
+            _dialog.value = d.copy(working = true)
+            try {
+                val summary = fileImporter.import(uri = uri, bookName = name, filenameDecoded = filename)
+                _dialog.value = LibraryDialog.ImportDone(summary)
+            } catch (e: UnsupportedFileTypeException) {
+                _dialog.value = d.copy(
+                    working = false,
+                    failureMessage = R.string.library_import_failed_file_type,
+                    failureDetail = null,
+                )
+            } catch (e: FileNotOpenableException) {
+                _dialog.value = d.copy(
+                    working = false,
+                    failureMessage = R.string.library_import_failed_open,
+                    failureDetail = null,
+                )
+            } catch (e: Exception) {
+                _dialog.value = d.copy(
+                    working = false,
+                    failureMessage = R.string.library_import_failed,
+                    failureDetail = e.message,
+                )
+            }
         }
     }
 

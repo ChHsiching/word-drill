@@ -4,6 +4,7 @@ import android.app.Application
 import com.github.chsiching.worddrill.data.DictionaryImportOrchestrator
 import com.github.chsiching.worddrill.data.PresetImportOrchestrator
 import com.github.chsiching.worddrill.data.ReviewBookInitializer
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,11 @@ class WordDrillApp : Hilt_WordDrillApp() {
 
     override fun onCreate() {
         super.onCreate()
+        // Ticket #21：PdfBox-Android 的 native 库（libpdfbox.so）需在用前 init。
+        // 文件导入 PDF 时 [com.github.chsiching.worddrill.data.wordimport.PdfTableParser]
+        // 依赖它；这里在 Application 启动时一次性初始化，幂等（PDFBoxResourceLoader 内部已防重）。
+        PDFBoxResourceLoader.init(this)
+
         // 首启在后台幂等导入预置词库；已导入则立即返回，无重复开销。
         appScope.launch { presetImportOrchestrator.ensurePresetImported() }
         // Ticket #19：首启后台幂等导入内置词典（ECDICT 10 万词，只读参考数据）。
