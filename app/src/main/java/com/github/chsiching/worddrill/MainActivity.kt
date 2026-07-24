@@ -12,9 +12,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.data.settings.ThemeMode
 import com.github.chsiching.worddrill.ui.navigation.WordDrillRoot
-import com.github.chsiching.worddrill.ui.theme.BgDark
-import com.github.chsiching.worddrill.ui.theme.BgLight
-import com.github.chsiching.worddrill.ui.theme.ThemeRevealBox
+import com.github.chsiching.worddrill.ui.theme.ThemeRevealContent
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.lifecycleScope
@@ -53,21 +51,11 @@ class MainActivity : Hilt_MainActivity() {
         )
         setContent {
             val themeMode by themeState.collectAsStateWithLifecycle()
-            var renderedTheme by remember { mutableStateOf(themeMode) }
 
-            WordDrillTheme(themeMode = renderedTheme) {
-                // 目标背景色：当前是深色 → 切浅色 → 圆用白(BgLight)；当前浅 → 切深 → 圆用黑(BgDark)
-                val currentlyDark = renderedTheme == ThemeMode.DARK ||
-                    (renderedTheme == ThemeMode.SYSTEM && androidx.compose.foundation.isSystemInDarkTheme())
-                val targetBg = if (currentlyDark) BgLight else BgDark
-
-                ThemeRevealBox(
-                    targetBgColor = targetBg,
-                    onApplyTheme = { targetIsDark ->
-                        // 圆到 50% 时真切：本地立即切（不等 DataStore）+ 异步写库
-                        renderedTheme = if (targetIsDark) ThemeMode.DARK else ThemeMode.LIGHT
-                    },
-                ) {
+            // content lambda 接收「用哪个主题渲染」，ThemeRevealContent 自动处理
+            // 底层（当前主题）+ overlay（新主题，clip 成圆形扩散）
+            ThemeRevealContent(currentTheme = themeMode) { renderTheme ->
+                WordDrillTheme(themeMode = renderTheme) {
                     WordDrillRoot()
                 }
             }

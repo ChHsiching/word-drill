@@ -3,7 +3,9 @@ package com.github.chsiching.worddrill.ui.theme
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,98 +13,119 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import kotlinx.coroutines.launch
 import kotlin.math.hypot
 
 /**
- * Circular Reveal 主题切换（审核反馈 5）。
+ * Circular Reveal 主题切换（审核反馈 5 重写）。
  *
- * 效果：点击主题切换 icon 后，以 icon 为圆心，新主题的背景色呈圆形从 icon 扩散到全屏。
+ * 之前错误：只画纯色圆覆盖内容。正确效果：圆内是完整的新主题 UI（背景+文字+所有元素），
+ * 圆外是旧主题 UI。所以需要 app 内容渲染两遍（旧 + 新 overlay），新主题被 clip 成圆形。
  *
- * 流程：
- * 1. MeScreen 的 icon 点击 → [LocalThemeRevealTrigger].invoke(iconCenter, targetTheme)
- * 2. ThemeRevealBox 启动 Animatable(0→1)，圆从 icon 扩展
- * 3. 圆到 50% → [onApplyTheme](targetTheme) 真切 ColorScheme（被圆覆盖看不见接缝）
- * 4. 圆到 100% → 动画结束，移除 overlay
+ * 用法：在 [ThemeRevealContent] 里渲染 app 内容，它会自动处理双主题叠加 + clip 动画。
+ * 触发点通过 [LocalThemeRevealTrigger] 传入 icon 中心坐标 + 目标主题。
  *
- * targetBgColor 用目标主题背景色（深色=黑/浅色=白）。
- *
- * @param targetBgColor reveal 圆的颜色（目标主题背景色）
- * @param onApplyTheme 圆扩展到 50% 时调用，参数是目标主题（在这里真切 ColorScheme）
+ * @param currentTheme 当前渲染的主题（传给 content lambda 决定用哪套 ColorScheme）
+ * @param content 渲染 app 内容的 lambda，接收「应该用哪个主题渲染」参数
  */
 @Composable
-fun ThemeRevealBox(
-    targetBgColor: Color,
-    onApplyTheme: (targetIsDark: Boolean) -> Unit,
-    content: @Composable () -> Unit,
+fun <T> ThemeRevealContent(
+    currentTheme: T,
+    content: @Composable (theme: T) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
 
-    var triggerCenter by remember { mutableStateOf<Offset?>(null) }
+    // overlay 主题（reveal 期间用，null = 无 overlay）
+    var overlayTheme by remember { mutableStateOf<T?>(null) }
+    // 触发点（屏幕坐标 px）
+    var revealCenter by remember { mutableStateOf(Offset.Zero) }
+    // reveal 进度 0→1
     val revealProgress = remember { Animatable(0f) }
     var animating by remember { mutableStateOf(false) }
-    var pendingTargetIsDark by remember { mutableStateOf(false) }
 
-    val trigger: ThemeRevealTrigger = { center, targetIsDark ->
+    // 动态圆形 Shape（半径随 revealProgress 变）
+    val circleShape = remember(revealCenter, revealProgress.value) {
+        CircleRevealShape(revealCenter, revealProgress.value)
+    }
+
+    val trigger: ThemeRevealTrigger = { center, startReveal ->
         if (!animating) {
-            triggerCenter = center
-            pendingTargetIsDark = targetIsDark
+            revealCenter = center
             animating = true
-            scope.launch {
-                revealProgress.snapTo(0f)
-                revealProgress.animateTo(0.5f, animationSpec = tween(400))
-                onApplyTheme(targetIsDark)
-                revealProgress.animateTo(1f, animationSpec = tween(400))
-                animating = false
-                triggerCenter = null
+            startReveal { newTheme ->
+                // startReveal 回调返回目标主题；设为 overlay，开始动画
+                @Suppress("UNCHECKED_CAST")
+                overlayTheme = newTheme as T
+                scope.launch {
+                    revealProgress.snapTo(0f)
+                    revealProgress.animateTo(1f, animationSpec = tween(700))
+                    animating = false
+                    overlayTheme = null
+                }
             }
         }
     }
 
-    androidx.compose.runtime.CompositionLocalProvider(
-        LocalThemeRevealTrigger provides trigger,
-    ) {
+    // 底层：当前主题
+    content(currentTheme)
+
+    // 顶层 overlay：新主题（如果有），被 clip 成圆形
+    overlayTheme?.let { ot ->
         Box(
-            modifier = Modifier.drawWithContent {
-                drawContent()
-                val center = triggerCenter
-                if (center != null && animating) {
-                    val maxRadius = listOf(
-                        hypot(center.x, center.y),
-                        hypot(size.width - center.x, center.y),
-                        hypot(center.x, size.height - center.y),
-                        hypot(size.width - center.x, size.height - center.y),
-                    ).max()
-                    val radius = maxRadius * revealProgress.value
-                    clipPath(
-                        Path().apply {
-                            addOval(Rect(center = center, radius = radius))
-                        },
-                    ) {
-                        drawRect(targetBgColor)
-                    }
-                }
-            },
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(circleShape),
         ) {
-            content()
+            content(ot)
         }
     }
 }
 
-/**
- * 触发主题 reveal。
- * - [Offset]：触发点屏幕坐标（icon 中心）
- * - [Boolean]：目标是否深色（true=切到深色，false=切到浅色）
- */
-typealias ThemeRevealTrigger = (center: Offset, targetIsDark: Boolean) -> Unit
+/** 触发 reveal。参数：icon 中心坐标 + 启动回调（回调接收一个 setTheme 函数）。 */
+typealias ThemeRevealTrigger = (center: Offset, startReveal: (setOverlayTheme: (Any?) -> Unit) -> Unit) -> Unit
 
 val LocalThemeRevealTrigger = compositionLocalOf<ThemeRevealTrigger> {
-    // 默认无 reveal：直接应用（向后兼容）
-    { _, _ -> }
+    // 默认无 reveal：直接调 startReveal 但不设 overlay（退化为瞬间切，无动画）
+    { _, startReveal -> startReveal {} }
+}
+
+/**
+ * 以 [center] 为圆心、半径 = maxRadius × [progress] 的圆形 Shape。
+ * 用于 clip overlay（新主题只在圆内可见）。
+ */
+private class CircleRevealShape(
+    private val center: Offset,
+    private val progress: Float,
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+        density: androidx.compose.ui.unit.Density,
+    ): Outline {
+        val maxRadius = listOf(
+            hypot(center.x, center.y),
+            hypot(size.width - center.x, center.y),
+            hypot(center.x, size.height - center.y),
+            hypot(size.width - center.x, size.height - center.y),
+        ).max()
+        val radius = maxRadius * progress
+        val path = Path().apply {
+            addOval(
+                androidx.compose.ui.geometry.Rect(
+                    center = center,
+                    radius = radius,
+                ),
+            )
+        }
+        return Outline.Generic(path)
+    }
 }

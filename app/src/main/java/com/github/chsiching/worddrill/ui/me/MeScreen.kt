@@ -108,9 +108,9 @@ fun MeScreen(
             )
             ThemeToggleIcon(
                 themeMode = themeMode,
-                onToggle = { targetIsDark ->
-                    // 直接切深/浅（不走 cycle，cycle 可能跳 SYSTEM 与 reveal 目标不符）
-                    settingsViewModel.setTheme(if (targetIsDark) ThemeMode.DARK else ThemeMode.LIGHT)
+                onToggle = { targetMode ->
+                    // 三态循环的目标主题（SYSTEM → LIGHT → DARK → SYSTEM）
+                    settingsViewModel.setTheme(targetMode)
                 },
             )
         }
@@ -398,16 +398,30 @@ private fun NavStyleRow(current: NavStyle, onClick: () -> Unit) {
  * 点击：本地算「当前是否深色 → 目标 = 反过来」，传给 [LocalThemeRevealTrigger]
  * 触发 circular reveal；同时写 DataStore（cycleTheme）持久化。
  */
+/**
+ * 主题三态循环：SYSTEM → LIGHT → DARK → SYSTEM。
+ * 纯函数，便于本地预算目标（reveal 需要点击瞬间知道目标）。
+ */
+private fun nextThemeMode(current: ThemeMode): ThemeMode = when (current) {
+    ThemeMode.SYSTEM -> ThemeMode.LIGHT
+    ThemeMode.LIGHT -> ThemeMode.DARK
+    ThemeMode.DARK -> ThemeMode.SYSTEM
+}
+
+/** 判断某主题当前是否深色（SYSTEM 取系统当前）。@Composable 因为 isSystemInDarkTheme 是。 */
+@Composable
+private fun isDarkMode(mode: ThemeMode): Boolean = when (mode) {
+    ThemeMode.LIGHT -> false
+    ThemeMode.DARK -> true
+    ThemeMode.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
+}
+
 @Composable
 private fun ThemeToggleIcon(
     themeMode: ThemeMode,
-    onToggle: (targetIsDark: Boolean) -> Unit,
+    onToggle: (targetMode: ThemeMode) -> Unit,
 ) {
-    val isDark = when (themeMode) {
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-        ThemeMode.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
-    }
+    val isDark = isDarkMode(themeMode)
     val trigger = LocalThemeRevealTrigger.current
     val iconVector = if (isDark) Icons.Outlined.DarkMode else Icons.Outlined.LightMode
 
@@ -428,10 +442,12 @@ private fun ThemeToggleIcon(
                     iconPos.x + iconSize / 2f,
                     iconPos.y + iconSize / 2f,
                 )
-                // 先写 DataStore（onToggle），再触发 reveal（trigger）。
-                // 顺序无所谓：reveal 在中点才真切 ColorScheme，DataStore 异步写不影响视觉。
-                onToggle(!isDark)
-                trigger(center, !isDark)
+                // 三态循环的目标
+                val target = nextThemeMode(themeMode)
+                trigger(center) { setOverlayTheme ->
+                    setOverlayTheme(target)
+                    onToggle(target)
+                }
             },
         ) {
             Icon(
