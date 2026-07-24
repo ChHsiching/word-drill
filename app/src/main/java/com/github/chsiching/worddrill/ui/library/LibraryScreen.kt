@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -93,7 +94,7 @@ fun LibraryScreen(
                         onOpen = { onOpenBook(book.bookId) },
                         onSelectCurrent = { viewModel.selectBook(book.bookId) },
                         onRename = { viewModel.openRenameDialog(book.bookId) },
-                        onDelete = { viewModel.deleteBook(book.bookId) },
+                        onDelete = { viewModel.openDeleteDialog(book.bookId) },
                     )
                 }
             }
@@ -123,6 +124,11 @@ fun LibraryScreen(
             error = dialog.error,
             onNameInput = viewModel::onNameInput,
             onConfirm = viewModel::submitRename,
+            onDismiss = viewModel::dismissDialog,
+        )
+        is LibraryDialog.Delete -> DeleteBookDialog(
+            name = dialog.name,
+            onConfirm = viewModel::submitDelete,
             onDismiss = viewModel::dismissDialog,
         )
     }
@@ -270,6 +276,35 @@ private fun BookNameDialog(
             TextButton(onClick = onConfirm, enabled = error == null && name.isNotBlank()) {
                 Text(stringResource(R.string.library_confirm))
             }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_cancel)) }
+        },
+    )
+}
+
+/**
+ * 删除词书二次确认对话框（Ticket #18）。
+ * 取消是安全选项（默认）；删除用 error 色提示破坏性。DAO 层 isPreset=0 兜底，UI 层
+ * 已对预置词书隐藏删除入口，这里只处理自定义词书。
+ */
+@Composable
+private fun DeleteBookDialog(
+    name: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.library_delete_title)) },
+        text = { Text(stringResource(R.string.library_delete_message, name)) },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
+            ) { Text(stringResource(R.string.library_delete_confirm)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_cancel)) }
