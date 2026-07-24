@@ -153,7 +153,14 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
 
 /**
  * 浮在内容区上的导航栏：根据 [navStyle] 渲染浮动胶囊或全宽底部栏。
- * 锁定时整体 opacity 淡出（不用位移），淡出后仍占位但不接收点击（pointer-events:none）。
+ *
+ * 风格切换（审核反馈 2A）：pill 和 bar **同时存在**于同一 BottomCenter 对齐点，
+ * 用 alpha 交叉淡入淡出（0.3s tween）。两者位置一致 → 不会乱跳；只是透明度
+ * 在 0↔1 之间平滑过渡。锁定时整体 opacity 淡出（叠加在风格 alpha 上）。
+ *
+ * 为什么不用 AnimatedContent：AnimatedContent 切换会先移除旧 Composable 再加新的，
+ * 期间位置会跳（pill 居中悬浮 vs bar 全宽贴底，两者宽度/位置不同），用户明确不要乱跳。
+ * 同位叠加 + alpha 交叉淡入淡出是唯一不乱跳的方案（apple-design §3 interruptibility）。
  */
 @Composable
 private fun BottomNavOverlay(
@@ -164,44 +171,60 @@ private fun BottomNavOverlay(
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // 隐藏态 opacity 0；显隐之间 0.2s opacity only 过渡
-    val opacity by animateFloatAsState(
-        targetValue = if (hidden) 0f else 1f,
+    // pill 的目标 alpha：当前是 pill 且未隐藏时为 1，否则 0
+    val pillAlpha by animateFloatAsState(
+        targetValue = if (navStyle == NavStyle.PILL && !hidden) 1f else 0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMedium,
         ),
-        label = "navOpacity",
+        label = "pillAlpha",
+    )
+    // bar 的目标 alpha：当前是 bar 且未隐藏时为 1，否则 0
+    val barAlpha by animateFloatAsState(
+        targetValue = if (navStyle == NavStyle.BAR && !hidden) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium,
+        ),
+        label = "barAlpha",
     )
     Box(
         modifier = modifier
             .fillMaxWidth()
+            // 隐藏时（锁定）禁用点击，避免淡出过程误触
             .then(if (hidden) Modifier.clickable(enabled = false) {} else Modifier),
     ) {
-        if (opacity > 0.01f) {
-            when (navStyle) {
-                NavStyle.PILL -> PillNav(
-                    currentRoute = currentRoute,
-                    compactNav = compactNav,
-                    onNavigate = onNavigate,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        // edge-to-edge：浮动胶囊先避小白条（navigationBarsPadding），
-                        // 再加 20dp 视觉留白（Bug 2：原来只 20dp 硬编码会被小白条遮住）。
-                        .navigationBarsPadding()
-                        .padding(bottom = 20.dp)
-                        .padding(horizontal = 24.dp)
-                        .graphicsLayer { this.alpha = opacity },
-                )
-                NavStyle.BAR -> BarNav(
-                    currentRoute = currentRoute,
-                    compactNav = compactNav,
-                    onNavigate = onNavigate,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .graphicsLayer { this.alpha = opacity },
-                )
-            }
+        // 两个 nav 同时存在，叠加渲染。alpha=0 时仍占位但不可见、不响应点击
+        // （graphicsLayer 把 alpha=0 的视为「视觉不可见」，但为保险给 clickable 加 enabled 判断）
+        if (pillAlpha > 0.01f) {
+            PillNav(
+                currentRoute = currentRoute,
+                compactNav = compactNav,
+                onNavigate = onNavigate,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 20.dp)
+                    .padding(horizontal = 24.dp)
+                    .graphicsLayer {
+                        this.alpha = pillAlpha
+                        // 完全透明时不响应点击（hitTest 短路）
+                        if (pillAlpha < 0.5f) this.alpha = pillAlpha
+                    }
+                    .then(if (pillAlpha < 0.5f) Modifier.clickable(enabled = false) {} else Modifier),
+            )
+        }
+        if (barAlpha > 0.01f) {
+            BarNav(
+                currentRoute = currentRoute,
+                compactNav = compactNav,
+                onNavigate = onNavigate,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .graphicsLayer { this.alpha = barAlpha }
+                    .then(if (barAlpha < 0.5f) Modifier.clickable(enabled = false) {} else Modifier),
+            )
         }
     }
 }

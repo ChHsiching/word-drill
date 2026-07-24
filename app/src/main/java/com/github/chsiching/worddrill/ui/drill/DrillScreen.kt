@@ -139,15 +139,19 @@ internal fun DrillPager(
             WordCard(
                 word = cards[pageIndex],
                 hidePhonetic = hidePhonetic,
-                isAtFirstBoundary = pageIndex == 0,
-                isAtLastBoundary = pageIndex == cards.lastIndex,
             )
         }
     }
 }
 
 /**
- * 顶部条：词书名（左） ↔ 跳过 + 锁定（右）。
+ * 顶部条：词书名（左） · 计数器（中） · 跳过+锁定（右）。
+ *
+ * 计数器要真正在屏幕水平中心，不能跟着 SpaceBetween 走（左右两块宽度不等时，
+ * SpaceBetween 会把中间元素挤偏 —— 审核反馈：跳过+锁定比词书名宽，计数器偏左）。
+ * 用 Box 叠加：底层 Row 用 SpaceBetween 放左右两块，叠加层 Text 计数器用
+ * Alignment.TopCenter 绝对居中（脱离 Row 的均分逻辑）。
+ *
  * 锁定态隐藏跳过（AnimatedVisibility fade），锁定按钮反色背景 + LockOpen 图标。
  */
 @Composable
@@ -159,22 +163,26 @@ private fun DrillTopBar(
     onToggleLock: () -> Unit,
     onSkip: () -> Unit,
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 28.dp),
+        contentAlignment = Alignment.Center,
     ) {
+        // 底层：左右两块 SpaceBetween
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // 词书名（左）
             Text(
                 text = bookName,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelLarge,
                 letterSpacing = 1.sp,
             )
+            // 跳过 + 锁定（右）
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AnimatedVisibility(
                     visible = !locked,
@@ -194,14 +202,11 @@ private fun DrillTopBar(
                 LockButton(locked = locked, onClick = onToggleLock)
             }
         }
+        // 叠加层：计数器绝对居中（不被左右宽度差影响）
         Text(
             text = "${index + 1} / $total",
-            textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
         )
     }
 }
@@ -234,33 +239,32 @@ private fun LockButton(locked: Boolean, onClick: () -> Unit) {
 /**
  * 单张卡片：单词 → 音标 → 分割线 → 义项列表。
  * 卡片切换的 spring 入场由 HorizontalPager 的页面重组自然驱动（每页 Composable 独立实例）。
+ *
+ * 审核反馈：去掉「已是第一张 / 已是最后一张」提示 —— 顶部计数器「X / Y」已表达位置，
+ * 卡片内再重复提示冗余。
  */
 @Composable
 private fun WordCard(
     word: WordWithSenses,
     hidePhonetic: Boolean,
-    isAtFirstBoundary: Boolean,
-    isAtLastBoundary: Boolean,
 ) {
-    val boundaryHint = when {
-        isAtFirstBoundary && isAtLastBoundary -> null
-        isAtFirstBoundary -> stringResource(R.string.drill_first_card)
-        isAtLastBoundary -> stringResource(R.string.drill_last_card)
-        else -> null
-    }
     val typography = MaterialTheme.wordDrillTypography
     val colors = MaterialTheme.colorScheme
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 28.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
+            .padding(horizontal = 28.dp),
+        contentAlignment = Alignment.TopCenter,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+            // 审核反馈 2：卡片原垂直居中显得太靠下，改靠上偏移约屏幕 12%
+            // （给一个合理的顶部呼吸空间，不顶到顶条，也不沉到中间）。
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 80.dp),
         ) {
             // 英文单词 —— 44sp SemiBold
             Text(
@@ -304,14 +308,6 @@ private fun WordCard(
                         )
                     }
                 }
-            }
-            if (boundaryHint != null) {
-                Text(
-                    text = boundaryHint,
-                    color = colors.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 24.dp),
-                )
             }
         }
     }

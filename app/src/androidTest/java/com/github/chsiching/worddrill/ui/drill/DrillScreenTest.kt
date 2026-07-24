@@ -111,21 +111,21 @@ class DrillScreenTest {
         composeRule.onNodeWithText("苹果").assertIsDisplayed()
         composeRule.onNodeWithText("v.").assertIsDisplayed()
         composeRule.onNodeWithText("囤积").assertIsDisplayed()
-        // 第一张显示「已是第一张」提示
-        composeRule.onNodeWithText("已是第一张").assertIsDisplayed()
+        // 顶部计数器（审核反馈：去掉边界提示后，计数器「1 / 3」表达位置）
+        composeRule.onNodeWithText("1 / 3").assertIsDisplayed()
     }
 
     @Test
-    fun lastCardShowsEndHint() {
+    fun lastCardCounterShowsLastIndex() {
         composeDrillPager()
         // 向右滑（左滑手势）到底：3 张卡需滑 2 次到最后一张。
-        // 在根节点上滑动，避免目标词滑出屏幕后 onNodeWithText 找不到节点。
         repeat(2) {
             composeRule.onRoot().performTouchInput { swipeLeft() }
             composeRule.waitForIdle()
         }
 
         composeRule.onNodeWithText("circle").assertIsDisplayed()
-        composeRule.onNodeWithText("已是最后一张").assertIsDisplayed()
+        // 计数器显示 3 / 3（替代原「已是最后一张」边界提示）
+        composeRule.onNodeWithText("3 / 3").assertIsDisplayed()
     }
 }
