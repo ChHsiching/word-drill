@@ -77,7 +77,6 @@ fun MeScreen(
     val compactNav by settingsViewModel.compactNav.collectAsStateWithLifecycle()
     val exportStatus by exportImportViewModel.status.collectAsStateWithLifecycle()
     var showAbout by remember { mutableStateOf(false) }
-    var showThemePicker by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -131,7 +130,7 @@ fun MeScreen(
 
         // 通用组
         SettingsGroup(label = stringResource(R.string.me_group_general)) {
-            ThemeRow(current = themeMode, onClick = { showThemePicker = true })
+            ThemeRow(current = themeMode, onClick = settingsViewModel::cycleTheme)
             InGroupSeparator()
             DataSection(
                 status = exportStatus,
@@ -144,13 +143,6 @@ fun MeScreen(
 
     if (showAbout) {
         AboutDialog(onDismiss = { showAbout = false })
-    }
-    if (showThemePicker) {
-        ThemePickerDialog(
-            current = themeMode,
-            onSelected = settingsViewModel::setTheme,
-            onDismiss = { showThemePicker = false },
-        )
     }
 }
 
@@ -587,56 +579,6 @@ private fun StatusLine(status: ExportImportStatus, onClear: () -> Unit) {
             }
         }
     }
-}
-
-/** 主题选择对话框（点主题行触发）。 */
-@Composable
-private fun ThemePickerDialog(
-    current: ThemeMode,
-    onSelected: (ThemeMode) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val options = listOf(
-        ThemeMode.LIGHT to R.string.me_theme_light,
-        ThemeMode.DARK to R.string.me_theme_dark,
-        ThemeMode.SYSTEM to R.string.me_theme_system,
-    )
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.me_theme)) },
-        text = {
-            Column {
-                options.forEach { (mode, labelRes) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onSelected(mode)
-                                onDismiss()
-                            }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = stringResource(labelRes),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (mode == current) {
-                            Text(
-                                text = "✓",
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.me_cancel)) }
-        },
-    )
 }
 
 @Composable

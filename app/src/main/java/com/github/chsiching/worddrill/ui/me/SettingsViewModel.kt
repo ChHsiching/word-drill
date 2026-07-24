@@ -58,6 +58,19 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setTheme(mode) }
     }
 
+    /**
+     * 在 [ThemeMode] 三态之间循环切换（审核反馈 4：主题行点击循环，不再弹对话框）。
+     * 顺序：LIGHT → DARK → SYSTEM → LIGHT …
+     */
+    fun cycleTheme() {
+        val next = when (themeMode.value) {
+            ThemeMode.LIGHT -> ThemeMode.DARK
+            ThemeMode.DARK -> ThemeMode.SYSTEM
+            ThemeMode.SYSTEM -> ThemeMode.LIGHT
+        }
+        setTheme(next)
+    }
+
     fun setHidePhonetic(value: Boolean) {
         viewModelScope.launch { settings.setHidePhonetic(value) }
     }

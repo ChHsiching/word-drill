@@ -233,30 +233,27 @@ class MeScreenTest {
     }
 
     @Test
-    fun themePickerDialog_showsThreeOptions_whenThemeRowClicked() {
-        // 重置为 SYSTEM（默认值），避免被前序测试 setTheme(DARK) 影响后撞节点
+    fun themeRow_clickCyclesToNextMode() = runBlocking {
+        // 审核反馈 4：主题行点击循环（LIGHT→DARK→SYSTEM），不再弹对话框。
+        // 初始设为 SYSTEM，点一次应到 LIGHT。
         runBlocking { settings.setTheme(ThemeMode.SYSTEM) }
         renderWithVm(vm())
-        // 点「主题」行 → 弹出三选项
+        composeRule.onNodeWithText("主题", substring = false).performScrollTo()
         composeRule.onNodeWithText("主题", substring = false).performClick()
         composeRule.waitForIdle()
-        // 弹窗里三选项都渲染：用 onAllNodesWithText 至少 1 个存在验证（行值可能与选项同名 → 多节点）
-        composeRule.onAllNodesWithText("浅色").fetchSemanticsNodes().isNotEmpty()
-        composeRule.onAllNodesWithText("深色").fetchSemanticsNodes().isNotEmpty()
-        composeRule.onAllNodesWithText("跟随系统").fetchSemanticsNodes().isNotEmpty()
+        val mode = settings.themePreference.first { it == ThemeMode.LIGHT }
+        assertThat(mode).isEqualTo(ThemeMode.LIGHT)
         Unit
     }
 
     @Test
     fun selectDarkTheme_persistsToDataStore() = runBlocking {
+        // 审核反馈 4：循环切换。初始设 LIGHT，点一次到 DARK。
+        runBlocking { settings.setTheme(ThemeMode.LIGHT) }
         renderWithVm(vm())
-        // 「主题」行在屏外（通用组在底部），先 scroll 到它再点开对话框
         composeRule.onNodeWithText("主题", substring = false).performScrollTo()
         composeRule.onNodeWithText("主题", substring = false).performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("深色").performClick()
-        composeRule.waitForIdle()
-        // 等 setTheme 协程落库 + Flow 刷新
         val mode = settings.themePreference.first { it == ThemeMode.DARK }
         assertThat(mode).isEqualTo(ThemeMode.DARK)
         Unit
@@ -274,7 +271,7 @@ class MeScreenTest {
         // 与正文"WordDrill"。正文用 substring=false 精确匹配唯一节点。
         composeRule.onNodeWithText("WordDrill", substring = false).assertIsDisplayed()
         // 版本号行：与 build.gradle.kts 的 versionName 一致；bump 时同步更新。
-        composeRule.onNodeWithText("版本 0.1.0-dev19").assertIsDisplayed()
+        composeRule.onNodeWithText("版本 0.1.0-dev20").assertIsDisplayed()
     }
 
     // ---- Ticket #10/#16：数据导出/导入入口（通用组下两行）----

@@ -270,13 +270,16 @@ private fun PillNav(
                 .padding(6.dp)
                 .onGloballyPositioned { rowWidth = it.size.width.toFloat() }
                 .drawBehind {
-                    // 画黑色圆角矩形指示器（高度 = Row 高度，宽度 = itemWidth，x = animatedX）
+                    // 画黑色胶囊指示器（审核反馈 4：原高度填满 Row 显得太圆，
+                    // 改为高度比 Row 小一点、垂直居中，圆角半径 = 指示器高度/2 → 胶囊形）。
                     if (itemWidth > 0f) {
+                        val indicatorHeight = size.height - 10.dp.toPx() // 上下各留 5dp
+                        val verticalOffset = (size.height - indicatorHeight) / 2f
                         drawRoundRect(
                             color = indicatorColor,
-                            topLeft = androidx.compose.ui.geometry.Offset(animatedX, 0f),
-                            size = androidx.compose.ui.geometry.Size(itemWidth, size.height),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f),
+                            topLeft = androidx.compose.ui.geometry.Offset(animatedX, verticalOffset),
+                            size = androidx.compose.ui.geometry.Size(itemWidth, indicatorHeight),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(indicatorHeight / 2f),
                         )
                     }
                 },

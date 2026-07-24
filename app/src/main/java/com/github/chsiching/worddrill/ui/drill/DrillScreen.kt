@@ -1,8 +1,5 @@
 package com.github.chsiching.worddrill.ui.drill
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -185,21 +182,16 @@ private fun DrillTopBar(
                 letterSpacing = 1.sp,
             )
             // 跳过 + 锁定（右）
+            // 审核反馈 4：锁定时不隐藏跳过按钮（锁定只隐藏导航栏，跳过仍可用）。
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AnimatedVisibility(
-                    visible = !locked,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
-                ) {
-                    Text(
-                        text = stringResource(R.string.drill_skip),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier
-                            .clickable(onClick = onSkip)
-                            .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.drill_skip),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .clickable(onClick = onSkip)
+                        .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
+                )
                 Spacer(Modifier.width(10.dp))
                 LockButton(locked = locked, onClick = onToggleLock)
             }
