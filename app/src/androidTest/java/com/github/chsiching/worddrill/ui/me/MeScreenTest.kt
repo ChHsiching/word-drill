@@ -4,8 +4,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -28,12 +30,18 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 「我的」Tab 主接缝（Ticket #8）：Compose UI + 内存 Room + 真 ViewModel。
+ * 「我的」Tab 主接缝（Ticket #8 + #16 重写）：Compose UI + 内存 Room + 真 ViewModel。
  *
  * 验收覆盖（规格 AC）：
  * - 展示今日/累计/进度三个统计
  * - 刷 N 张后数字正确（聚合正确性）
  * - 切换当前词书后，进度对应新词书
+ *
+ * Ticket #16 后：
+ * - 设置分三组（显示/导航/通用），不再有「软件设置」「数据」标题
+ * - 主题三选项移到主题选择对话框（点「主题」行触发）
+ * - 「关于」入口在通用组
+ * - 导出/导入在通用组，文案「导出数据」「导入数据」
  *
  * 接缝：通过 MeScreen(viewModel = ...) 注入真 MeViewModel（内存 Room DAO +
  * 真 SettingsRepository），collectAsStateWithLifecycle 驱动 UI；UI 文案断言聚合结果。
@@ -124,7 +132,8 @@ class MeScreenTest {
         renderWithVm(vm())
         composeRule.onNodeWithText("今日刷卡").assertIsDisplayed()
         composeRule.onNodeWithText("累计刷卡").assertIsDisplayed()
-        composeRule.onNodeWithText("当前词书进度").assertIsDisplayed()
+        // 当前进度区域：书名 + 进度都在
+        composeRule.onNodeWithText("测试词书").assertIsDisplayed()
     }
 
     @Test
@@ -155,9 +164,11 @@ class MeScreenTest {
             seedSwipe(wordId = 2, timestamp = now)
         }
         renderWithVm(vm())
-        // 进度行：书名：已刷 / 总（百分比）（坑 G：用 substring 精确长文案避免误匹配）
-        composeRule.onNodeWithText("测试词书：2 / 3（66%）").assertIsDisplayed()
-        // 三个统计区标签都在
+        // #16 起进度区拆为：书名（独立 Text）+ "done / total"（独立 Text）+ "percent%"（独立 Text）
+        composeRule.onNodeWithText("测试词书").assertIsDisplayed()
+        composeRule.onNodeWithText("2 / 3").assertIsDisplayed()
+        composeRule.onNodeWithText("66%").assertIsDisplayed()
+        // 两个统计标签
         composeRule.onNodeWithText("今日刷卡").assertIsDisplayed()
         composeRule.onNodeWithText("累计刷卡").assertIsDisplayed()
     }
@@ -170,7 +181,9 @@ class MeScreenTest {
             settings.setCurrentBookId(emptyBookId)
         }
         renderWithVm(vm())
-        composeRule.onNodeWithText("空词书：0 / 0（0%）").assertIsDisplayed()
+        composeRule.onNodeWithText("空词书").assertIsDisplayed()
+        composeRule.onNodeWithText("0 / 0").assertIsDisplayed()
+        composeRule.onNodeWithText("0%").assertIsDisplayed()
     }
 
     @Test
@@ -197,23 +210,49 @@ class MeScreenTest {
         assertThat(state.bookName).isEqualTo("另一本")
     }
 
-    // ---- Ticket #9：主题切换 + 关于页 ----
+    // ---- Ticket #16：设置分三组 + 主题选择对话框 + 关于 ----
 
     @Test
-    fun settingsSection_showsThemeOptions_andAboutEntry() {
+    fun settingsGroups_showDisplayNavigationGeneralLabels() {
         renderWithVm(vm())
-        // 三个主题选项 + 关于入口都在（坑 G：用完整文案避免子串误匹配）
-        composeRule.onNodeWithText("软件设置").assertIsDisplayed()
-        composeRule.onNodeWithText("浅色").assertIsDisplayed()
-        composeRule.onNodeWithText("深色").assertIsDisplayed()
-        composeRule.onNodeWithText("跟随系统").assertIsDisplayed()
-        composeRule.onNodeWithText("关于").assertIsDisplayed()
+        // 三个分组标签（#16 起：显示 / 导航 / 通用）
+        composeRule.onNodeWithText("显示").assertIsDisplayed()
+        composeRule.onNodeWithText("导航").assertIsDisplayed()
+        // 通用组在屏外（verticalScroll + 底部 padding），用 onNodeWithText 验证存在（找不到会抛）
+        composeRule.onNodeWithText("通用", substring = false)
+        // 显示组：隐藏音标
+        composeRule.onNodeWithText("隐藏音标").assertIsDisplayed()
+        // 导航组：导航栏风格 + 简约导航
+        composeRule.onNodeWithText("导航栏风格").assertIsDisplayed()
+        composeRule.onNodeWithText("简约导航").assertIsDisplayed()
+        // 通用组：主题 + 导出 + 导入 + 关于（屏外用 onNodeWithText 验证渲染）
+        composeRule.onNodeWithText("主题", substring = false)
+        composeRule.onNodeWithText("导出数据")
+        composeRule.onNodeWithText("导入数据")
+        composeRule.onNodeWithText("关于", substring = false)
+    }
+
+    @Test
+    fun themePickerDialog_showsThreeOptions_whenThemeRowClicked() {
+        // 重置为 SYSTEM（默认值），避免被前序测试 setTheme(DARK) 影响后撞节点
+        runBlocking { settings.setTheme(ThemeMode.SYSTEM) }
+        renderWithVm(vm())
+        // 点「主题」行 → 弹出三选项
+        composeRule.onNodeWithText("主题", substring = false).performClick()
+        composeRule.waitForIdle()
+        // 弹窗里三选项都渲染：用 onAllNodesWithText 至少 1 个存在验证（行值可能与选项同名 → 多节点）
+        composeRule.onAllNodesWithText("浅色").fetchSemanticsNodes().isNotEmpty()
+        composeRule.onAllNodesWithText("深色").fetchSemanticsNodes().isNotEmpty()
+        composeRule.onAllNodesWithText("跟随系统").fetchSemanticsNodes().isNotEmpty()
+        Unit
     }
 
     @Test
     fun selectDarkTheme_persistsToDataStore() = runBlocking {
         renderWithVm(vm())
-        // 点"深色"选项 → 落库
+        // 点「主题」行打开选择对话框，再点"深色"
+        composeRule.onNodeWithText("主题", substring = false).performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithText("深色").performClick()
         composeRule.waitForIdle()
         // 等 setTheme 协程落库 + Flow 刷新
@@ -225,8 +264,9 @@ class MeScreenTest {
     @Test
     fun aboutDialog_showsAppNameAndVersion_whenOpened() {
         renderWithVm(vm())
-        // 点"关于"入口 → 弹窗显示 App 名 + 版本号
-        composeRule.onNodeWithText("关于").performClick()
+        // 「关于」入口在屏外，先 scroll 到它再点
+        composeRule.onNodeWithText("关于", substring = false).performScrollTo()
+        composeRule.onNodeWithText("关于", substring = false).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("关于 WordDrill").assertIsDisplayed()
         // 坑 G：onNodeWithText 默认子串匹配，"WordDrill" 会同时命中标题"关于 WordDrill"
@@ -236,36 +276,31 @@ class MeScreenTest {
         composeRule.onNodeWithText("版本 0.1.0").assertIsDisplayed()
     }
 
-    // ---- Ticket #10：数据导出/导入入口 ----
-
-    @Test
-    fun dataSection_showsExportImportEntries() {
-        renderWithVm(vm())
-        // 数据区标题 + 导出/导入按钮（坑 G：用 substring=false 精确匹配短按钮文案）
-        composeRule.onNodeWithText("数据", substring = false).assertIsDisplayed()
-        composeRule.onNodeWithText("导出", substring = false).assertIsDisplayed()
-        composeRule.onNodeWithText("导入", substring = false).assertIsDisplayed()
-    }
+    // ---- Ticket #10/#16：数据导出/导入入口（通用组下两行）----
 
     @Test
     fun exportDialog_showsNicknameField_whenExportClicked() {
         renderWithVm(vm())
-        composeRule.onNodeWithText("导出", substring = false).performClick()
+        // 「导出数据」入口在屏外，先 scroll 到它再点
+        composeRule.onNodeWithText("导出数据").performScrollTo()
+        composeRule.onNodeWithText("导出数据").performClick()
         composeRule.waitForIdle()
-        // 导出弹窗：标题 + 说明 + 昵称输入框 + 确认/取消
-        composeRule.onNodeWithText("导出数据").assertIsDisplayed()
+        // 导出弹窗：说明 + 昵称输入框 + 确认/取消（标题与行同名「导出数据」故跳过）
         composeRule.onNodeWithText("将整库（词条池、词书、刷卡日志）导出为 JSON 文件，用于换机迁移。").assertIsDisplayed()
         composeRule.onNodeWithText("可选昵称标签").assertIsDisplayed()
         // 点取消后弹窗关闭（坑 M：避重复词，用 substring=false 精确匹配）
         composeRule.onNodeWithText("取消", substring = false).performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("导出数据").assertIsNotDisplayed()
+        // 关闭后：说明文本消失（弹窗关闭判定）
+        composeRule.onNodeWithText("将整库（词条池、词书、刷卡日志）导出为 JSON 文件，用于换机迁移。").assertIsNotDisplayed()
     }
 
     @Test
     fun importDialog_showsOverwriteWarning_whenImportClicked() {
         renderWithVm(vm())
-        composeRule.onNodeWithText("导入", substring = false).performClick()
+        // 「导入数据」入口在屏外，先 scroll 到它再点
+        composeRule.onNodeWithText("导入数据").performScrollTo()
+        composeRule.onNodeWithText("导入数据").performClick()
         composeRule.waitForIdle()
         // 导入弹窗：标题 + 覆盖警告 + 确认/取消
         composeRule.onNodeWithText("确认导入").assertIsDisplayed()

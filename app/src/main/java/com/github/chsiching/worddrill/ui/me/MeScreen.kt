@@ -3,20 +3,31 @@ package com.github.chsiching.worddrill.ui.me
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,26 +38,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.BuildConfig
 import com.github.chsiching.worddrill.R
+import com.github.chsiching.worddrill.data.settings.NavStyle
 import com.github.chsiching.worddrill.data.settings.ThemeMode
+import com.github.chsiching.worddrill.ui.theme.wordDrillColors
+import com.github.chsiching.worddrill.ui.theme.wordDrillTypography
 import kotlinx.coroutines.delay
 
 /**
- * 「我的」Tab（Ticket #8 + #9 + #10）：统计展示 + 软件设置 + 数据导出/导入。
+ * 「我的」Tab（Ticket #8 + #9 + #10 + #16 重写）：统计卡片 + 分组设置 + 数据导出/导入。
  *
- * 统计（#8）：从 swipe_log 聚合的三个数字，全部响应式 Flow 驱动（[MeViewModel]）。
- * 在「刷」Tab 刷卡后切回本 Tab，数字立即更新；切换当前词书后进度对应新词书。
- *
- * 设置（#9）：主题切换（浅色/深色/跟随系统）+ 关于入口。主题写入 DataStore，
- * [com.github.chsiching.worddrill.MainActivity] 同样订阅 → 全局配色立即生效。
- *
- * 数据（#10）：整库导出/导入（SAF 选文件，JSON 格式）。导入默认覆盖，用于换机迁移。
+ * 设计稿（#16）：
+ * - 大标题「我的」
+ * - 统计卡片：今日大数字（56sp）+ 当前词书进度条（spring 宽度过渡）+ 累计（24sp）
+ * - 设置分三组：显示（隐藏音标）/ 导航（导航栏风格 + 简约导航）/ 通用（主题 + 导出 + 导入 + 关于）
+ * - toggle 用 [Toggle]（黑色配色，spring knob 动画），非 Material3 绿色 Switch
+ * - 底部 padding 120dp（避免被浮动导航遮挡）
  */
 @Composable
 fun MeScreen(
@@ -57,136 +72,349 @@ fun MeScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
+    val hidePhonetic by settingsViewModel.hidePhonetic.collectAsStateWithLifecycle()
+    val navStyle by settingsViewModel.navStyle.collectAsStateWithLifecycle()
+    val compactNav by settingsViewModel.compactNav.collectAsStateWithLifecycle()
     val exportStatus by exportImportViewModel.status.collectAsStateWithLifecycle()
     var showAbout by remember { mutableStateOf(false) }
+    var showThemePicker by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 120.dp),
     ) {
-        MeStatsContent(state = state)
-        MeSettingsContent(
-            currentTheme = themeMode,
-            onThemeSelected = settingsViewModel::setTheme,
-            onAboutClick = { showAbout = true },
+        // 大标题
+        Text(
+            text = stringResource(R.string.tab_me),
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = 24.dp, top = 24.dp, bottom = 28.dp, end = 24.dp),
         )
-        MeDataContent(status = exportStatus, viewModel = exportImportViewModel)
+
+        // 统计卡片
+        StatsCard(
+            state = state,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp),
+        )
+
+        Spacer(Modifier.size(24.dp))
+
+        // 显示组
+        SettingsGroup(label = stringResource(R.string.me_group_display)) {
+            ToggleRow(
+                label = stringResource(R.string.me_setting_hide_phonetic),
+                on = hidePhonetic,
+                onToggle = settingsViewModel::setHidePhonetic,
+            )
+        }
+
+        Spacer(Modifier.size(16.dp))
+
+        // 导航组
+        SettingsGroup(label = stringResource(R.string.me_group_navigation)) {
+            NavStyleRow(
+                current = navStyle,
+                onClick = settingsViewModel::cycleNavStyle,
+            )
+            InGroupSeparator()
+            ToggleRow(
+                label = stringResource(R.string.me_setting_compact_nav),
+                on = compactNav,
+                onToggle = settingsViewModel::setCompactNav,
+            )
+        }
+
+        Spacer(Modifier.size(16.dp))
+
+        // 通用组
+        SettingsGroup(label = stringResource(R.string.me_group_general)) {
+            ThemeRow(current = themeMode, onClick = { showThemePicker = true })
+            InGroupSeparator()
+            DataSection(
+                status = exportStatus,
+                viewModel = exportImportViewModel,
+            )
+            InGroupSeparator()
+            AboutRow(onClick = { showAbout = true })
+        }
     }
 
     if (showAbout) {
         AboutDialog(onDismiss = { showAbout = false })
     }
+    if (showThemePicker) {
+        ThemePickerDialog(
+            current = themeMode,
+            onSelected = settingsViewModel::setTheme,
+            onDismiss = { showThemePicker = false },
+        )
+    }
 }
 
 /**
- * 统计展示主体（从 [MeScreen] 拆出，按 state 渲染，便于阅读/复用）。
+ * 统计卡片：今日大数字（56sp）+ 进度条（spring 宽度）+ 累计（24sp）。
  */
 @Composable
-private fun MeStatsContent(state: MeStatsUiState) {
-    StatCard(
-        label = stringResource(R.string.me_today),
-        value = state.todayCount.toString(),
-    )
-    StatCard(
-        label = stringResource(R.string.me_total),
-        value = state.totalCount.toString(),
-    )
+private fun StatsCard(state: MeStatsUiState, modifier: Modifier = Modifier) {
+    val typography = MaterialTheme.wordDrillTypography
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        color = colors.surface,
+        shape = RoundedCornerShape(20.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            // 今日 —— 最大数字
+            Text(
+                text = state.todayCount.toString(),
+                style = typography.statNumberLarge.copy(color = colors.onSurface),
+            )
+            Text(
+                text = stringResource(R.string.me_today),
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
 
-    // 当前词书进度：书名 + 已刷 X / 总 Y (Z%) + 进度条
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = stringResource(R.string.me_progress),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        val bookLine = if (state.bookName.isEmpty()) {
-            stringResource(R.string.me_no_current_book)
-        } else {
-            stringResource(
-                R.string.me_progress_line,
-                state.bookName,
-                state.brushed,
-                state.total,
-                state.percent,
+            // 进度条 —— 当前词书
+            ProgressBar(
+                bookName = if (state.bookName.isEmpty()) stringResource(R.string.me_no_current_book) else state.bookName,
+                done = state.brushed,
+                total = state.total,
+                percent = state.percent,
+                modifier = Modifier.padding(top = 28.dp),
+            )
+
+            // 累计 —— 次级统计（顶部分隔线 + 大数字 + 标签）
+            Box(
+                modifier = Modifier
+                    .padding(top = 24.dp)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                // 顶部分隔线（先画，下方 Column 覆盖中间留出文字）
+                Box(
+                    modifier = Modifier
+                        .height(1.dp)
+                        .fillMaxWidth()
+                        .background(MaterialTheme.wordDrillColors.separator),
+                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .padding(top = 20.dp)
+                        .fillMaxWidth(),
+                ) {
+                    Text(
+                        text = state.totalCount.toString(),
+                        style = typography.statNumber.copy(color = colors.onSurface),
+                    )
+                    Text(
+                        text = stringResource(R.string.me_total),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 进度条：书名 + X/Y + 条 + 百分比，spring 宽度过渡。 */
+@Composable
+private fun ProgressBar(
+    bookName: String,
+    done: Int,
+    total: Int,
+    percent: Int,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    // spring 宽度过渡：spec 0.5s spring。
+    val animatedFraction by animateFloatAsState(
+        targetValue = (percent / 100f).coerceIn(0f, 1f),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "progressWidth",
+    )
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = bookName,
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.onSurfaceVariant,
+            )
+            Text(
+                text = "$done / $total",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.onSurface,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+        Spacer(Modifier.size(8.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .background(MaterialTheme.wordDrillColors.progressTrack, RoundedCornerShape(3.dp)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(animatedFraction)
+                    .height(6.dp)
+                    .background(colors.onSurface, RoundedCornerShape(3.dp)),
             )
         }
         Text(
-            text = bookLine,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        LinearProgressIndicator(
-            progress = { state.percent / 100f },
-            modifier = Modifier.fillMaxWidth(),
+            text = "$percent%",
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.onSurfaceVariant,
+            textAlign = TextAlign.End,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp),
         )
     }
 }
 
-/**
- * 软件设置区（Ticket #9）：主题三选一 + 关于入口。
- */
+/** 设置分组：标题 + surface 卡片容器。 */
 @Composable
-private fun MeSettingsContent(
-    currentTheme: ThemeMode,
-    onThemeSelected: (ThemeMode) -> Unit,
-    onAboutClick: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun SettingsGroup(label: String, content: @Composable () -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
         Text(
-            text = stringResource(R.string.me_settings),
-            style = MaterialTheme.typography.titleMedium,
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 12.dp, bottom = 8.dp),
+        )
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(14.dp),
+        ) {
+            Column { content() }
+        }
+    }
+}
+
+/** 组内分隔线（0.5px separator，左右各留 16dp）。 */
+@Composable
+private fun InGroupSeparator() {
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(MaterialTheme.wordDrillColors.separator),
+    )
+}
+
+/** Toggle 设置行：左侧文案，右侧 Toggle。 */
+@Composable
+private fun ToggleRow(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Toggle(on = on, onClick = { onToggle(!on) })
+    }
+}
+
+/** 导航栏风格行：点击循环 浮动胶囊 ↔ 底部栏，右侧当前值 + chevron。 */
+@Composable
+private fun NavStyleRow(current: NavStyle, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.me_setting_nav_style),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = stringResource(
+                if (current == NavStyle.PILL) R.string.me_setting_nav_style_pill else R.string.me_setting_nav_style_bar
+            ),
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+/** 主题行：点击弹选择对话框。 */
+@Composable
+private fun ThemeRow(current: ThemeMode, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
             text = stringResource(R.string.me_theme),
             style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
         )
-        themeOptions.forEach { (mode, labelRes) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .selectable(
-                        selected = mode == currentTheme,
-                        onClick = { onThemeSelected(mode) },
-                    )
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                RadioButton(
-                    selected = mode == currentTheme,
-                    onClick = null, // selectable 在 Row 上处理点击
-                )
-                Text(
-                    text = stringResource(labelRes),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-        }
-        TextButton(onClick = onAboutClick, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.me_about))
-        }
+        Text(
+            text = stringResource(
+                when (current) {
+                    ThemeMode.LIGHT -> R.string.me_theme_light
+                    ThemeMode.DARK -> R.string.me_theme_dark
+                    ThemeMode.SYSTEM -> R.string.me_theme_system
+                }
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
 /**
- * 数据导出/导入区（Ticket #10）。
- *
- * SAF 文件选择由本 Composable 内的 launcher 发起：
- * - 导出：先弹昵称输入框（可选），确认后 launch [ActivityResultContracts.CreateDocument]；
- *   SAF 回调 uri → [ExportImportViewModel.exportTo]。
- * - 导入：先弹覆盖确认框，确认后 launch [ActivityResultContracts.OpenDocument]；
- *   SAF 回调 uri → [ExportImportViewModel.importFrom]。
- *
- * 状态：[ExportImportStatus]，Done/Failed 展示几秒后自动清回 Idle（[LaunchedEffect]）。
+ * 数据导出/导入区（Ticket #10）：嵌在通用组里，两项各一行。
  */
 @Composable
-private fun MeDataContent(
+private fun DataSection(
     status: ExportImportStatus,
     viewModel: ExportImportViewModel,
 ) {
-    // SAF 导出：pendingNickname 在 dialog 确认时记下，SAF 回调时取用
     var pendingNickname by remember { mutableStateOf<String?>(null) }
     var showExportDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
@@ -203,28 +431,18 @@ private fun MeDataContent(
         if (uri != null) viewModel.importFrom(uri)
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = stringResource(R.string.me_data),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            // 坑 G：用 substring=false 或完整文案消歧；这里按钮文案独立无重复，无歧义
-            Button(
-                onClick = { showExportDialog = true },
-                enabled = status !is ExportImportStatus.Working,
-                modifier = Modifier.weight(1f),
-            ) { Text(stringResource(R.string.me_export)) }
-            OutlinedButton(
-                onClick = { showImportDialog = true },
-                enabled = status !is ExportImportStatus.Working,
-                modifier = Modifier.weight(1f),
-            ) { Text(stringResource(R.string.me_import)) }
-        }
+    DataRow(
+        label = stringResource(R.string.me_setting_export),
+        onClick = { showExportDialog = true },
+        enabled = status !is ExportImportStatus.Working,
+    )
+    InGroupSeparator()
+    DataRow(
+        label = stringResource(R.string.me_setting_import),
+        onClick = { showImportDialog = true },
+        enabled = status !is ExportImportStatus.Working,
+    )
+    if (status !is ExportImportStatus.Idle) {
         StatusLine(status = status, onClear = viewModel::clearStatus)
     }
 
@@ -248,7 +466,6 @@ private fun MeDataContent(
             confirmButton = {
                 TextButton(onClick = {
                     showExportDialog = false
-                    // 记下昵称（空白视为无昵称），SAF 回调时取用
                     pendingNickname = nicknameInput.trim().ifEmpty { null }
                     exportLauncher.launch("worddrill-backup.json")
                 }) { Text(stringResource(R.string.me_export_confirm)) }
@@ -281,7 +498,56 @@ private fun MeDataContent(
     }
 }
 
-/** 导出/导入状态行：Working/Failed 展示文案；Done 短暂展示后自动清回 Idle。 */
+@Composable
+private fun DataRow(label: String, onClick: () -> Unit, enabled: Boolean = true) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .then(if (!enabled) Modifier.alpha(0.5f) else Modifier),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+/** 关于行：右侧版本号。 */
+@Composable
+private fun AboutRow(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.me_setting_about),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = BuildConfig.VERSION_NAME,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** 导出/导入状态行。 */
 @Composable
 private fun StatusLine(status: ExportImportStatus, onClear: () -> Unit) {
     when (status) {
@@ -291,6 +557,7 @@ private fun StatusLine(status: ExportImportStatus, onClear: () -> Unit) {
                 text = stringResource(R.string.me_working),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
         is ExportImportStatus.Done -> {
@@ -298,6 +565,7 @@ private fun StatusLine(status: ExportImportStatus, onClear: () -> Unit) {
                 text = stringResource(status.messageRes),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
             LaunchedEffect(status) {
                 delay(2_000)
@@ -305,13 +573,13 @@ private fun StatusLine(status: ExportImportStatus, onClear: () -> Unit) {
             }
         }
         is ExportImportStatus.Failed -> {
-            // 失败文案：失败标签 + 异常详情（若有）；详情多为英文/路径，仅辅助排障
             val message = status.detail?.let { "${stringResource(status.messageRes)}：$it" }
                 ?: stringResource(status.messageRes)
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
             LaunchedEffect(status) {
                 delay(4_000)
@@ -321,17 +589,56 @@ private fun StatusLine(status: ExportImportStatus, onClear: () -> Unit) {
     }
 }
 
-/** 主题三选项：(模式, 文案资源)。集中一处便于测试与扩展。 */
-private val themeOptions: List<Pair<ThemeMode, Int>> = listOf(
-    ThemeMode.LIGHT to R.string.me_theme_light,
-    ThemeMode.DARK to R.string.me_theme_dark,
-    ThemeMode.SYSTEM to R.string.me_theme_system,
-)
+/** 主题选择对话框（点主题行触发）。 */
+@Composable
+private fun ThemePickerDialog(
+    current: ThemeMode,
+    onSelected: (ThemeMode) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val options = listOf(
+        ThemeMode.LIGHT to R.string.me_theme_light,
+        ThemeMode.DARK to R.string.me_theme_dark,
+        ThemeMode.SYSTEM to R.string.me_theme_system,
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.me_theme)) },
+        text = {
+            Column {
+                options.forEach { (mode, labelRes) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onSelected(mode)
+                                onDismiss()
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(labelRes),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (mode == current) {
+                            Text(
+                                text = "✓",
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.me_cancel)) }
+        },
+    )
+}
 
-/**
- * 关于对话框（Ticket #9）：App 名 + 版本号。
- * 版本号读 [BuildConfig.VERSION_NAME]（由 versionName 注入，buildConfig feature 已启用）。
- */
 @Composable
 private fun AboutDialog(onDismiss: () -> Unit) {
     AlertDialog(
@@ -356,21 +663,4 @@ private fun AboutDialog(onDismiss: () -> Unit) {
             }
         },
     )
-}
-
-@Composable
-private fun StatCard(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.displaySmall,
-            textAlign = TextAlign.Start,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
 }

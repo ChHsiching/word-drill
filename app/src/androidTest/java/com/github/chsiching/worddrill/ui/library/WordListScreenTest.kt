@@ -98,9 +98,9 @@ class WordListScreenTest {
     @Test
     fun customBook_showsWords_andAddEntry() {
         setContentFor(customBookId)
-        // 列表展示已种子词条
+        // 列表展示已种子词条（#16 起 pos 与 meaning 拆成独立 Text 节点）
         composeRule.onNodeWithText("apple").assertIsDisplayed()
-        composeRule.onNodeWithText("n.  苹果").assertIsDisplayed()
+        composeRule.onNodeWithText("苹果").assertIsDisplayed()
         // 自定义词书：有「新增词条」入口（IconButton 的 contentDescription）
         composeRule.onNodeWithContentDescription("新增词条").assertIsDisplayed()
     }
@@ -122,7 +122,7 @@ class WordListScreenTest {
 
         // 列表应出现新词（UI 刷新验证）
         composeRule.onNodeWithText("balance").assertIsDisplayed()
-        composeRule.onNodeWithText("n.  平衡").assertIsDisplayed()
+        composeRule.onNodeWithText("平衡").assertIsDisplayed()
         // 落库也确认
         val words = runBlocking { db.wordDao().getWordsWithSensesByBook(customBookId) }
         assertThat(words.any { it.word.text == "balance" }).isTrue()
@@ -156,25 +156,29 @@ class WordListScreenTest {
     @Test
     fun editSense_updatesPosAndMeaning_inListAndDb() {
         setContentFor(customBookId)
-        // 点行内释义文本打开编辑对话框（每条释义可点 → 编辑对应 sense）
-        composeRule.onNodeWithText("n.  苹果").performClick()
+        // 点行内释义文本打开编辑对话框（#16 起点 meaning 节点「苹果」触发编辑）
+        composeRule.onNodeWithText("苹果").performClick()
         composeRule.waitForIdle()
-        // 用 performTextReplacement 替换（performTextInput 是追加，会把"苹果"变成"苹果X"）
-        composeRule.onNodeWithText("n.").performTextReplacement("v.")
-        composeRule.onNodeWithText("苹果").performTextReplacement("囤积")
+        // #16 起 pos / meaning 拆成独立 Text 节点：列表显示的 "n." + "苹果" 与对话框
+        // TextField 的初始值 "n." + "苹果" 同名（两个同名节点）。用 hasSetTextAction()
+        // 只匹配可编辑的 TextField（列表 Text 不可编辑），精确定位对话框字段。
+        composeRule.onAllNodes(androidx.compose.ui.test.hasSetTextAction())[0].performTextReplacement("v.")
+        composeRule.waitForIdle()
+        composeRule.onAllNodes(androidx.compose.ui.test.hasSetTextAction())[1].performTextReplacement("囤积")
         composeRule.waitForIdle()
         composeRule.onNodeWithText("确定").performClick()
         composeRule.waitForIdle()
 
-        // UI 列表刷新：原 "n.  苹果" 消失，新 "v.  囤积" 出现
-        composeRule.onNodeWithText("v.  囤积").assertIsDisplayed()
-        composeRule.onNodeWithText("n.  苹果").assertDoesNotExist()
+        // UI 列表刷新：原 meaning "苹果" 消失，新 meaning "囤积" 出现
+        composeRule.onNodeWithText("囤积").assertIsDisplayed()
+        composeRule.onNodeWithText("苹果").assertDoesNotExist()
         // 落库确认：词性与释义都已更新
         val sense = runBlocking {
             db.wordDao().getByText("apple")!!.let { db.wordDao().getSensesForWord(it.wordId).single() }
         }
         assertThat(sense.pos).isEqualTo("v.")
         assertThat(sense.meaning).isEqualTo("囤积")
+        Unit
     }
 
     @Test

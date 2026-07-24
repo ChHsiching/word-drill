@@ -8,6 +8,17 @@ import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * 词书 + 词条数（Ticket #16：词库列表副标题需要展示词条数）。
+ * JOIN + GROUP BY 一次查出所有词书的词条数，避免 N 次查询。
+ */
+data class BookWithCount(
+    val bookId: Long,
+    val name: String,
+    val isPreset: Boolean,
+    val wordCount: Int,
+)
+
 @Dao
 interface BookDao {
 
@@ -18,6 +29,22 @@ interface BookDao {
 
     @Query("SELECT * FROM book ORDER BY isPreset DESC, name ASC")
     fun observeAll(): Flow<List<Book>>
+
+    /**
+     * 词书 + 词条数（Ticket #16）。LEFT JOIN 保证空词书（0 词）也列出。
+     * 排序与 [observeAll] 一致：预置在前、name 升序。
+     */
+    @Query(
+        """
+        SELECT b.bookId AS bookId, b.name AS name, b.isPreset AS isPreset,
+               COUNT(bw.wordId) AS wordCount
+        FROM book b
+        LEFT JOIN book_word bw ON b.bookId = bw.bookId
+        GROUP BY b.bookId
+        ORDER BY b.isPreset DESC, b.name ASC
+        """
+    )
+    fun observeAllWithCounts(): Flow<List<BookWithCount>>
 
     @Query("SELECT * FROM book WHERE bookId = :bookId")
     suspend fun getById(bookId: Long): Book?

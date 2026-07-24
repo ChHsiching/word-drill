@@ -89,6 +89,9 @@ class DrillScreenTest {
                         bookName = "测试词书",
                         cards = cards(),
                         onPageSettled = { _, _ -> },
+                        locked = false,
+                        onToggleLock = {},
+                        hidePhonetic = false,
                     )
                 }
             }
@@ -102,10 +105,12 @@ class DrillScreenTest {
 
         // 顶部词书名
         composeRule.onNodeWithText("测试词书").assertIsDisplayed()
-        // 第一张卡：英文 + 两个词性的释义都同屏
+        // 第一张卡：英文单词 + 两个词性的 pos / 中文释义都同屏（#16 起拆成独立 Text 节点）
         composeRule.onNodeWithText("apple").assertIsDisplayed()
-        composeRule.onNodeWithText("n.  苹果").assertIsDisplayed()
-        composeRule.onNodeWithText("v.  囤积").assertIsDisplayed()
+        composeRule.onNodeWithText("n.").assertIsDisplayed()
+        composeRule.onNodeWithText("苹果").assertIsDisplayed()
+        composeRule.onNodeWithText("v.").assertIsDisplayed()
+        composeRule.onNodeWithText("囤积").assertIsDisplayed()
         // 第一张显示「已是第一张」提示
         composeRule.onNodeWithText("已是第一张").assertIsDisplayed()
     }
