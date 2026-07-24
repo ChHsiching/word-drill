@@ -16,9 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material3.Icon
@@ -112,7 +111,12 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
         NavHost(
             navController = navController,
             startDestination = TopDestination.Drill.route,
-            modifier = Modifier.fillMaxSize(),
+            // edge-to-edge：内容顶部留状态栏空间（Bug 1：否则顶部文字与状态栏重叠）。
+            // 底部不在这里加 padding —— 浮动导航栏自己 navigationBarsPadding 避小白条，
+            // 内容区各 Screen 自己在 LazyColumn/Column 上加 bottom padding 让出导航高度。
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding(),
         ) {
             composable(TopDestination.Drill.route) {
                 DrillScreen(
@@ -182,6 +186,9 @@ private fun BottomNavOverlay(
                     onNavigate = onNavigate,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
+                        // edge-to-edge：浮动胶囊先避小白条（navigationBarsPadding），
+                        // 再加 20dp 视觉留白（Bug 2：原来只 20dp 硬编码会被小白条遮住）。
+                        .navigationBarsPadding()
                         .padding(bottom = 20.dp)
                         .padding(horizontal = 24.dp)
                         .graphicsLayer { this.alpha = opacity },
@@ -192,8 +199,7 @@ private fun BottomNavOverlay(
                     onNavigate = onNavigate,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .graphicsLayer { this.alpha = opacity }
-                        .windowInsetsPadding(WindowInsets.navigationBars),
+                        .graphicsLayer { this.alpha = opacity },
                 )
             }
         }
@@ -276,6 +282,9 @@ private fun BarNav(
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // edge-to-edge：Surface 背景延伸到屏幕底（覆盖小白条区域），内部 Row 用
+    // navigationBarsPadding 让图标/文字避小白条。这样小白条画在 bar 背景之上，
+    // 不会有「bar 上移、下方露出一段背景色」的难看效果（Bug 2 修复）。
     Surface(
         color = MaterialTheme.colorScheme.surface,
         modifier = modifier.fillMaxWidth(),
@@ -284,7 +293,8 @@ private fun BarNav(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 6.dp, bottom = 24.dp),
+                .navigationBarsPadding()
+                .padding(top = 6.dp),
         ) {
             topDestinations.forEach { dest ->
                 val selected = currentRoute == dest.route
