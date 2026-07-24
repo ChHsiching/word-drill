@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -225,37 +226,35 @@ class MeScreenTest {
         // 导航组：导航栏风格 + 简约导航
         composeRule.onNodeWithText("导航栏风格").assertIsDisplayed()
         composeRule.onNodeWithText("简约导航").assertIsDisplayed()
-        // 通用组：主题 + 导出 + 导入 + 关于（屏外用 onNodeWithText 验证渲染）
-        composeRule.onNodeWithText("主题", substring = false)
+        // 通用组：导出 + 导入 + 关于（审核反馈 5：主题移到右上角 icon，不在通用组）
         composeRule.onNodeWithText("导出数据")
         composeRule.onNodeWithText("导入数据")
         composeRule.onNodeWithText("关于", substring = false)
+        // 右上角主题 icon（contentDescription = "主题"）
+        composeRule.onNodeWithContentDescription("主题").assertIsDisplayed()
     }
 
     @Test
-    fun themeRow_clickCyclesToNextMode() = runBlocking {
-        // 审核反馈 4：主题行点击循环（LIGHT→DARK→SYSTEM），不再弹对话框。
-        // 初始设为 SYSTEM，点一次应到 LIGHT。
-        runBlocking { settings.setTheme(ThemeMode.SYSTEM) }
+    fun themeIcon_togglesToOppositeMode() = runBlocking {
+        // 审核反馈 5：右上角 icon 点击切深/浅（当前 LIGHT → 切 DARK）。
+        runBlocking { settings.setTheme(ThemeMode.LIGHT) }
         renderWithVm(vm())
-        composeRule.onNodeWithText("主题", substring = false).performScrollTo()
-        composeRule.onNodeWithText("主题", substring = false).performClick()
+        composeRule.onNodeWithContentDescription("主题").performClick()
         composeRule.waitForIdle()
-        val mode = settings.themePreference.first { it == ThemeMode.LIGHT }
-        assertThat(mode).isEqualTo(ThemeMode.LIGHT)
+        val mode = settings.themePreference.first { it == ThemeMode.DARK }
+        assertThat(mode).isEqualTo(ThemeMode.DARK)
         Unit
     }
 
     @Test
-    fun selectDarkTheme_persistsToDataStore() = runBlocking {
-        // 审核反馈 4：循环切换。初始设 LIGHT，点一次到 DARK。
-        runBlocking { settings.setTheme(ThemeMode.LIGHT) }
+    fun themeIcon_darkToLight_togglesBack() = runBlocking {
+        // 审核反馈 5：当前 DARK → 切 LIGHT。
+        runBlocking { settings.setTheme(ThemeMode.DARK) }
         renderWithVm(vm())
-        composeRule.onNodeWithText("主题", substring = false).performScrollTo()
-        composeRule.onNodeWithText("主题", substring = false).performClick()
+        composeRule.onNodeWithContentDescription("主题").performClick()
         composeRule.waitForIdle()
-        val mode = settings.themePreference.first { it == ThemeMode.DARK }
-        assertThat(mode).isEqualTo(ThemeMode.DARK)
+        val mode = settings.themePreference.first { it == ThemeMode.LIGHT }
+        assertThat(mode).isEqualTo(ThemeMode.LIGHT)
         Unit
     }
 
@@ -271,7 +270,7 @@ class MeScreenTest {
         // 与正文"WordDrill"。正文用 substring=false 精确匹配唯一节点。
         composeRule.onNodeWithText("WordDrill", substring = false).assertIsDisplayed()
         // 版本号行：与 build.gradle.kts 的 versionName 一致；bump 时同步更新。
-        composeRule.onNodeWithText("版本 0.1.0-dev20").assertIsDisplayed()
+        composeRule.onNodeWithText("版本 0.1.0-dev21").assertIsDisplayed()
     }
 
     // ---- Ticket #10/#16：数据导出/导入入口（通用组下两行）----

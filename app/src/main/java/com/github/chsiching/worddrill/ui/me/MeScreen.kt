@@ -23,8 +23,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -39,6 +42,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -49,6 +56,7 @@ import com.github.chsiching.worddrill.BuildConfig
 import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.settings.NavStyle
 import com.github.chsiching.worddrill.data.settings.ThemeMode
+import com.github.chsiching.worddrill.ui.theme.LocalThemeRevealTrigger
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 import com.github.chsiching.worddrill.ui.theme.wordDrillTypography
 import kotlinx.coroutines.delay
@@ -84,14 +92,28 @@ fun MeScreen(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 120.dp),
     ) {
-        // 大标题
-        Text(
-            text = stringResource(R.string.tab_me),
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(start = 24.dp, top = 24.dp, bottom = 28.dp, end = 24.dp),
-        )
+        // 大标题 + 右上角主题切换 icon（审核反馈 5）
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 28.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.tab_me),
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            ThemeToggleIcon(
+                themeMode = themeMode,
+                onToggle = { targetIsDark ->
+                    // 直接切深/浅（不走 cycle，cycle 可能跳 SYSTEM 与 reveal 目标不符）
+                    settingsViewModel.setTheme(if (targetIsDark) ThemeMode.DARK else ThemeMode.LIGHT)
+                },
+            )
+        }
 
         // 统计卡片
         StatsCard(
@@ -128,10 +150,8 @@ fun MeScreen(
 
         Spacer(Modifier.size(16.dp))
 
-        // 通用组
+        // 通用组（审核反馈 5：主题切换移到右上角 icon，不再在通用组里占一行）
         SettingsGroup(label = stringResource(R.string.me_group_general)) {
-            ThemeRow(current = themeMode, onClick = settingsViewModel::cycleTheme)
-            InGroupSeparator()
             DataSection(
                 status = exportStatus,
                 viewModel = exportImportViewModel,
@@ -364,38 +384,63 @@ private fun NavStyleRow(current: NavStyle, onClick: () -> Unit) {
 }
 
 /** 主题行：点击弹选择对话框。 */
+/**
+ * 右上角主题切换 icon（审核反馈 5）。
+ *
+ * - 当前浅色 → 显示太阳 icon（点击切到下一态）
+ * - 当前深色 → 显示月亮 icon
+ * - 点击触发 [LocalThemeRevealTrigger]，以 icon 中心为圆心做 circular reveal 扩散
+ * - SYSTEM 态：按系统当前深浅决定显示太阳还是月亮
+ */
+/**
+ * 右上角主题切换 icon（审核反馈 5）。
+ *
+ * 点击：本地算「当前是否深色 → 目标 = 反过来」，传给 [LocalThemeRevealTrigger]
+ * 触发 circular reveal；同时写 DataStore（cycleTheme）持久化。
+ */
 @Composable
-private fun ThemeRow(current: ThemeMode, onClick: () -> Unit) {
-    Row(
+private fun ThemeToggleIcon(
+    themeMode: ThemeMode,
+    onToggle: (targetIsDark: Boolean) -> Unit,
+) {
+    val isDark = when (themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
+    }
+    val trigger = LocalThemeRevealTrigger.current
+    val iconVector = if (isDark) Icons.Outlined.DarkMode else Icons.Outlined.LightMode
+
+    var iconPos by remember { mutableStateOf(Offset.Zero) }
+    var iconSize by remember { mutableStateOf(0) }
+
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .onGloballyPositioned { coords ->
+                iconPos = coords.positionInWindow()
+                iconSize = coords.size.width
+            },
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = stringResource(R.string.me_theme),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = stringResource(
-                when (current) {
-                    ThemeMode.LIGHT -> R.string.me_theme_light
-                    ThemeMode.DARK -> R.string.me_theme_dark
-                    ThemeMode.SYSTEM -> R.string.me_theme_system
-                }
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Icon(
-            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
-        )
+        IconButton(
+            onClick = {
+                val center = Offset(
+                    iconPos.x + iconSize / 2f,
+                    iconPos.y + iconSize / 2f,
+                )
+                // 先写 DataStore（onToggle），再触发 reveal（trigger）。
+                // 顺序无所谓：reveal 在中点才真切 ColorScheme，DataStore 异步写不影响视觉。
+                onToggle(!isDark)
+                trigger(center, !isDark)
+            },
+        ) {
+            Icon(
+                imageVector = iconVector,
+                contentDescription = stringResource(R.string.me_theme),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
     }
 }
 
