@@ -3,6 +3,7 @@ package com.github.chsiching.worddrill.ui.drill
 import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -207,5 +208,46 @@ class DrillScreenTest {
 
         composeRule.onNodeWithText("跳过").assertIsDisplayed()
         composeRule.onNodeWithText("恢复").assertDoesNotExist()
+    }
+
+    /**
+     * #26：词书名过长时不应挤压右侧的跳过/锁定按钮。
+     *
+     * 用一条超长词书名（远超屏幕宽度）渲染 DrillPager，验证：
+     * - 跳过按钮仍可见可点击
+     * - 锁定按钮 contentDescription（「锁定」）对应的节点仍存在
+     * - 计数器「1 / 3」仍显示
+     *
+     * 视觉换行效果在模拟器上手验（截图），这里只验证节点存在性（不被挤出树）。
+     */
+    @Test
+    fun longBookName_doesNotPushOutRightSideButtons() {
+        val longName = "我的超级长的自定义考研英语复习词书".repeat(3)
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillPager(
+                        bookName = longName,
+                        cards = cards(),
+                        onPageSettled = { _, _ -> },
+                        onSkip = { },
+                        isReviewBook = false,
+                        onRestore = { },
+                        locked = false,
+                        onToggleLock = {},
+                        hidePhonetic = false,
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        // 右侧两按钮仍可见（跳过 = Text，锁定 = Icon contentDescription）
+        composeRule.onNodeWithText("跳过").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("锁定").assertIsDisplayed()
+        // 计数器位置不受影响
+        composeRule.onNodeWithText("1 / 3").assertIsDisplayed()
+        // 词书名完整文本仍渲染（换行后整段文本节点仍存在 —— Compose Text 节点保留完整字符串）
+        composeRule.onNodeWithText(longName).assertIsDisplayed()
     }
 }

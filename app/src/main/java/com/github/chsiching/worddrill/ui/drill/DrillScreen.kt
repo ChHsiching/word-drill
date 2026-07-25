@@ -159,10 +159,10 @@ internal fun DrillPager(
 /**
  * 顶部条：词书名（左） · 计数器（中） · 跳过+锁定（右）。
  *
- * 计数器要真正在屏幕水平中心，不能跟着 SpaceBetween 走（左右两块宽度不等时，
- * SpaceBetween 会把中间元素挤偏 —— 审核反馈：跳过+锁定比词书名宽，计数器偏左）。
- * 用 Box 叠加：底层 Row 用 SpaceBetween 放左右两块，叠加层 Text 计数器用
- * Alignment.TopCenter 绝对居中（脱离 Row 的均分逻辑）。
+ * 三段布局：[词书名 weight 1f][Spacer weight 1f][按钮 intrinsic]。
+ * 词书名最多占左半（剩余空间的一半），Spacer 占中间留给计数器叠加层，按钮按 intrinsic
+ * 宽度贴最右。这样长名字只会换行在左半区，绝不侵入计数器水平区域，更不会挤压按钮。
+ * 短名字时 Text 不撑满 weight，左对齐视觉不变；计数器由叠加层 Text 绝对居中。
  *
  * 锁定态隐藏跳过（AnimatedVisibility fade），锁定按钮反色背景 + LockOpen 图标。
  */
@@ -186,19 +186,24 @@ private fun DrillTopBar(
             .padding(horizontal = 28.dp),
         contentAlignment = Alignment.Center,
     ) {
-        // 底层：左右两块 SpaceBetween
+        // 底层：词书名（weight 1f，最多左半） + Spacer（weight 1f，留给计数器） + 按钮（intrinsic，贴右）
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 词书名（左）
+            // 词书名（左）：weight(1f) 让它和 Spacer 均分扣掉按钮宽度后的剩余空间，
+            // 即词书名最多占 (总宽 - 按钮宽) / 2，止于屏幕中线左侧，不会侵入计数器。
+            // softWrap 默认开启，超长自动换行不截断。
             Text(
                 text = bookName,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelLarge,
                 letterSpacing = 1.sp,
+                modifier = Modifier.weight(1f),
             )
+            // 中间留白：weight(1f) 占位给计数器叠加层，确保词书名右边界 < 屏幕中线
+            Spacer(Modifier.weight(1f))
             // 跳过/恢复 + 锁定（右）
             // 审核反馈 4：锁定时不隐藏跳过按钮（锁定只隐藏导航栏，跳过仍可用）。
             Row(verticalAlignment = Alignment.CenterVertically) {
