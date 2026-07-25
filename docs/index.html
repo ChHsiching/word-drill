@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WordDrill — 极简英语学习闪卡</title>
+<meta name="description" content="靠不断滑动浏览做被动重复记忆的闪卡 App。纯离线、无账号、无后端。预置 CET-4/CET-6/考研英语，内置 10 万词词典。">
+<style>
+:root {
+  --bg: #FAFAFA; --surface: #FFFFFF;
+  --text-primary: #1A1A1A;
+  --text-secondary: rgba(60,60,67,0.6);
+  --text-tertiary: rgba(60,60,67,0.3);
+  --separator: rgba(60,60,67,0.12);
+  --chip-bg: #F5F5F7;
+  --spring: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000; --surface: #1C1C1E;
+    --text-primary: #FFF;
+    --text-secondary: rgba(235,235,245,0.6);
+    --text-tertiary: rgba(235,235,245,0.3);
+    --separator: rgba(84,84,88,0.5);
+    --chip-bg: #2C2C2E;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "SF Pro Text", "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+  background: var(--bg); color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+.container { max-width: 840px; margin: 0 auto; padding: 0 24px; }
+
+/* ═══ Hero ═══ */
+.hero {
+  text-align: center; padding: 100px 24px 60px;
+}
+.hero-logo { width: 100px; height: 100px; margin-bottom: 24px; }
+.hero h1 {
+  font-size: 48px; font-weight: 700; letter-spacing: -1px;
+  margin-bottom: 12px;
+}
+.hero .tagline {
+  font-size: 20px; color: var(--text-secondary);
+  margin-bottom: 8px; font-weight: 400;
+}
+.hero .tagline-en {
+  font-size: 14px; color: var(--text-tertiary);
+  margin-bottom: 36px;
+}
+.download-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 14px 32px; border-radius: 100px;
+  background: var(--text-primary); color: var(--bg);
+  text-decoration: none; font-size: 17px; font-weight: 600;
+  transition: transform 0.2s var(--spring), opacity 0.2s;
+}
+.download-btn:hover { transform: scale(1.03); }
+.download-btn:active { transform: scale(0.98); }
+.download-meta { font-size: 13px; color: var(--text-tertiary); margin-top: 12px; }
+
+/* ═══ Screenshots ═══ */
+.screenshots {
+  display: flex; justify-content: center; gap: 16px;
+  padding: 40px 24px 80px; flex-wrap: wrap;
+}
+.screenshots img {
+  width: 240px; border-radius: 16px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+}
+
+/* ═══ Features ═══ */
+.features { padding: 0 24px 80px; }
+.features h2 {
+  font-size: 32px; font-weight: 700; text-align: center;
+  letter-spacing: -0.5px; margin-bottom: 40px;
+}
+.feature-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px; max-width: 800px; margin: 0 auto;
+}
+.feature-card {
+  background: var(--surface); border-radius: 16px;
+  padding: 28px 24px;
+}
+.feature-card .icon { font-size: 28px; margin-bottom: 12px; }
+.feature-card h3 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+.feature-card p { font-size: 14px; color: var(--text-secondary); }
+
+/* ═══ Footer ═══ */
+.footer {
+  text-align: center; padding: 40px 24px;
+  border-top: 0.5px solid var(--separator);
+}
+.footer a { color: var(--text-secondary); text-decoration: none; font-size: 14px; }
+.footer a:hover { color: var(--text-primary); }
+.footer .copyright { font-size: 13px; color: var(--text-tertiary); margin-top: 8px; }
+
+/* ═══ Scroll reveal ═══ */
+.reveal { opacity: 0; transform: translateY(20px); transition: all 0.6s var(--spring); }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- ═══ Hero ═══ -->
+<div class="hero">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="website/logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="website/logo-light.svg">
+    <img class="hero-logo" src="website/logo-light.svg" alt="WordDrill">
+  </picture>
+  <h1>WordDrill</h1>
+  <div class="tagline">极简英语学习闪卡 · 纯粹刷词加深记忆</div>
+  <div class="tagline-en">Minimal flashcard app for passive repetition · Offline · No account</div>
+  <a class="download-btn" href="https://github.com/ChHsiching/word-drill/releases/latest">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    下载 APK
+  </a>
+  <div class="download-meta">v0.2.0 · Android 8.0+ · ~34 MB</div>
+</div>
+
+<!-- ═══ Screenshots ═══ -->
+<div class="screenshots reveal">
+  <img src="website/screenshot-1.png" alt="刷卡页" />
+  <img src="website/screenshot-2.png" alt="词库页" />
+  <img src="website/screenshot-3.png" alt="我的页" />
+</div>
+
+<!-- ═══ Features ═══ -->
+<div class="features">
+  <h2 class="reveal">核心功能</h2>
+  <div class="feature-grid">
+    <div class="feature-card reveal">
+      <div class="icon">📖</div>
+      <h3>全屏刷卡</h3>
+      <p>同屏显示英文、词性、音标和中文释义。左右滑动切换，不考试不评分。</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="icon">📚</div>
+      <h3>三个预置词书</h3>
+      <p>CET-4、CET-6、考研英语，开箱即用。支持自定义词书。</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="icon">🔍</div>
+      <h3>内置 10 万词词典</h3>
+      <p>ECDICT 英汉词典，添加词条时自动查词性、释义和音标。</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="icon">📄</div>
+      <h3>文件导入</h3>
+      <p>支持 Excel、文本、CSV、PDF 批量导入词书。自动匹配词典数据。</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="icon">⚡</div>
+      <h3>跳过与复习</h3>
+      <p>熟悉的词一键跳过，自动收入复习词书。专注刷不熟的内容。</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="icon">🔄</div>
+      <h3>数据迁移</h3>
+      <p>整库导出/导入 JSON，换机不丢数据。完全离线，无后端。</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="icon">🎨</div>
+      <h3>深色模式</h3>
+      <p>深色/浅色/跟随系统，circular reveal 切换动画。</p>
+    </div>
+    <div class="feature-card reveal">
+      <div class="icon">🔒</div>
+      <h3>沉浸锁定</h3>
+      <p>锁定后隐藏导航栏，纯全屏刷卡不被打扰。</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Footer ═══ -->
+<div class="footer">
+  <a href="https://github.com/ChHsiching/word-drill">GitHub</a> ·
+  <a href="https://github.com/ChHsiching/word-drill/releases">Releases</a> ·
+  <a href="LICENSE.html">MIT License</a>
+  <div class="copyright">© 2026 ChHsiching · Built with Kotlin & Jetpack Compose</div>
+</div>
+
+<script>
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach((e, i) => {
+    if (e.isIntersecting) {
+      setTimeout(() => e.target.classList.add('visible'), i * 80);
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
