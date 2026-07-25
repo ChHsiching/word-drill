@@ -14,8 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +35,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.local.dao.DeletedEntry
 import com.github.chsiching.worddrill.data.local.entity.Book
+import com.github.chsiching.worddrill.ui.theme.DialogButton
+import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
+import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 
 /** 待永久删除的目标（ sealed 区分词书 / 词条，用于确认对话框文案）。 */
@@ -241,7 +242,7 @@ private fun RowSeparator() {
 /**
  * 永久删除二次确认对话框（Ticket #22）。
  * 与 [com.github.chsiching.worddrill.ui.library.WordListScreen] 的 DeleteWordDialog 同模式，
- * 但提示「不可撤销」（永久删除 = 真 DELETE，无法恢复）。
+ * 但提示「不可撤销」（永久删除 = 真 DELETE，无法恢复），destructive 浅红底按钮。
  */
 @Composable
 private fun PurgeConfirmDialog(
@@ -249,20 +250,21 @@ private fun PurgeConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    WordDrillDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.recycle_bin_purge_title)) },
-        text = { Text(stringResource(R.string.recycle_bin_purge_message, displayName)) },
-        confirmButton = {
-            TextButton(
+        title = stringResource(R.string.recycle_bin_purge_title),
+        message = stringResource(R.string.recycle_bin_purge_message, displayName),
+        buttons = {
+            DialogButton(
+                text = stringResource(R.string.recycle_bin_purge_confirm),
                 onClick = onConfirm,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
-            ) { Text(stringResource(R.string.recycle_bin_purge_confirm)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_cancel)) }
+                style = DialogButtonStyle.Destructive,
+            )
+            DialogButton(
+                text = stringResource(R.string.library_cancel),
+                onClick = onDismiss,
+                style = DialogButtonStyle.Cancel,
+            )
         },
     )
 }

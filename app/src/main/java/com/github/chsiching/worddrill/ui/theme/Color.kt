@@ -27,6 +27,12 @@ val SeparatorStrongLight = Color(0x1F000000) // rgba(0,0,0,0.12)
 val ProgressTrackLight = Color(0xFFE8E8ED)
 val ChipBgLight = Color(0xFFF5F5F7)
 
+// ── E 风格弹窗 destructive 按钮（Ticket #25）：浅红底 + 红字 ──
+// 设计稿 dialog-5-full.html 的 err = '#FF453A'，浅底 = rgba(255,69,58,0.12)，
+// 深浅模式同色（iOS 系统红）。alpha 0.12 → 0x1F。
+val DestructiveFg = Color(0xFFFF453A)
+val DestructiveBg = Color(0x1FFF453A)
+
 // ── Dark ────────────────────────────────────────────────────
 val BgDark = Color(0xFF000000)
 val SurfaceDark = Color(0xFF1C1C1E)

@@ -20,8 +20,6 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -29,7 +27,6 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,6 +44,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.local.WordWithSenses
+import com.github.chsiching.worddrill.ui.theme.DialogButton
+import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
+import com.github.chsiching.worddrill.ui.theme.DialogTextField
+import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 
 /**
@@ -234,36 +235,33 @@ private fun AddWordDialog(
 ) {
     var posExpanded by remember { mutableStateOf(false) }
 
-    AlertDialog(
+    WordDrillDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.word_list_add)) },
-        text = {
+        title = stringResource(R.string.word_list_add),
+        content = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+                DialogTextField(
                     value = state.text,
                     onValueChange = onTextInput,
-                    label = { Text(stringResource(R.string.word_list_text_hint)) },
+                    label = stringResource(R.string.word_list_text_hint),
                     singleLine = true,
                     isError = state.error != null,
-                    modifier = Modifier.fillMaxWidth(),
                 )
                 ExposedDropdownMenuBox(
                     expanded = posExpanded,
                     onExpandedChange = { posExpanded = it },
                 ) {
-                    OutlinedTextField(
+                    DialogTextField(
                         value = state.pos,
                         onValueChange = {},
-                        readOnly = true, // POS 不能自由输入，只能从下拉选（issue #9）
-                        label = { Text(stringResource(R.string.word_list_pos_dropdown_label)) },
+                        label = stringResource(R.string.word_list_pos_dropdown_label),
                         singleLine = true,
                         isError = state.error != null,
+                        readOnly = true, // POS 不能自由输入，只能从下拉选（issue #9）
                         trailingIcon = {
                             ExposedDropdownMenuDefaults.TrailingIcon(posExpanded)
                         },
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
                         modifier = Modifier
-                            .fillMaxWidth()
                             .menuAnchor()
                             .clickable { posExpanded = !posExpanded },
                     )
@@ -282,24 +280,28 @@ private fun AddWordDialog(
                         }
                     }
                 }
-                OutlinedTextField(
+                DialogTextField(
                     value = state.meaning,
                     onValueChange = onMeaningInput,
-                    label = { Text(stringResource(R.string.word_list_meaning_hint)) },
+                    label = stringResource(R.string.word_list_meaning_hint),
                     singleLine = true,
                     isError = state.error != null,
                     supportingText = if (state.error != null) ({ Text(stringResource(state.error)) }) else null,
-                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
-        confirmButton = {
-            TextButton(onClick = onConfirm, enabled = state.error == null && state.text.isNotBlank()) {
-                Text(stringResource(R.string.library_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_cancel)) }
+        buttons = {
+            DialogButton(
+                text = stringResource(R.string.library_cancel),
+                onClick = onDismiss,
+                style = DialogButtonStyle.Cancel,
+            )
+            DialogButton(
+                text = stringResource(R.string.library_confirm),
+                onClick = onConfirm,
+                style = DialogButtonStyle.Primary,
+                enabled = state.error == null && state.text.isNotBlank(),
+            )
         },
     )
 }
@@ -312,41 +314,41 @@ private fun EditSenseDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    WordDrillDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.word_list_edit)) },
-        text = {
+        title = stringResource(R.string.word_list_edit),
+        message = state.wordText,
+        content = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = state.wordText,
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                OutlinedTextField(
+                DialogTextField(
                     value = state.pos,
                     onValueChange = onPosInput,
-                    label = { Text(stringResource(R.string.word_list_pos_hint)) },
+                    label = stringResource(R.string.word_list_pos_hint),
                     singleLine = true,
                     isError = state.error != null,
-                    modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
+                DialogTextField(
                     value = state.meaning,
                     onValueChange = onMeaningInput,
-                    label = { Text(stringResource(R.string.word_list_meaning_hint)) },
+                    label = stringResource(R.string.word_list_meaning_hint),
                     singleLine = true,
                     isError = state.error != null,
                     supportingText = if (state.error != null) ({ Text(stringResource(state.error)) }) else null,
-                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
-        confirmButton = {
-            TextButton(onClick = onConfirm, enabled = state.error == null && state.pos.isNotBlank()) {
-                Text(stringResource(R.string.library_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_cancel)) }
+        buttons = {
+            DialogButton(
+                text = stringResource(R.string.library_cancel),
+                onClick = onDismiss,
+                style = DialogButtonStyle.Cancel,
+            )
+            DialogButton(
+                text = stringResource(R.string.library_confirm),
+                onClick = onConfirm,
+                style = DialogButtonStyle.Primary,
+                enabled = state.error == null && state.pos.isNotBlank(),
+            )
         },
     )
 }
@@ -354,7 +356,7 @@ private fun EditSenseDialog(
 /**
  * 删除词条二次确认对话框（Ticket #22）。
  * 与 [com.github.chsiching.worddrill.ui.library.LibraryScreen] 的 DeleteBookDialog 同模式：
- * 取消是安全选项（默认）；删除用 error 色提示破坏性。
+ * 取消是安全选项（默认）；删除用 destructive 浅红底按钮提示破坏性。
  * 语义：软删（deleted=1，进回收站，可恢复），文案明确告知「可从回收站恢复」。
  */
 @Composable
@@ -363,20 +365,21 @@ private fun DeleteWordDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    WordDrillDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.word_list_delete_title)) },
-        text = { Text(stringResource(R.string.word_list_delete_message, wordText)) },
-        confirmButton = {
-            TextButton(
+        title = stringResource(R.string.word_list_delete_title),
+        message = stringResource(R.string.word_list_delete_message, wordText),
+        buttons = {
+            DialogButton(
+                text = stringResource(R.string.word_list_delete_confirm),
                 onClick = onConfirm,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
-            ) { Text(stringResource(R.string.word_list_delete_confirm)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_cancel)) }
+                style = DialogButtonStyle.Destructive,
+            )
+            DialogButton(
+                text = stringResource(R.string.library_cancel),
+                onClick = onDismiss,
+                style = DialogButtonStyle.Cancel,
+            )
         },
     )
 }

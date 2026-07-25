@@ -26,11 +26,9 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.BrightnessAuto
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -57,7 +55,11 @@ import com.github.chsiching.worddrill.BuildConfig
 import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.settings.NavStyle
 import com.github.chsiching.worddrill.data.settings.ThemeMode
+import com.github.chsiching.worddrill.ui.theme.DialogButton
+import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
+import com.github.chsiching.worddrill.ui.theme.DialogTextField
 import com.github.chsiching.worddrill.ui.theme.LocalThemeRevealTrigger
+import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 import com.github.chsiching.worddrill.ui.theme.wordDrillTypography
 import kotlinx.coroutines.delay
@@ -500,51 +502,56 @@ private fun DataSection(
 
     if (showExportDialog) {
         var nicknameInput by remember { mutableStateOf("") }
-        AlertDialog(
+        WordDrillDialog(
             onDismissRequest = { showExportDialog = false },
-            title = { Text(stringResource(R.string.me_export_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.me_export_message))
-                    OutlinedTextField(
-                        value = nicknameInput,
-                        onValueChange = { nicknameInput = it },
-                        label = { Text(stringResource(R.string.me_export_nickname_hint)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+            title = stringResource(R.string.me_export_title),
+            message = stringResource(R.string.me_export_message),
+            content = {
+                DialogTextField(
+                    value = nicknameInput,
+                    onValueChange = { nicknameInput = it },
+                    label = stringResource(R.string.me_export_nickname_hint),
+                    singleLine = true,
+                )
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    showExportDialog = false
-                    pendingNickname = nicknameInput.trim().ifEmpty { null }
-                    exportLauncher.launch("worddrill-backup.json")
-                }) { Text(stringResource(R.string.me_export_confirm)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showExportDialog = false }) {
-                    Text(stringResource(R.string.me_cancel))
-                }
+            buttons = {
+                DialogButton(
+                    text = stringResource(R.string.me_cancel),
+                    onClick = { showExportDialog = false },
+                    style = DialogButtonStyle.Cancel,
+                )
+                DialogButton(
+                    text = stringResource(R.string.me_export_confirm),
+                    onClick = {
+                        showExportDialog = false
+                        pendingNickname = nicknameInput.trim().ifEmpty { null }
+                        exportLauncher.launch("worddrill-backup.json")
+                    },
+                    style = DialogButtonStyle.Primary,
+                )
             },
         )
     }
 
     if (showImportDialog) {
-        AlertDialog(
+        WordDrillDialog(
             onDismissRequest = { showImportDialog = false },
-            title = { Text(stringResource(R.string.me_import_title)) },
-            text = { Text(stringResource(R.string.me_import_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showImportDialog = false
-                    importLauncher.launch(arrayOf("application/json", "*/*"))
-                }) { Text(stringResource(R.string.me_import_confirm)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showImportDialog = false }) {
-                    Text(stringResource(R.string.me_cancel))
-                }
+            title = stringResource(R.string.me_import_title),
+            message = stringResource(R.string.me_import_message),
+            buttons = {
+                DialogButton(
+                    text = stringResource(R.string.me_cancel),
+                    onClick = { showImportDialog = false },
+                    style = DialogButtonStyle.Cancel,
+                )
+                DialogButton(
+                    text = stringResource(R.string.me_import_confirm),
+                    onClick = {
+                        showImportDialog = false
+                        importLauncher.launch(arrayOf("application/json", "*/*"))
+                    },
+                    style = DialogButtonStyle.Primary,
+                )
             },
         )
     }
@@ -643,26 +650,25 @@ private fun StatusLine(status: ExportImportStatus, onClear: () -> Unit) {
 
 @Composable
 private fun AboutDialog(onDismiss: () -> Unit) {
-    AlertDialog(
+    WordDrillDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.me_about_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = stringResource(R.string.me_about_app_name),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    text = stringResource(R.string.me_about_version, BuildConfig.VERSION_NAME),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        title = stringResource(R.string.me_about_title),
+        message = stringResource(R.string.me_about_app_name),
+        content = {
+            Text(
+                text = stringResource(R.string.me_about_version, BuildConfig.VERSION_NAME),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
         },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.me_about_close))
-            }
+        buttons = {
+            DialogButton(
+                text = stringResource(R.string.me_about_close),
+                onClick = onDismiss,
+                style = DialogButtonStyle.Primary,
+            )
         },
     )
 }

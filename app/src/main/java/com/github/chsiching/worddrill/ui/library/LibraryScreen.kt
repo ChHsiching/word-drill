@@ -25,13 +25,12 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.FileUpload
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,14 +38,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.local.dao.BookWithCount
+import com.github.chsiching.worddrill.ui.theme.DialogButton
+import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
+import com.github.chsiching.worddrill.ui.theme.DialogTextField
+import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 
 /**
@@ -303,29 +308,31 @@ private fun BookNameDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    WordDrillDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = onNameInput,
-                    label = { Text(stringResource(R.string.library_name_hint)) },
-                    singleLine = true,
-                    isError = error != null,
-                    supportingText = if (error != null) ({ Text(stringResource(error)) }) else null,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+        title = title,
+        content = {
+            DialogTextField(
+                value = name,
+                onValueChange = onNameInput,
+                label = stringResource(R.string.library_name_hint),
+                singleLine = true,
+                isError = error != null,
+                supportingText = if (error != null) ({ Text(stringResource(error)) }) else null,
+            )
         },
-        confirmButton = {
-            TextButton(onClick = onConfirm, enabled = error == null && name.isNotBlank()) {
-                Text(stringResource(R.string.library_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_cancel)) }
+        buttons = {
+            DialogButton(
+                text = stringResource(R.string.library_cancel),
+                onClick = onDismiss,
+                style = DialogButtonStyle.Cancel,
+            )
+            DialogButton(
+                text = stringResource(R.string.library_confirm),
+                onClick = onConfirm,
+                style = DialogButtonStyle.Primary,
+                enabled = error == null && name.isNotBlank(),
+            )
         },
     )
 }
@@ -358,16 +365,12 @@ private fun ImportBookDialog(
         }
     }
 
-    AlertDialog(
+    WordDrillDialog(
         onDismissRequest = { if (!state.working) onDismiss() },
-        title = { Text(stringResource(R.string.library_import_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = stringResource(R.string.library_import_message),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        title = stringResource(R.string.library_import_title),
+        message = stringResource(R.string.library_import_message),
+        content = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = {
                         pickFileLauncher.launch(
@@ -391,22 +394,25 @@ private fun ImportBookDialog(
                         ?: stringResource(R.string.library_import_file_none),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
+                DialogTextField(
                     value = state.name,
                     onValueChange = onNameInput,
-                    label = { Text(stringResource(R.string.library_name_hint)) },
+                    label = stringResource(R.string.library_name_hint),
                     singleLine = true,
                     isError = state.error != null,
                     enabled = !state.working,
                     supportingText = if (state.error != null) ({ Text(stringResource(state.error)) }) else null,
-                    modifier = Modifier.fillMaxWidth(),
                 )
                 if (state.working) {
                     Text(
                         text = stringResource(R.string.library_import_working),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 if (state.failureMessage != null) {
@@ -416,21 +422,26 @@ private fun ImportBookDialog(
                         text = msg,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
         },
-        confirmButton = {
-            TextButton(
+        buttons = {
+            DialogButton(
+                text = stringResource(R.string.library_cancel),
+                onClick = onDismiss,
+                style = DialogButtonStyle.Cancel,
+                enabled = !state.working,
+            )
+            DialogButton(
+                text = stringResource(R.string.library_confirm),
                 onClick = onSubmit,
+                style = DialogButtonStyle.Primary,
                 enabled = !state.working && state.error == null
                     && state.name.isNotBlank() && state.uri != null,
-            ) { Text(stringResource(R.string.library_confirm)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !state.working) {
-                Text(stringResource(R.string.library_cancel))
-            }
+            )
         },
     )
 }
@@ -453,22 +464,24 @@ private fun ImportDoneDialog(
     summary: com.github.chsiching.worddrill.data.wordimport.ImportSummary,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    WordDrillDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.library_import_title)) },
-        text = {
-            Text(stringResource(R.string.library_import_done, summary.success, summary.skipped))
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_confirm)) }
+        title = stringResource(R.string.library_import_title),
+        message = stringResource(R.string.library_import_done, summary.success, summary.skipped),
+        buttons = {
+            DialogButton(
+                text = stringResource(R.string.library_confirm),
+                onClick = onDismiss,
+                style = DialogButtonStyle.Primary,
+            )
         },
     )
 }
 
 /**
  * 删除词书二次确认对话框（Ticket #18）。
- * 取消是安全选项（默认）；删除用 error 色提示破坏性。DAO 层 isPreset=0 兜底，UI 层
- * 已对预置词书隐藏删除入口，这里只处理自定义词书。
+ * 取消是安全选项（默认）；删除用 destructive 浅红底按钮提示破坏性。DAO 层 isPreset=0 兜底，
+ * UI 层已对预置词书隐藏删除入口，这里只处理自定义词书。
  */
 @Composable
 private fun DeleteBookDialog(
@@ -476,20 +489,21 @@ private fun DeleteBookDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    WordDrillDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.library_delete_title)) },
-        text = { Text(stringResource(R.string.library_delete_message, name)) },
-        confirmButton = {
-            TextButton(
+        title = stringResource(R.string.library_delete_title),
+        message = stringResource(R.string.library_delete_message, name),
+        buttons = {
+            DialogButton(
+                text = stringResource(R.string.library_delete_confirm),
                 onClick = onConfirm,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
-            ) { Text(stringResource(R.string.library_delete_confirm)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_cancel)) }
+                style = DialogButtonStyle.Destructive,
+            )
+            DialogButton(
+                text = stringResource(R.string.library_cancel),
+                onClick = onDismiss,
+                style = DialogButtonStyle.Cancel,
+            )
         },
     )
 }
