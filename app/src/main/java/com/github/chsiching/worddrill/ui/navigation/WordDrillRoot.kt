@@ -259,14 +259,18 @@ private fun PillNav(
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val selectedIndex = topDestinations.indexOfFirst { it.route == currentRoute }.let { if (it < 0) 0 else it }
+    // 选中 Tab 索引：用 selectedTabIndexForRoute 把当前 route（含二级页）映射到所属顶层 Tab。
+    // null = 当前 route 不属于任何顶层 Tab（不应发生，但防御性处理）：指示器不画，避免错误高亮。
+    val selectedIndex = selectedTabIndexForRoute(currentRoute)
     val indicatorColor = MaterialTheme.colorScheme.onSurface
 
     var rowWidth by remember { mutableStateOf(0f) }
     val itemWidth = if (rowWidth > 0f) rowWidth / topDestinations.size else 0f
 
     val animatedX by animateFloatAsState(
-        targetValue = selectedIndex * itemWidth,
+        // selectedIndex 为 null（当前 route 不属于任何顶层 Tab）时，指示器移到 Row 左外
+        // （-itemWidth）+ drawBehind 不绘制，避免错误高亮。
+        targetValue = (selectedIndex ?: -1) * itemWidth,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow,
@@ -289,7 +293,8 @@ private fun PillNav(
                     // 画黑色指示器：高度 = Row 高度，圆角半径 = 高度/2（两端完整半圆）。
                     // 简约状态（compactNav）Row 矮 → 指示器自然呈圆形，合理，不动。
                     // 非简约状态的高度缩减通过 NavItem 的 padding 实现（见下方），不改这里。
-                    if (itemWidth > 0f) {
+                    // selectedIndex 为 null 时不画（当前 route 不属于任何顶层 Tab）。
+                    if (selectedIndex != null && itemWidth > 0f) {
                         drawRoundRect(
                             color = indicatorColor,
                             topLeft = androidx.compose.ui.geometry.Offset(animatedX, 0f),
@@ -337,8 +342,11 @@ private fun BarNav(
                 .navigationBarsPadding()
                 .padding(top = 6.dp),
         ) {
-            topDestinations.forEach { dest ->
-                val selected = currentRoute == dest.route
+            // 用 selectedTabIndexForRoute 与 PillNav 一致地判断选中态
+            // （二级页 library/{bookId} → Library, recycle_bin → Me）。
+            val selectedIndex = selectedTabIndexForRoute(currentRoute)
+            topDestinations.forEachIndexed { index, dest ->
+                val selected = index == selectedIndex
                 BarNavItem(
                     destination = dest,
                     selected = selected,
