@@ -1,5 +1,8 @@
 package com.github.chsiching.worddrill.ui.library
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.clickable
@@ -21,11 +24,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,7 +50,7 @@ import com.github.chsiching.worddrill.data.local.dao.BookWithCount
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 
 /**
- * 「库」Tab（Ticket #6 + #16 重写）：词书列表 + 切换/新建/重命名/删除。
+ * 「库」Tab（Ticket #6 + #16 重写 + #21 文件导入）：词书列表 + 切换/新建/重命名/删除/导入。
  *
  * 设计稿（#16）：去掉 CenterAlignedTopAppBar，改大标题；纯文字列表（无前置 icon）；
  * 选中态用浅灰背景（chipBg）+ check + 文字加粗；原地选中不跳转。
@@ -53,6 +59,8 @@ import com.github.chsiching.worddrill.ui.theme.wordDrillColors
  * - 点行主体 → 设为当前词书（写 DataStore，「刷」Tab 监听同源 Flow 立即重载）
  * - 点行尾 chevron → 进入词书内词条列表（[WordListScreen]）
  * - 自定义词书：重命名/删除入口（保留原 TextButton，与既有交互一致）
+ *
+ * Ticket #21 新增：「+ 新建词书」按钮下方加「从文件导入」按钮，弹 SAF + 输入词书名。
  *
  * 预置词书不显示重命名/删除（isPreset 判定，DAO 层 rename/deleteCustom 也有 isPreset=0 兜底）。
  */
@@ -105,6 +113,13 @@ fun LibraryScreen(
                     modifier = Modifier.padding(horizontal = 28.dp),
                 )
             }
+            item { Spacer(Modifier.size(8.dp)) }
+            item {
+                ImportBookButton(
+                    onClick = viewModel::openImportDialog,
+                    modifier = Modifier.padding(horizontal = 28.dp),
+                )
+            }
         }
     }
 
@@ -129,6 +144,17 @@ fun LibraryScreen(
         is LibraryDialog.Delete -> DeleteBookDialog(
             name = dialog.name,
             onConfirm = viewModel::submitDelete,
+            onDismiss = viewModel::dismissDialog,
+        )
+        is LibraryDialog.Import -> ImportBookDialog(
+            state = dialog,
+            onNameInput = viewModel::onNameInput,
+            onPickFile = viewModel::onFileSelected,
+            onSubmit = viewModel::submitImport,
+            onDismiss = viewModel::dismissDialog,
+        )
+        is LibraryDialog.ImportDone -> ImportDoneDialog(
+            summary = dialog.summary,
             onDismiss = viewModel::dismissDialog,
         )
     }
@@ -247,6 +273,27 @@ private fun AddBookButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * 从文件导入按钮（Ticket #21）：与 [AddBookButton] 同位置风格，但用 OutlinedButton
+ * 区分主次（"新建"是主入口，"导入"是次入口）。
+ */
+@Composable
+private fun ImportBookButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.FileUpload,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.library_import))
+    }
+}
+
 @Composable
 private fun BookNameDialog(
     title: String,
@@ -279,6 +326,141 @@ private fun BookNameDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_cancel)) }
+        },
+    )
+}
+
+/**
+ * 文件导入对话框（Ticket #21）。
+ *
+ * - 顶部说明文案（支持的格式 + 列结构）
+ * - 「选择文件」按钮触发 SAF（OpenDocument，mime 过滤 xlsx/txt/csv/pdf/任意）
+ * - 已选文件名展示
+ * - 词书名输入框（沿用 BookNameValidation 校验）
+ * - 确定按钮：选了文件 + 名称通过校验 + 非 working 才可点
+ */
+@Composable
+private fun ImportBookDialog(
+    state: LibraryDialog.Import,
+    onNameInput: (String) -> Unit,
+    onPickFile: (uri: Uri, filename: String) -> Unit,
+    onSubmit: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val pickFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri != null) {
+            // 从 Uri Cursor 取 DISPLAY_NAME；取不到时 fallback 到 uri.lastPathSegment
+            val filename = queryFilename(context, uri)
+            onPickFile(uri, filename)
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!state.working) onDismiss() },
+        title = { Text(stringResource(R.string.library_import_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = stringResource(R.string.library_import_message),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
+                    onClick = {
+                        pickFileLauncher.launch(
+                            arrayOf(
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                "application/vnd.ms-excel",
+                                "text/plain",
+                                "text/csv",
+                                "application/pdf",
+                                "*/*",
+                            )
+                        )
+                    },
+                    enabled = !state.working,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.library_import_pick_file))
+                }
+                Text(
+                    text = state.filename?.let { stringResource(R.string.library_import_file_picked, it) }
+                        ?: stringResource(R.string.library_import_file_none),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = state.name,
+                    onValueChange = onNameInput,
+                    label = { Text(stringResource(R.string.library_name_hint)) },
+                    singleLine = true,
+                    isError = state.error != null,
+                    enabled = !state.working,
+                    supportingText = if (state.error != null) ({ Text(stringResource(state.error)) }) else null,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (state.working) {
+                    Text(
+                        text = stringResource(R.string.library_import_working),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (state.failureMessage != null) {
+                    val msg = state.failureDetail?.let { "${stringResource(state.failureMessage)}：$it" }
+                        ?: stringResource(state.failureMessage)
+                    Text(
+                        text = msg,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onSubmit,
+                enabled = !state.working && state.error == null
+                    && state.name.isNotBlank() && state.uri != null,
+            ) { Text(stringResource(R.string.library_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !state.working) {
+                Text(stringResource(R.string.library_cancel))
+            }
+        },
+    )
+}
+
+/** 从 SAF Uri 查文件名（DISPLAY_NAME 列）。取不到时 fallback 到 lastPathSegment。 */
+private fun queryFilename(context: android.content.Context, uri: Uri): String {
+    return runCatching {
+        context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+    }.getOrNull()?.takeIf { it.isNotBlank() } ?: (uri.lastPathSegment ?: "unknown")
+}
+
+/**
+ * 导入完成对话框（Ticket #21）。展示 [ImportSummary]，用户点确定关闭。
+ */
+@Composable
+private fun ImportDoneDialog(
+    summary: com.github.chsiching.worddrill.data.wordimport.ImportSummary,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.library_import_title)) },
+        text = {
+            Text(stringResource(R.string.library_import_done, summary.success, summary.skipped))
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_confirm)) }
         },
     )
 }

@@ -165,4 +165,33 @@ class DatabaseJsonSerializerTest {
         val restored = DatabaseJsonSerializer.deserialize(json)
         assertThat(restored.words.single().phonetic).isNull()
     }
+
+    // ---- Ticket #20：book_word.skipped 往返（跳过状态导出/导入不丢）----
+
+    @Test
+    fun roundTrip_preservesSkippedFlag() {
+        val withSkipped = snapshot.copy(
+            bookWords = listOf(
+                BookWord(bookId = 1, wordId = 10, skipped = true),
+                BookWord(bookId = 1, wordId = 20, skipped = false),
+            )
+        )
+        val restored = DatabaseJsonSerializer.deserialize(
+            DatabaseJsonSerializer.serialize(withSkipped)
+        )
+        assertThat(restored.bookWords.find { it.wordId == 10L }?.skipped).isTrue()
+        assertThat(restored.bookWords.find { it.wordId == 20L }?.skipped).isFalse()
+    }
+
+    @Test
+    fun deserialize_skipped_defaultsFalse_whenMissing() {
+        // 兼容 Ticket #20 之前的导出文件（bookWords 里没有 skipped 字段）
+        val json = """
+            {"version":1,"books":[],"words":[],"senses":[],
+             "bookWords":[{"bookId":1,"wordId":10}],
+             "swipeLogs":[]}
+        """.trimIndent()
+        val restored = DatabaseJsonSerializer.deserialize(json)
+        assertThat(restored.bookWords.single().skipped).isFalse()
+    }
 }

@@ -81,6 +81,7 @@ class WordListScreenTest {
             db = db,
             wordDao = db.wordDao(),
             bookDao = db.bookDao(),
+            dictionaryDao = db.dictionaryDao(),
         )
         composeRule.setContent {
             WordDrillTheme {
@@ -111,9 +112,10 @@ class WordListScreenTest {
         // 点「新增词条」入口（IconButton contentDescription）打开对话框
         composeRule.onNodeWithContentDescription("新增词条").performClick()
         composeRule.waitForIdle()
-        // 输入三个字段（performTextInput 走程序化设置，不走 IME，可靠）
+        // 输入单词与释义（performTextInput 走程序化设置，不走 IME，可靠）
         composeRule.onNodeWithText("单词").performTextInput("balance")
-        composeRule.onNodeWithText("词性").performTextInput("n.")
+        // POS 走下拉（#9 起 POS 不能自由输入）：点开下拉 → 选 n.
+        selectPosFromDropdown("n.")
         composeRule.onNodeWithText("释义").performTextInput("平衡")
         composeRule.waitForIdle()
         // 点「确定」
@@ -135,7 +137,8 @@ class WordListScreenTest {
         composeRule.onNodeWithContentDescription("新增词条").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("单词").performTextInput("apple")
-        composeRule.onNodeWithText("词性").performTextInput("v.")
+        // POS 走下拉：选 v.
+        selectPosFromDropdown("v.")
         composeRule.onNodeWithText("释义").performTextInput("囤积")
         composeRule.waitForIdle()
         composeRule.onNodeWithText("确定").performClick()
@@ -151,6 +154,24 @@ class WordListScreenTest {
             db.wordDao().getByText("apple")?.let { db.wordDao().getSensesForWord(it.wordId) } ?: emptyList()
         }
         assertThat(senses).hasSize(2)
+    }
+
+    /**
+     * 模拟 POS 下拉选择（#9 起 POS 从下拉选，不自由输入）。
+     *
+     * 步骤：点 POS 字段（label "词性"）展开下拉 → 点目标 POS 菜单项。
+     *
+     * 注意：列表里已展示的词条 POS（如种子 "n."）会与下拉项 "n." 同文本，
+     * 用 [onAllNodesWithText] + 最后一个匹配（AlertDialog popup 在语义树后部）。
+     */
+    private fun selectPosFromDropdown(pos: String) {
+        composeRule.onNodeWithText("词性").performClick()
+        composeRule.waitForIdle()
+        val candidates = composeRule.onAllNodes(
+            androidx.compose.ui.test.hasText(pos, substring = false)
+        )
+        candidates[candidates.fetchSemanticsNodes().size - 1].performClick()
+        composeRule.waitForIdle()
     }
 
     @Test
@@ -207,5 +228,23 @@ class WordListScreenTest {
         composeRule.onNodeWithContentDescription("从词书移除").assertDoesNotExist()
         // 顶部展示预置词书名
         composeRule.onNodeWithText("CET-4").assertIsDisplayed()
+    }
+
+    // ---- Ticket #9：POS 下拉（不能自由输入）----
+
+    @Test
+    fun addDialog_posField_isDropdownWithOptions() {
+        setContentFor(customBookId)
+        composeRule.onNodeWithContentDescription("新增词条").performClick()
+        composeRule.waitForIdle()
+        // 点开 POS 下拉
+        composeRule.onNodeWithText("词性").performClick()
+        composeRule.waitForIdle()
+        // 固定 12 个 POS 选项应展示。
+        // 注：列表里已展示的 POS（如种子 "n."）与下拉项 "n." 同文本，用 >= 1 断言。
+        for (pos in WORD_LIST_POS_OPTIONS) {
+            val matches = composeRule.onAllNodes(androidx.compose.ui.test.hasText(pos, substring = false))
+            assertThat(matches.fetchSemanticsNodes().size).isAtLeast(1)
+        }
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.dao.BookDao
+import com.github.chsiching.worddrill.data.local.dao.DictionaryDao
 import com.github.chsiching.worddrill.data.local.dao.SwipeLogDao
 import com.github.chsiching.worddrill.data.local.dao.WordDao
 import dagger.Module
@@ -31,8 +32,15 @@ object DatabaseModule {
             WordDrillDatabase::class.java,
             "worddrill.db"
         )
-            // Ticket #14：显式注册 v1→v2，避免 fallbackToDestructiveMigration 清掉用户词书/刷卡记录。
-            .addMigrations(WordDrillDatabase.MIGRATION_1_2)
+            // 显式注册 migrations：fallbackToDestructiveMigration 会丢用户词书/刷卡记录，禁用。
+            // - v1→v2 (Ticket #14)：word 表加 phonetic 列
+            // - v2→v3 (Ticket #19)：新增 dictionary 表（只读 ECDICT 词典）
+            // - v3→v4 (Ticket #20)：book_word 表加 skipped 列（跳过标记，词书级独立）
+            .addMigrations(
+                WordDrillDatabase.MIGRATION_1_2,
+                WordDrillDatabase.MIGRATION_2_3,
+                WordDrillDatabase.MIGRATION_3_4,
+            )
             .build()
 
     @Provides
@@ -43,4 +51,7 @@ object DatabaseModule {
 
     @Provides
     fun provideSwipeLogDao(db: WordDrillDatabase): SwipeLogDao = db.swipeLogDao()
+
+    @Provides
+    fun provideDictionaryDao(db: WordDrillDatabase): DictionaryDao = db.dictionaryDao()
 }

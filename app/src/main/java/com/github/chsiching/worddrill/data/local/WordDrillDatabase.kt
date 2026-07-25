@@ -5,10 +5,12 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.github.chsiching.worddrill.data.local.dao.BookDao
+import com.github.chsiching.worddrill.data.local.dao.DictionaryDao
 import com.github.chsiching.worddrill.data.local.dao.SwipeLogDao
 import com.github.chsiching.worddrill.data.local.dao.WordDao
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
+import com.github.chsiching.worddrill.data.local.entity.DictionaryEntry
 import com.github.chsiching.worddrill.data.local.entity.Sense
 import com.github.chsiching.worddrill.data.local.entity.SwipeLog
 import com.github.chsiching.worddrill.data.local.entity.Word
@@ -20,14 +22,16 @@ import com.github.chsiching.worddrill.data.local.entity.Word
         Book::class,
         BookWord::class,
         SwipeLog::class,
+        DictionaryEntry::class,
     ],
-    version = 2,
+    version = 4,
     exportSchema = false,
 )
 abstract class WordDrillDatabase : RoomDatabase() {
     abstract fun wordDao(): WordDao
     abstract fun bookDao(): BookDao
     abstract fun swipeLogDao(): SwipeLogDao
+    abstract fun dictionaryDao(): DictionaryDao
 
     companion object {
         /**
@@ -39,6 +43,55 @@ abstract class WordDrillDatabase : RoomDatabase() {
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE word ADD COLUMN phonetic TEXT")
+            }
+        }
+
+        /**
+         * Ticket #19：v2 → v3 新增 dictionary 表（只读 ECDICT 词典）。
+         *
+         * 表 schema 与 [DictionaryEntry] 实体对应：(word, pos) 唯一索引兜底重复导入。
+         * 老用户升级后 dictionary 为空，首启由 [com.github.chsiching.worddrill.data.DictionaryImportOrchestrator]
+         * 从 assets/dictionary.json 导入；不破坏既有 word/sense/book 数据。
+         *
+         * 注意：CREATE TABLE 语句必须与 Room codegen 生成的 schema 完全一致（含
+         * `PRIMARY KEY AUTOINCREMENT NOT NULL` 列约束 + 反引号 quoting），
+         * 否则 Room 在启动时做 schema 校验会抛 IllegalStateException。_codegen
+         * 形态从实机 sqlite_master 抓取确认过。
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `dictionary` (
+                        `dictId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `word` TEXT NOT NULL,
+                        `phonetic` TEXT,
+                        `pos` TEXT NOT NULL,
+                        `meaning` TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_dictionary_word_pos` ON `dictionary` (`word`, `pos`)"
+                )
+            }
+        }
+
+        /**
+         * Ticket #20：v3 → v4 给 book_word 表加 skipped 列（跳过标记，词书级独立）。
+         *
+         * ALTER TABLE ADD COLUMN 在 SQLite 上保留旧关联行，新列默认 0（未跳过）。
+         * Room Boolean 映射 INTEGER（0/1），migration 显式写 INTEGER NOT NULL DEFAULT 0
+         * 与 Room codegen 的列定义一致（否则 schema 校验会抛 IllegalStateException）。
+         *
+         * 跳过语义：[BookWord.skipped]。词书级独立 = 每条 (bookId, wordId) 关联单独标记，
+         * CET-4 跳过不影响 CET-6 同词的关联。老数据全部 skipped=0（未跳过），行为不变。
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE book_word ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0"
+                )
             }
         }
     }

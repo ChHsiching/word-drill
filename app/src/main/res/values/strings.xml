@@ -75,6 +75,8 @@
     <string name="drill_skip">跳过</string>
     <string name="drill_lock">锁定</string>
     <string name="drill_unlock">解锁</string>
+    <!-- issue #1: 复习词书的恢复按钮（替代跳过，恢复 = 词回到所有原词书 + 从复习词书移除）-->
+    <string name="drill_restore">恢复</string>
     <string name="drill_swipe_hint">← 左右滑动切换 →</string>
     <!-- 「库」Tab 重写 -->
     <string name="library_large_title">词库</string>
@@ -91,4 +93,18 @@
     <string name="me_setting_export">导出数据</string>
     <string name="me_setting_import">导入数据</string>
     <string name="me_setting_about">关于</string>
+    <!-- Ticket #21：文件导入词书 -->
+    <string name="library_import">从文件导入</string>
+    <string name="library_import_title">从文件导入词书</string>
+    <string name="library_import_message">支持 xlsx / txt / csv / pdf。列结构：序号、单词、音标、词性释义。词优先查内置词典补全释义。</string>
+    <string name="library_import_pick_file">选择文件</string>
+    <string name="library_import_file_picked">已选：%1$s</string>
+    <string name="library_import_file_none">未选择文件</string>
+    <string name="library_import_working">导入中…</string>
+    <string name="library_import_done">成功导入 %1$d 词 · 跳过 %2$d 词（数据不完整）</string>
+    <string name="library_import_failed">导入失败</string>
+    <string name="library_import_failed_file_type">不支持的文件类型（仅支持 xlsx/txt/csv/pdf）</string>
+    <string name="library_import_failed_open">无法打开所选文件</string>
+    <!-- Ticket #9：手动加词条词性从下拉选 + 输入单词后查词典带出释义 -->
+    <string name="word_list_pos_dropdown_label">词性</string>
 </resources>

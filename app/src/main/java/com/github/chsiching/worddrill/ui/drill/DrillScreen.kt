@@ -87,6 +87,9 @@ fun DrillScreen(
             bookName = state.bookName,
             cards = state.cards,
             onPageSettled = viewModel::onPageSettled,
+            onSkip = { page -> viewModel.skipCurrentWord(page) },
+            isReviewBook = state.isReviewBook,
+            onRestore = { page -> viewModel.restoreCurrentWord(page) },
             locked = locked,
             onToggleLock = onToggleLock,
             hidePhonetic = hidePhonetic,
@@ -100,13 +103,15 @@ internal fun DrillPager(
     bookName: String,
     cards: List<WordWithSenses>,
     onPageSettled: (previousPage: Int, currentPage: Int) -> Unit,
+    onSkip: (currentPage: Int) -> Unit,
+    isReviewBook: Boolean,
+    onRestore: (currentPage: Int) -> Unit,
     locked: Boolean,
     onToggleLock: () -> Unit,
     hidePhonetic: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val pagerState = rememberPagerState(pageCount = { cards.size })
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(pagerState) {
         var previousSettled = pagerState.settledPage
@@ -126,14 +131,14 @@ internal fun DrillPager(
             total = cards.size,
             locked = locked,
             onToggleLock = onToggleLock,
-            onSkip = {
-                // 跳过 = 前进一张（不循环，到头不动）；spec 明确「跳过逻辑（加入复习词书）」
-                // 属于另一 ticket，本按钮只负责翻页。
-                // #17 审核反馈 #3：锁定状态下跳过仍可用。锁定只隐藏导航栏，不影响跳过。
-                if (pagerState.currentPage < cards.lastIndex) {
-                    scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
-                }
+            isReviewBook = isReviewBook,
+            onAction = { page ->
+                // issue #1：复习词书用「恢复」(onRestore)，普通词书用「跳过」(onSkip)。
+                // 两者的卡片消失行为一致（恢复/跳过后词都从当前列表移除），
+                // pager 停在同 index 指向下一张。
+                if (isReviewBook) onRestore(page) else onSkip(page)
             },
+            currentPage = pagerState.currentPage,
         )
 
         HorizontalPager(
@@ -168,8 +173,13 @@ private fun DrillTopBar(
     total: Int,
     locked: Boolean,
     onToggleLock: () -> Unit,
-    onSkip: () -> Unit,
+    isReviewBook: Boolean,
+    onAction: (currentPage: Int) -> Unit,
+    currentPage: Int,
 ) {
+    // issue #1：复习词书按钮文案「恢复」，普通词书「跳过」。onAction 在 DrillPager 内
+    // 已按 isReviewBook 分发到 onRestore/onSkip，这里只负责无参闭包 + 文案切换。
+    val actionLabel = if (isReviewBook) R.string.drill_restore else R.string.drill_skip
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -189,27 +199,27 @@ private fun DrillTopBar(
                 style = MaterialTheme.typography.labelLarge,
                 letterSpacing = 1.sp,
             )
-            // 跳过 + 锁定（右）
+            // 跳过/恢复 + 锁定（右）
             // 审核反馈 4：锁定时不隐藏跳过按钮（锁定只隐藏导航栏，跳过仍可用）。
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // #17 审核反馈 #5：跳过按钮无 ripple 方框，按下时 alpha 0.4→1.0 反馈。
-                val skipInteraction = remember { MutableInteractionSource() }
-                val skipPressed by skipInteraction.collectIsPressedAsState()
-                val skipAlpha by animateFloatAsState(
-                    targetValue = if (skipPressed) 0.4f else 1f,
+                val actionInteraction = remember { MutableInteractionSource() }
+                val actionPressed by actionInteraction.collectIsPressedAsState()
+                val actionAlpha by animateFloatAsState(
+                    targetValue = if (actionPressed) 0.4f else 1f,
                     animationSpec = spring(),
-                    label = "skipAlpha",
+                    label = "actionAlpha",
                 )
                 Text(
-                    text = stringResource(R.string.drill_skip),
+                    text = stringResource(actionLabel),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier
-                        .alpha(skipAlpha)
+                        .alpha(actionAlpha)
                         .clickable(
-                            interactionSource = skipInteraction,
+                            interactionSource = actionInteraction,
                             indication = null,
-                            onClick = onSkip,
+                            onClick = { onAction(currentPage) },
                         )
                         .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
                 )

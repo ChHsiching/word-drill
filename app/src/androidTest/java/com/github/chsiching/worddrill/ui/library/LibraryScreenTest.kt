@@ -67,7 +67,15 @@ class LibraryScreenTest {
     }
 
     private fun setContent() {
-        val vm = LibraryViewModel(bookDao = db.bookDao(), settings = settings)
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val fileImporter = com.github.chsiching.worddrill.data.wordimport.FileWordImporter(
+            context = context,
+            db = db,
+            wordDao = db.wordDao(),
+            bookDao = db.bookDao(),
+            dictionaryDao = db.dictionaryDao(),
+        )
+        val vm = LibraryViewModel(bookDao = db.bookDao(), settings = settings, fileImporter = fileImporter)
         composeRule.setContent {
             WordDrillTheme {
                 Surface {
@@ -137,5 +145,24 @@ class LibraryScreenTest {
         // 预置词书验收：CET-4 行不显示删除入口 → 全列表「删除」TextButton 数 == 自定义词书数(1)
         val deleteButtons = composeRule.onAllNodes(hasText("删除", substring = false))
         assertThat(deleteButtons.fetchSemanticsNodes().size).isEqualTo(1)
+    }
+
+    // ---- Ticket #21：文件导入入口 ----
+
+    @Test
+    fun importButton_isDisplayed() {
+        setContent()
+        // 「从文件导入」按钮在新建词书按钮下方，应展示
+        composeRule.onNodeWithText("从文件导入").assertIsDisplayed()
+    }
+
+    @Test
+    fun importButton_click_opensImportDialog() {
+        setContent()
+        composeRule.onNodeWithText("从文件导入").performClick()
+        composeRule.waitForIdle()
+        // 对话框标题 + 选择文件按钮 + 说明文案 都应展示
+        composeRule.onNodeWithText("从文件导入词书").assertIsDisplayed()
+        composeRule.onNodeWithText("选择文件").assertIsDisplayed()
     }
 }

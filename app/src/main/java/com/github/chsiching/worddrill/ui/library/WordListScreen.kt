@@ -18,8 +18,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +33,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -41,10 +49,13 @@ import com.github.chsiching.worddrill.data.local.WordWithSenses
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 
 /**
- * 「库」Tab 二级页：词书内词条列表（Ticket #7 + #16 重写）。
+ * 「库」Tab 二级页：词书内词条列表（Ticket #7 + #16 重写 + #9 POS 下拉与词典查词）。
  *
  * 设计稿（#16）：去掉 TopAppBar，改 back + 标题 + 新增入口的内联头部；行用 separator 分隔。
  * 仍保留全部 Ticket #7 能力（自定义词书增/改/移，预置只读）。
+ *
+ * Ticket #9：[AddWordDialog] 的 POS 改成下拉（[ExposedDropdownMenuBox]，readOnly=true），
+ * 固定 12 个 POS；输入 word 后由 [WordListViewModel] debounce 查词典自动填 pos + meaning。
  */
 @Composable
 fun WordListScreen(
@@ -118,9 +129,9 @@ fun WordListScreen(
         WordListDialog.None -> Unit
         is WordListDialog.Add -> AddWordDialog(
             state = dialog,
-            onTextInput = { t -> viewModel.onAddInput(t, dialog.pos, dialog.meaning) },
-            onPosInput = { p -> viewModel.onAddInput(dialog.text, p, dialog.meaning) },
-            onMeaningInput = { m -> viewModel.onAddInput(dialog.text, dialog.pos, m) },
+            onTextInput = viewModel::onTextInput,
+            onPosInput = viewModel::onPosInput,
+            onMeaningInput = viewModel::onMeaningInput,
             onConfirm = viewModel::submitAdd,
             onDismiss = viewModel::dismissDialog,
         )
@@ -193,6 +204,14 @@ private fun WordRow(
     }
 }
 
+/**
+ * 新增词条对话框（Ticket #7 + #9 POS 下拉 + 词典查词）。
+ *
+ * - word 输入框：onValueChange 触发 [WordListViewModel.onTextInput]，VM 内 debounce 查词典
+ * - pos 改用 [ExposedDropdownMenuBox]（readOnly=true，只能从 12 个固定 POS 选，不能自由输入）
+ * - meaning 输入框：词典命中时自动填，用户仍可手改
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddWordDialog(
     state: WordListDialog.Add,
@@ -202,6 +221,8 @@ private fun AddWordDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var posExpanded by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.word_list_add)) },
@@ -215,14 +236,41 @@ private fun AddWordDialog(
                     isError = state.error != null,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = state.pos,
-                    onValueChange = onPosInput,
-                    label = { Text(stringResource(R.string.word_list_pos_hint)) },
-                    singleLine = true,
-                    isError = state.error != null,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                ExposedDropdownMenuBox(
+                    expanded = posExpanded,
+                    onExpandedChange = { posExpanded = it },
+                ) {
+                    OutlinedTextField(
+                        value = state.pos,
+                        onValueChange = {},
+                        readOnly = true, // POS 不能自由输入，只能从下拉选（issue #9）
+                        label = { Text(stringResource(R.string.word_list_pos_dropdown_label)) },
+                        singleLine = true,
+                        isError = state.error != null,
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(posExpanded)
+                        },
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                            .clickable { posExpanded = !posExpanded },
+                    )
+                    ExposedDropdownMenu(
+                        expanded = posExpanded,
+                        onDismissRequest = { posExpanded = false },
+                    ) {
+                        for (option in WORD_LIST_POS_OPTIONS) {
+                            DropdownMenuItem(
+                                text = { Text(option) },
+                                onClick = {
+                                    onPosInput(option)
+                                    posExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
                 OutlinedTextField(
                     value = state.meaning,
                     onValueChange = onMeaningInput,
