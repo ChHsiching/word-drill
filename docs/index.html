@@ -131,7 +131,11 @@ body {
 </div>
 
 <div class="hero">
-  <img class="hero-logo" id="heroLogo" src="website/logo-light.svg" alt="WordDrill">
+  <picture id="heroLogoPicture">
+    <source media="(prefers-color-scheme: dark)" srcset="website/logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="website/logo-light.svg">
+    <img class="hero-logo" id="heroLogo" src="website/logo-light.svg" alt="WordDrill">
+  </picture>
   <h1>WordDrill</h1>
   <div class="tagline">纯粹刷词，加深记忆</div>
   <div class="tagline-en">Swipe. Read. Remember. No exams, no scores, no algorithms.</div>
@@ -196,10 +200,15 @@ function applyTheme(t) {
   const isDark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
 
-  // Swap logo
+  // Swap logo: auto 模式由 <picture> 接管（跟随系统），手动模式覆盖 img src
   const logo = document.getElementById('heroLogo');
-  logo.style.opacity = '0';
-  setTimeout(() => { logo.src = isDark ? 'website/logo-dark.svg' : 'website/logo-light.svg'; logo.style.opacity = '1'; }, 100);
+  if (t === 'auto') {
+    // 让 <picture> 的 <source> 按 prefers-color-scheme 决定
+    const systemDark = matchMedia('(prefers-color-scheme: dark)').matches;
+    logo.src = systemDark ? 'website/logo-dark.svg' : 'website/logo-light.svg';
+  } else {
+    logo.src = isDark ? 'website/logo-dark.svg' : 'website/logo-light.svg';
+  }
 
   // Update toggle active state
   document.querySelectorAll('.tt-item').forEach(el => el.classList.toggle('active', el.dataset.themeVal === t));
