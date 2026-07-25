@@ -1,18 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!--
-        Ticket #24 — 系统 SplashScreen 背景色匹配应用主题偏好。
-        系统 splash 在 Activity 代码跑之前渲染，只能读 manifest 里声明的 theme。
-        setTheme() 在 Application/Activity.onCreate 里都改不了它（窗口已用 manifest theme 建好）。
-
-        方案：3 个 activity-alias 指向同一个 MainActivity，各自带不同 splash 主题：
-        - .LauncherSystem（默认）：跟随系统夜间模式
-        - .LauncherLight：强制浅色
-        - .LauncherDark：强制深色
-        WordDrillApp.onCreate 用 PackageManager 启用用户偏好对应的 alias、禁用其他两个。
-        用户切主题后下次冷启动，系统读的是启用 alias 的 theme → splash 颜色正确。
-    -->
     <application
         android:name=".WordDrillApp"
         android:allowBackup="true"
@@ -23,45 +11,14 @@
         android:theme="@style/Theme.WordDrill">
         <activity
             android:name=".MainActivity"
-            android:exported="false"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.WordDrill.Splash" />
-
-        <activity-alias
-            android:name=".LauncherSystem"
-            android:enabled="true"
             android:exported="true"
-            android:targetActivity=".MainActivity"
+            android:label="@string/app_name"
             android:theme="@style/Theme.WordDrill.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".LauncherLight"
-            android:enabled="false"
-            android:exported="true"
-            android:targetActivity=".MainActivity"
-            android:theme="@style/Theme.WordDrill.Splash.Light">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".LauncherDark"
-            android:enabled="false"
-            android:exported="true"
-            android:targetActivity=".MainActivity"
-            android:theme="@style/Theme.WordDrill.Splash.Dark">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
+        </activity>
     </application>
 
 </manifest>

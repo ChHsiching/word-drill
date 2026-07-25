@@ -12,34 +12,15 @@
     </style>
 
     <!-- Ticket #24 — 启动画面主题（API 31+ 系统强制）。
-         拆成 Light / Dark 两套（不用 DayNight parent，避免跟随系统夜间模式）。
-         Application.onCreate 同步读 SharedPreferences 缓存的用户主题偏好，
-         在 Activity 创建前 setTheme() 选对应变体 → 系统 splash 背景色与应用偏好一致。
-         SYSTEM 模式作为 manifest 默认主题，由 values/values-night 跟随系统。
+         parent 必须是 Theme.SplashScreen，且 postSplashScreenTheme 指向正式主题。
+         windowSplashScreenBackground = 应用主背景色（无缝衔接）；
          windowSplashScreenAnimatedIcon = 透明 drawable（与背景同色，视觉上无系统 logo），
-         android:windowBackground 也设为同色，避免 compat 库 parent 默认渐变泄露。 -->
-
-    <!-- 默认（SYSTEM）：跟系统夜间模式。manifest 里 Activity 用此主题。 -->
+         让自定义 Compose 启动动画从首帧起就是用户看到的唯一动画。
+         android:windowBackground 也设为同色，避免 compat 库 parent 的默认渐变泄露。 -->
     <style name="Theme.WordDrill.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_invisible</item>
         <item name="android:windowBackground">@color/ic_launcher_background</item>
-        <item name="postSplashScreenTheme">@style/Theme.WordDrill</item>
-    </style>
-
-    <!-- 强制浅色：用户偏好 LIGHT 时，Application.onCreate setTheme 选此。 -->
-    <style name="Theme.WordDrill.Splash.Light" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/splash_bg_light</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_invisible</item>
-        <item name="android:windowBackground">@color/splash_bg_light</item>
-        <item name="postSplashScreenTheme">@style/Theme.WordDrill</item>
-    </style>
-
-    <!-- 强制深色：用户偏好 DARK 时，Application.onCreate setTheme 选此。 -->
-    <style name="Theme.WordDrill.Splash.Dark" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/splash_bg_dark</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_invisible</item>
-        <item name="android:windowBackground">@color/splash_bg_dark</item>
         <item name="postSplashScreenTheme">@style/Theme.WordDrill</item>
     </style>
 </resources>

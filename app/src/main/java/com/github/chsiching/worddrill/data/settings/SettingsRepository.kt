@@ -114,12 +114,6 @@ class SettingsRepository @Inject constructor(
     /** 写入主题偏好，重启后保持。 */
     suspend fun setTheme(mode: ThemeMode) {
         context.appDataStore.edit { it[themeKey] = mode.name }
-        // Ticket #24：同步镜像到 SharedPreferences。
-        // 系统 SplashScreen 在 Application.onCreate 之前渲染，那时 DataStore 还没准备好
-        // （异步读取），但 SharedPreferences 可同步读。镜像让 Application 能立刻拿到
-        // 用户偏好并 setTheme() 选对应 splash 变体（LIGHT/DARK），避免「白闪 2 秒」。
-        context.getSharedPreferences("splash_theme_prefs", android.content.Context.MODE_PRIVATE)
-            .edit().putString("theme_mode", mode.name).commit()
     }
 
     // ---- Ticket #16：UI 设置（隐藏音标 / 导航栏风格 / 简约导航）----
