@@ -40,3 +40,12 @@ captures/
 # Keystore files
 *.jks
 *.keystore
+
+# Scratch / temp / design files (not app code)
+.scratch/
+.zcode/
+designs/
+
+# Python cache
+__pycache__/
+*.pyc
