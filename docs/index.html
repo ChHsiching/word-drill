@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" style="color-scheme: light dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>WordDrill — 极简英语学习闪卡</title>
 <meta name="description" content="靠不断滑动浏览做被动重复记忆的闪卡 App。纯离线、无账号、无后端。预置 CET-4/CET-6/考研英语，内置 10 万词词典。">
 <style>
@@ -37,32 +38,35 @@ html[data-theme="dark"] {
 body {
   font-family: -apple-system, "SF Pro Text", "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
   background: var(--bg); color: var(--text-primary);
-  -webkit-font-smoothing: antialiased;
-  line-height: 1.6;
+  -webkit-font-smoothing: antialiased; line-height: 1.6;
   transition: background 0.3s var(--spring), color 0.3s var(--spring);
   overflow-x: hidden;
 }
 
-/* ═══ Theme toggle ═══ */
+/* ═══ Segmented theme toggle ═══ */
 .theme-toggle {
   position: fixed; top: 20px; right: 20px; z-index: 100;
-  width: 40px; height: 40px; border-radius: 50%;
-  background: var(--surface); border: 0.5px solid var(--separator);
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: all 0.2s var(--spring);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-  color: var(--text-primary);
+  display: flex; gap: 0;
+  background: rgba(118,118,128,0.12);
+  border-radius: 8px; padding: 2px;
+  transition: background 0.3s var(--spring);
 }
-.theme-toggle:active { transform: scale(0.9); }
-.theme-toggle svg { width: 18px; height: 18px; }
-.theme-toggle .icon-auto, .theme-toggle .icon-light, .theme-toggle .icon-dark { display: none; }
-html[data-theme="auto"] .theme-toggle .icon-auto,
-html[data-theme="light"] .theme-toggle .icon-light,
-html[data-theme="dark"] .theme-toggle .icon-dark { display: block; }
+.tt-item {
+  width: 28px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s var(--spring);
+}
+.tt-item.active {
+  background: var(--surface); color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.tt-item svg { width: 14px; height: 14px; }
 
 /* ═══ Hero ═══ */
 .hero { text-align: center; padding: 120px 24px 80px; }
-.hero-logo { width: 100px; height: 100px; margin-bottom: 28px; }
+.hero-logo { width: 100px; height: 100px; margin-bottom: 28px; transition: opacity 0.2s; }
 .hero h1 { font-size: clamp(40px, 7vw, 64px); font-weight: 700; letter-spacing: -1.5px; margin-bottom: 16px; }
 .hero .tagline { font-size: clamp(18px, 3vw, 24px); color: var(--text-secondary); margin-bottom: 8px; font-weight: 400; }
 .hero .tagline-en { font-size: 14px; color: var(--text-tertiary); margin-bottom: 40px; }
@@ -77,42 +81,27 @@ html[data-theme="dark"] .theme-toggle .icon-dark { display: block; }
 .download-btn:active { transform: scale(0.98); }
 .download-meta { font-size: 13px; color: var(--text-tertiary); margin-top: 14px; }
 
-/* ═══ Hero screenshots — three phones ═══ */
-.hero-phones {
-  display: flex; justify-content: center; gap: 12px;
-  padding: 60px 24px 40px;
-}
-.hero-phones img {
-  width: 200px; border-radius: 12px;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.1);
-}
+/* ═══ Hero phones ═══ */
+.hero-phones { display: flex; justify-content: center; gap: 12px; padding: 60px 24px 40px; }
+.hero-phones img { width: 200px; filter: drop-shadow(0 8px 40px rgba(0,0,0,0.15)); transition: opacity 0.2s; }
 .hero-phones img:nth-child(2) { transform: translateY(-20px); }
 
-/* ═══ Feature sections — alternating ═══ */
-.feature {
-  display: flex; align-items: center; justify-content: center;
-  gap: 60px; padding: 100px 24px;
-  max-width: 1000px; margin: 0 auto;
-}
-.feature-text { flex: 1; max-width: 400px; }
-.feature-text h2 {
-  font-size: clamp(28px, 4vw, 40px); font-weight: 700;
-  letter-spacing: -0.8px; margin-bottom: 16px; line-height: 1.2;
-}
-.feature-text p { font-size: 18px; color: var(--text-secondary); line-height: 1.6; }
-.feature-visual { flex: 1; max-width: 300px; text-align: center; }
-.feature-visual img { width: 100%; max-width: 260px; border-radius: 12px; box-shadow: 0 12px 48px rgba(0,0,0,0.12); }
-
-/* Alternating layout */
-.feature.reverse { flex-direction: row-reverse; }
-
-/* Stats band */
-.stats {
-  display: flex; justify-content: center; gap: 60px;
-  padding: 80px 24px; text-align: center;
-}
+/* ═══ Stats ═══ */
+.stats { display: flex; justify-content: center; gap: 60px; padding: 80px 24px; text-align: center; }
 .stat-num { font-size: 48px; font-weight: 700; letter-spacing: -1px; }
 .stat-label { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+
+/* ═══ Feature sections ═══ */
+.feature {
+  display: flex; align-items: center; justify-content: center;
+  gap: 60px; padding: 100px 24px; max-width: 1000px; margin: 0 auto;
+}
+.feature-text { flex: 1; max-width: 400px; }
+.feature-text h2 { font-size: clamp(28px, 4vw, 40px); font-weight: 700; letter-spacing: -0.8px; margin-bottom: 16px; line-height: 1.2; }
+.feature-text p { font-size: 18px; color: var(--text-secondary); line-height: 1.6; }
+.feature-visual { flex: 1; max-width: 300px; text-align: center; }
+.feature-visual img { width: 100%; max-width: 260px; filter: drop-shadow(0 12px 48px rgba(0,0,0,0.15)); transition: opacity 0.2s; }
+.feature.reverse { flex-direction: row-reverse; }
 
 @media (max-width: 700px) {
   .feature { flex-direction: column !important; gap: 32px; padding: 60px 24px; text-align: center; }
@@ -135,20 +124,14 @@ html[data-theme="dark"] .theme-toggle .icon-dark { display: block; }
 </head>
 <body>
 
-<!-- Theme toggle -->
-<div class="theme-toggle" onclick="cycleTheme()" title="切换主题">
-  <svg class="icon-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-  <svg class="icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-  <svg class="icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+<div class="theme-toggle" id="themeToggle">
+  <div class="tt-item" data-theme-val="auto" title="跟随系统"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18a4.5 9 0 0 1 0-18" fill="currentColor" stroke="none"/></svg></div>
+  <div class="tt-item" data-theme-val="light" title="浅色"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></div>
+  <div class="tt-item" data-theme-val="dark" title="深色"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></div>
 </div>
 
-<!-- ═══ Hero ═══ -->
 <div class="hero">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="website/logo-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="website/logo-light.svg">
-    <img class="hero-logo" src="website/logo-light.svg" alt="WordDrill">
-  </picture>
+  <img class="hero-logo" id="heroLogo" src="website/logo-light.svg" alt="WordDrill">
   <h1>WordDrill</h1>
   <div class="tagline">纯粹刷词，加深记忆</div>
   <div class="tagline-en">Swipe. Read. Remember. No exams, no scores, no algorithms.</div>
@@ -159,54 +142,42 @@ html[data-theme="dark"] .theme-toggle .icon-dark { display: block; }
   <div class="download-meta" id="download-meta">v0.2.0 · Android 8.0+ · ~34 MB</div>
 </div>
 
-<!-- ═══ Hero phones ═══ -->
 <div class="hero-phones reveal">
   <img src="website/screenshot-1.png" alt="刷卡页" />
   <img src="website/screenshot-2.png" alt="词库页" />
   <img src="website/screenshot-3.png" alt="我的页" />
 </div>
 
-<!-- ═══ Stats band ═══ -->
 <div class="stats reveal">
   <div><div class="stat-num">10万+</div><div class="stat-label">内置词典词条</div></div>
   <div><div class="stat-num">3</div><div class="stat-label">预置词书</div></div>
   <div><div class="stat-num">0</div><div class="stat-label">网络请求</div></div>
 </div>
 
-<!-- ═══ Feature 1: 全屏刷卡 ═══ -->
 <div class="feature reveal">
   <div class="feature-text">
     <h2>全屏刷卡<br/>纯粹阅读</h2>
     <p>单词、词性、音标、释义同屏展示。左右滑动切换，不考试不评分不判断对错。靠被动重复加深记忆，仅此而已。</p>
   </div>
-  <div class="feature-visual">
-    <img src="website/screenshot-1.png" alt="刷卡页" />
-  </div>
+  <div class="feature-visual"><img src="website/screenshot-1.png" alt="刷卡页" /></div>
 </div>
 
-<!-- ═══ Feature 2: 词典 + 导入 ═══ -->
 <div class="feature reverse reveal">
   <div class="feature-text">
     <h2>内置十万词典<br/>文件批量导入</h2>
     <p>ECDICT 英汉词典，添加词条自动查词性、释义、音标。支持 Excel、文本、PDF 批量导入词书，自动匹配词典数据。</p>
   </div>
-  <div class="feature-visual">
-    <img src="website/screenshot-2.png" alt="词库页" />
-  </div>
+  <div class="feature-visual"><img src="website/screenshot-2.png" alt="词库页" /></div>
 </div>
 
-<!-- ═══ Feature 3: 数据 + 隐私 ═══ -->
 <div class="feature reveal">
   <div class="feature-text">
     <h2>完全离线<br/>数据尽在掌握</h2>
     <p>所有数据本地存储，无后端无账号无网络请求。导出/导入 JSON 文件迁移数据，换机不丢进度。回收站防误删，跳过词自动收入复习词书。</p>
   </div>
-  <div class="feature-visual">
-    <img src="website/screenshot-3.png" alt="我的页" />
-  </div>
+  <div class="feature-visual"><img src="website/screenshot-3.png" alt="我的页" /></div>
 </div>
 
-<!-- ═══ Footer ═══ -->
 <div class="footer">
   <a href="https://github.com/ChHsiching/word-drill">GitHub</a> ·
   <a href="https://github.com/ChHsiching/word-drill/releases">Releases</a> ·
@@ -215,19 +186,32 @@ html[data-theme="dark"] .theme-toggle .icon-dark { display: block; }
 </div>
 
 <script>
-const THEMES = ['auto', 'light', 'dark'];
 function getTheme() { return localStorage.getItem('theme') || 'auto'; }
 function applyTheme(t) {
+  // Set data-theme attribute for CSS variable switching
   if (t === 'auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', t);
+
+  // Set color-scheme for browser native elements + Dark Reader detection
   const isDark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
-  document.querySelector('.hero-logo').src = isDark ? 'website/logo-dark.svg' : 'website/logo-light.svg';
+  document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+
+  // Swap logo
+  const logo = document.getElementById('heroLogo');
+  logo.style.opacity = '0';
+  setTimeout(() => { logo.src = isDark ? 'website/logo-dark.svg' : 'website/logo-light.svg'; logo.style.opacity = '1'; }, 100);
+
+  // Update toggle active state
+  document.querySelectorAll('.tt-item').forEach(el => el.classList.toggle('active', el.dataset.themeVal === t));
 }
-function cycleTheme() {
-  const next = THEMES[(THEMES.indexOf(getTheme()) + 1) % THEMES.length];
-  localStorage.setItem('theme', next);
-  applyTheme(next);
-}
+
+document.querySelectorAll('.tt-item').forEach(el => {
+  el.addEventListener('click', () => { localStorage.setItem('theme', el.dataset.themeVal); applyTheme(el.dataset.themeVal); });
+});
+
+// Listen to system theme changes when in auto mode
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (getTheme() === 'auto') applyTheme('auto'); });
+
 applyTheme(getTheme());
 
 fetch('https://api.github.com/repos/ChHsiching/word-drill/releases/latest')
@@ -237,16 +221,12 @@ fetch('https://api.github.com/repos/ChHsiching/word-drill/releases/latest')
     const sizeMB = apk ? (apk.size / 1048576).toFixed(0) : '~34';
     document.getElementById('download-btn').href = apk ? apk.browser_download_url : release.html_url;
     document.getElementById('download-meta').textContent = `${release.tag_name} · Android 8.0+ · ~${sizeMB} MB`;
-  })
-  .catch(() => {});
+  }).catch(() => {});
 
 const observer = new IntersectionObserver((entries) => {
-  entries.forEach((e) => {
-    if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }
-  });
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
 }, { threshold: 0.15 });
 document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 </script>
-
 </body>
 </html>
