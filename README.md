@@ -1,10 +1,21 @@
 <p align="center">
-  <img src="docs/worddrill-logo.svg" width="120" alt="WordDrill" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/worddrill-logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/worddrill-logo-light.svg">
+    <img src="docs/worddrill-logo-light.svg" width="120" alt="WordDrill" />
+  </picture>
 </p>
 
 <h1 align="center">WordDrill</h1>
 
 <p align="center">极简英语学习闪卡 App · 纯离线 · 无账号 · 无后端</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
+  <img src="https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white" alt="Android" />
+  <img src="https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin" />
+  <img src="https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white" alt="Jetpack Compose" />
+</p>
 
 ---
 
@@ -13,6 +24,20 @@
 WordDrill 是一个靠**不断滑动浏览**做被动重复记忆的闪卡 App。不考试、不评分、不判断对错，纯粹一直刷中英文卡片来加深记忆。
 
 预置 **CET-4 / CET-6 / 考研英语** 三个词书，内置 **~10 万词英汉词典**（ECDICT）自动查词性和释义。支持从 Excel / 文本 / PDF 文件批量导入自定义词书。所有数据本地存储，完全离线。
+
+## 截图
+
+<p align="center">
+  <em>截图待添加（用 <a href="https://deviceframes.com">deviceframes.com</a> 生成带设备外壳的展示图）</em>
+</p>
+
+<!-- 截图准备好后替换上面的占位：
+<p align="center">
+  <img src="docs/screenshot-1.png" width="280" alt="刷卡页" />
+  <img src="docs/screenshot-2.png" width="280" alt="词库页" />
+  <img src="docs/screenshot-3.png" width="280" alt="我的页" />
+</p>
+-->
 
 ## 核心功能
 
@@ -28,12 +53,6 @@ WordDrill 是一个靠**不断滑动浏览**做被动重复记忆的闪卡 App�
 - **锁定模式** — 刷卡时锁定隐藏导航栏，纯沉浸
 - **浮动胶囊导航** — iOS 18+ 风格，可切换底部栏
 - **简约导航** — 隐藏导航栏文字标签
-
-## 截图
-
-<p align="center">
-  <em>浅色刷卡页</em>
-</p>
 
 ## 技术栈
 
@@ -68,4 +87,4 @@ WordDrill 是一个靠**不断滑动浏览**做被动重复记忆的闪卡 App�
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 ChHsiching
