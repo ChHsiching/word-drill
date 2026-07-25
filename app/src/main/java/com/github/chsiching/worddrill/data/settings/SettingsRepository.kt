@@ -30,6 +30,12 @@ class SettingsRepository @Inject constructor(
 ) {
     private val presetImportedKey = booleanPreferencesKey("preset_imported")
     private val dictionaryImportedKey = booleanPreferencesKey("dictionary_imported")
+    /**
+     * Ticket #23：内置词典的导入版本（整数）。当前每发布一次修复过 dictionary.json 的版本就 +1，
+     * orchestrator 比对存储版本 < 期望版本时清表重导，保证老用户在 app 升级后能拿到新数据。
+     * 取代了纯布尔 [dictionaryImportedKey] 的"已导入即不再导"语义。
+     */
+    private val dictionaryVersionKey = longPreferencesKey("dictionary_version")
     private val reviewBookCreatedKey = booleanPreferencesKey("review_book_created")
     private val currentBookIdKey = longPreferencesKey("current_book_id")
     private val themeKey = stringPreferencesKey("theme_mode")
@@ -47,13 +53,28 @@ class SettingsRepository @Inject constructor(
 
     // ---- Ticket #19：内置词典首启导入幂等标记 ----
 
-    /** 内置词典（ECDICT）是否已导入完成。未读过时默认 false。 */
+    /**
+     * 内置词典（ECDICT）是否曾经成功导入过。Ticket #19 的原始幂等标记，
+     * Ticket #23 引入版本号后只作为"表里可能已有数据"的信号，供 [com.github.chsiching.worddrill.data.DictionaryImportOrchestrator]
+     * 判断是否需要先 [com.github.chsiching.worddrill.data.local.dao.DictionaryDao.clear] 再 insert。
+     */
     val dictionaryImported: Flow<Boolean> =
         context.appDataStore.data.map { it[dictionaryImportedKey] ?: false }
 
-    /** 标记内置词典导入完成。导入流程成功后调用一次，后续启动跳过导入。 */
-    suspend fun markDictionaryImported() {
-        context.appDataStore.edit { it[dictionaryImportedKey] = true }
+    /**
+     * Ticket #23：内置词典当前已导入的版本号。未读过时默认 0（视为"从未导入"）。
+     * orchestrator 用它与 [com.github.chsiching.worddrill.data.DictionaryImportOrchestrator.DICTIONARY_VERSION]
+     * 比对：小于期望版本 → 清表重导。
+     */
+    val dictionaryVersion: Flow<Long> =
+        context.appDataStore.data.map { it[dictionaryVersionKey] ?: 0L }
+
+    /** 标记当前已导入到 [version]。重导完成后调用。同时把旧布尔标记置 true（兼容诊断）。 */
+    suspend fun markDictionaryVersion(version: Long) {
+        context.appDataStore.edit {
+            it[dictionaryVersionKey] = version
+            it[dictionaryImportedKey] = true
+        }
     }
 
     // ---- Ticket #20：预置复习词书首启创建幂等标记 ----

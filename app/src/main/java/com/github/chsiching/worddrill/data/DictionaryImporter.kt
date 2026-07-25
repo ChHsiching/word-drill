@@ -27,9 +27,15 @@ class DictionaryImporter @Inject constructor(
 ) {
     /**
      * 把 [data] 写入数据库。返回写入的条目数（含 (word,pos) 唯一索引去重后实际新增）。
-     * 重复调用安全：基于 (word, pos) 唯一索引 + IGNORE 兜底，不会产生重复行。
+     *
+     * 参数 [clearFirst]：Ticket #23 新增。为 true 时先清空 dictionary 表再写，
+     * 用于版本升级重导场景（INSERT IGNORE 无法覆盖旧行，必须先 clear）。
+     * 默认 false 兼容旧调用方（首启空表导入）。
      */
-    suspend fun importDictionary(data: DictionaryWords): Int = db.withTransaction {
+    suspend fun importDictionary(data: DictionaryWords, clearFirst: Boolean = false): Int = db.withTransaction {
+        if (clearFirst) {
+            dictionaryDao.clear()
+        }
         val before = dictionaryDao.count()
         dictionaryDao.insertAll(
             data.words.map { e ->

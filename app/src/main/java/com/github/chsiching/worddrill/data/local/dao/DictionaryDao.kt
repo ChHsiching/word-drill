@@ -27,6 +27,14 @@ interface DictionaryDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(entries: List<DictionaryEntry>)
 
+    /**
+     * Ticket #23：清空 dictionary 表。orchestrator 在检测到 dictionary.json 内容有修复
+     * （[com.github.chsiching.worddrill.data.DictionaryImportOrchestrator.DICTIONARY_VERSION]
+     * 升级）时调用，保证旧污染行被清除后再重新填充——单靠 INSERT IGNORE 无法覆盖旧行。
+     */
+    @Query("DELETE FROM dictionary")
+    suspend fun clear()
+
     /** 测试 / 诊断用：返回总条目数。 */
     @Query("SELECT COUNT(*) FROM dictionary")
     suspend fun count(): Int

@@ -36,10 +36,13 @@ import os
 import re
 import sys
 
-# 与 gen_words_json.py 完全一致的 POS 前缀表（行首词性缩写）
+# 行首词性缩写表。Ticket #23：补 `adj.`（现代词典用 adj.，a. 只是古缩写）
+# 与 `interj.`（ECDICT 里 int. 与 interj. 都有出现）。
+# 注意：与 gen_words_json.py 不再保持完全一致——那个脚本只处理 cet4/cet6/ky 三本预置词书，
+# 不涉及本 ticket 的污染范围；为最小改动只在词典脚本修。
 POS_PREFIXES = (
     "prep.", "pron.", "conj.", "adv.", "num.", "art.", "aux.", "int.",
-    "abbr.", "vt.", "vi.", "n.", "v.", "a.",
+    "interj.", "abbr.", "adj.", "vt.", "vi.", "n.", "v.", "a.",
 )
 POS_RE = re.compile(r"^(" + "|".join(re.escape(p) for p in POS_PREFIXES) + r")")
 
@@ -67,7 +70,14 @@ def normalize_phonetic(raw):
 
 
 def parse_translation(translation):
-    """与 gen_words_json.py 同实现：[(pos, meaning), ...]，每个 POS 至多一条。"""
+    """
+    把 ECDICT translation 解析为 [(pos, meaning), ...]，每个 POS 至多一条。
+
+    Ticket #23 修复两类污染：
+    - POS_PREFIXES 已包含 `adj.`/`interj.`，不再被当作无 POS 行。
+    - 无 POS 前缀的行（领域标注 `[计]/[医]/[化]`、或缩写释义等）**不再续接到上一行**：
+      首行降级为 `n.`（避免丢词），非首行丢弃（无法可靠归类，宁可少给也不污染）。
+    """
     if not translation:
         return []
     senses = []
@@ -92,15 +102,16 @@ def parse_translation(translation):
                 pos_index[pos] = len(senses)
                 senses.append([pos, meaning])
         else:
+            # 无 POS 前缀的行（首行降级为 n.，非首行丢弃）。
+            # 见 ticket #23：ECDICT 中此类行多为另一义项但缺 POS 标记（常带领域前缀），
+            # 续接到上一行会造成跨义项污染；宁可少给也别污染。
+            if senses:
+                continue
             extra = re.sub(r"^\[[^\]]*\]\s*", "", line).strip()
             if not extra:
                 continue
-            if senses:
-                if extra not in senses[-1][1]:
-                    senses[-1][1] = (senses[-1][1] + "； " + extra) if senses[-1][1] else extra
-            else:
-                senses.append(["n.", extra])
-                pos_index["n."] = 0
+            senses.append(["n.", extra])
+            pos_index["n."] = 0
     return [(p, m) for p, m in senses]
 
 
