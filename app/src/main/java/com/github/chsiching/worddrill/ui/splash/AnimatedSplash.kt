@@ -6,7 +6,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -52,10 +51,10 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun AnimatedSplashOverlay(
+    darkTheme: Boolean,
     onReady: () -> Unit,
     onFinished: () -> Unit,
 ) {
-    val darkTheme = isSystemInDarkTheme()
     val reduceMotion = rememberReduceMotion()
 
     val elements = remember {

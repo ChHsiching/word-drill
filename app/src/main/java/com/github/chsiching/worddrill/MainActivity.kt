@@ -86,6 +86,7 @@ class MainActivity : Hilt_MainActivity() {
                         WordDrillRoot()
                         if (!splashDone) {
                             AnimatedSplashOverlay(
+                                darkTheme = darkBg,
                                 onReady = { animReady.set(true) },
                                 onFinished = { splashDone = true },
                             )
