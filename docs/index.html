@@ -15,8 +15,16 @@
   --chip-bg: #F5F5F7;
   --spring: cubic-bezier(0.22, 1, 0.36, 1);
 }
+html[data-theme="dark"] {
+  --bg: #000; --surface: #1C1C1E;
+  --text-primary: #FFF;
+  --text-secondary: rgba(235,235,245,0.6);
+  --text-tertiary: rgba(235,235,245,0.3);
+  --separator: rgba(84,84,88,0.5);
+  --chip-bg: #2C2C2E;
+}
 @media (prefers-color-scheme: dark) {
-  :root {
+  html:not([data-theme="light"]):not([data-theme="dark"]) {
     --bg: #000; --surface: #1C1C1E;
     --text-primary: #FFF;
     --text-secondary: rgba(235,235,245,0.6);
@@ -31,26 +39,33 @@ body {
   background: var(--bg); color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   line-height: 1.6;
+  transition: background 0.3s var(--spring), color 0.3s var(--spring);
 }
 .container { max-width: 840px; margin: 0 auto; padding: 0 24px; }
 
+/* ═══ Theme toggle (top-right floating) ═══ */
+.theme-toggle {
+  position: fixed; top: 20px; right: 20px; z-index: 100;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--surface); border: 0.5px solid var(--separator);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.2s var(--spring);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  color: var(--text-primary);
+}
+.theme-toggle:active { transform: scale(0.9); }
+.theme-toggle svg { width: 18px; height: 18px; }
+.theme-toggle .icon-auto, .theme-toggle .icon-light, .theme-toggle .icon-dark { display: none; }
+html[data-theme="auto"] .theme-toggle .icon-auto { display: block; }
+html[data-theme="light"] .theme-toggle .icon-light { display: block; }
+html[data-theme="dark"] .theme-toggle .icon-dark { display: block; }
+
 /* ═══ Hero ═══ */
-.hero {
-  text-align: center; padding: 100px 24px 60px;
-}
+.hero { text-align: center; padding: 100px 24px 60px; }
 .hero-logo { width: 100px; height: 100px; margin-bottom: 24px; }
-.hero h1 {
-  font-size: 48px; font-weight: 700; letter-spacing: -1px;
-  margin-bottom: 12px;
-}
-.hero .tagline {
-  font-size: 20px; color: var(--text-secondary);
-  margin-bottom: 8px; font-weight: 400;
-}
-.hero .tagline-en {
-  font-size: 14px; color: var(--text-tertiary);
-  margin-bottom: 36px;
-}
+.hero h1 { font-size: 48px; font-weight: 700; letter-spacing: -1px; margin-bottom: 12px; }
+.hero .tagline { font-size: 20px; color: var(--text-secondary); margin-bottom: 8px; font-weight: 400; }
+.hero .tagline-en { font-size: 14px; color: var(--text-tertiary); margin-bottom: 36px; }
 .download-btn {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 14px 32px; border-radius: 100px;
@@ -74,27 +89,18 @@ body {
 
 /* ═══ Features ═══ */
 .features { padding: 0 24px 80px; }
-.features h2 {
-  font-size: 32px; font-weight: 700; text-align: center;
-  letter-spacing: -0.5px; margin-bottom: 40px;
-}
+.features h2 { font-size: 32px; font-weight: 700; text-align: center; letter-spacing: -0.5px; margin-bottom: 40px; }
 .feature-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 24px; max-width: 800px; margin: 0 auto;
 }
-.feature-card {
-  background: var(--surface); border-radius: 16px;
-  padding: 28px 24px;
-}
+.feature-card { background: var(--surface); border-radius: 16px; padding: 28px 24px; transition: background 0.3s; }
 .feature-card .icon { font-size: 28px; margin-bottom: 12px; }
 .feature-card h3 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
 .feature-card p { font-size: 14px; color: var(--text-secondary); }
 
 /* ═══ Footer ═══ */
-.footer {
-  text-align: center; padding: 40px 24px;
-  border-top: 0.5px solid var(--separator);
-}
+.footer { text-align: center; padding: 40px 24px; border-top: 0.5px solid var(--separator); }
 .footer a { color: var(--text-secondary); text-decoration: none; font-size: 14px; }
 .footer a:hover { color: var(--text-primary); }
 .footer .copyright { font-size: 13px; color: var(--text-tertiary); margin-top: 8px; }
@@ -106,6 +112,13 @@ body {
 </head>
 <body>
 
+<!-- Theme toggle -->
+<div class="theme-toggle" onclick="cycleTheme()" title="切换主题">
+  <svg class="icon-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+  <svg class="icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  <svg class="icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+</div>
+
 <!-- ═══ Hero ═══ -->
 <div class="hero">
   <picture>
@@ -116,11 +129,11 @@ body {
   <h1>WordDrill</h1>
   <div class="tagline">极简英语学习闪卡 · 纯粹刷词加深记忆</div>
   <div class="tagline-en">Minimal flashcard app for passive repetition · Offline · No account</div>
-  <a class="download-btn" href="https://github.com/ChHsiching/word-drill/releases/latest">
+  <a class="download-btn" id="download-btn" href="https://github.com/ChHsiching/word-drill/releases/latest">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
     下载 APK
   </a>
-  <div class="download-meta">v0.2.0 · Android 8.0+ · ~34 MB</div>
+  <div class="download-meta" id="download-meta">v0.2.0 · Android 8.0+ · ~34 MB</div>
 </div>
 
 <!-- ═══ Screenshots ═══ -->
@@ -181,12 +194,41 @@ body {
 <div class="footer">
   <a href="https://github.com/ChHsiching/word-drill">GitHub</a> ·
   <a href="https://github.com/ChHsiching/word-drill/releases">Releases</a> ·
-  <a href="LICENSE.html">MIT License</a>
+  <a href="https://github.com/ChHsiching/word-drill/blob/main/LICENSE">MIT License</a>
   <div class="copyright">© 2026 ChHsiching · Built with Kotlin & Jetpack Compose</div>
 </div>
 
 <script>
-// Scroll reveal
+// ═══ Theme: auto / light / dark cycle, persisted ═══
+const THEMES = ['auto', 'light', 'dark'];
+function getTheme() { return localStorage.getItem('theme') || 'auto'; }
+function applyTheme(t) {
+  if (t === 'auto') { document.documentElement.removeAttribute('data-theme'); }
+  else { document.documentElement.setAttribute('data-theme', t); }
+  // Update logo
+  const isDark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.querySelector('.hero-logo').src = isDark ? 'website/logo-dark.svg' : 'website/logo-light.svg';
+}
+function cycleTheme() {
+  const cur = getTheme();
+  const next = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
+  localStorage.setItem('theme', next);
+  applyTheme(next);
+}
+applyTheme(getTheme());
+
+// ═══ Fetch latest release version + download link ═══
+fetch('https://api.github.com/repos/ChHsiching/word-drill/releases/latest')
+  .then(r => r.json())
+  .then(release => {
+    const apk = release.assets.find(a => a.name.endsWith('.apk'));
+    const sizeMB = apk ? (apk.size / 1048576).toFixed(0) : '~34';
+    document.getElementById('download-btn').href = apk ? apk.browser_download_url : release.html_url;
+    document.getElementById('download-meta').textContent = `${release.tag_name} · Android 8.0+ · ~${sizeMB} MB`;
+  })
+  .catch(() => {});
+
+// ═══ Scroll reveal ═══
 const observer = new IntersectionObserver((entries) => {
   entries.forEach((e, i) => {
     if (e.isIntersecting) {
