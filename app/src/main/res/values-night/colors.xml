@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ticket #24：深色主题下 icon 背景纯黑（与 BgDark 一致），
+         drawable-night 的前景会同步反色为白线/白块。 -->
+    <color name="ic_launcher_background">#000000</color>
+</resources>

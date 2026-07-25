@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ticket #24 — 双卡交叠 icon 前景（方案 B：前实心后轮廓）。
-     设计稿 designs/worddrill-icon/icon-03-compare.html 方案 B，viewBox 0 0 80 80。
-     foreground viewport 108×108，把 80×80 设计稿内容通过 group scale=0.825 + translate
-     映射到中心 66×66 安全区（原图 (0,0)→(21,21)、(80,80)→(87,87)，居中 54,54）。
-     浅色底版本：线/块用 #1A1A1A，前卡上的文字线用 #FAFAFA。深色版见 drawable-night。 -->
+<!-- Ticket #24 — 双卡交叠 icon 前景（深色底版本，与 drawable/ 同结构反色）。
+     深色底：线/块用 #FFFFFF，前卡上的文字线用 #000000。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -14,30 +11,30 @@
         android:scaleY="0.825"
         android:translateX="21"
         android:translateY="21">
-        <!-- 后卡轮廓：rect 14,22 37×50 rx=6 → 转圆角矩形 path -->
+        <!-- 后卡轮廓 -->
         <path
             android:pathData="M20,22 L45,22 A6,6 0 0 1 51,28 L51,72 A6,6 0 0 1 45,78 L20,78 A6,6 0 0 1 14,72 L14,28 A6,6 0 0 1 20,22 Z"
-            android:strokeColor="#1A1A1A"
+            android:strokeColor="#FFFFFF"
             android:strokeWidth="5"
             android:fillColor="#00000000" />
-        <!-- 前卡实心：rect 29,14 37×50 rx=6 -->
+        <!-- 前卡实心 -->
         <path
             android:pathData="M35,14 L60,14 A6,6 0 0 1 66,20 L66,64 A6,6 0 0 1 60,70 L35,70 A6,6 0 0 1 29,64 L29,20 A6,6 0 0 1 35,14 Z"
-            android:fillColor="#1A1A1A" />
-        <!-- 三条文字线（在前卡上） -->
+            android:fillColor="#FFFFFF" />
+        <!-- 三条文字线 -->
         <path
             android:pathData="M38,28 L58,28"
-            android:strokeColor="#FAFAFA"
+            android:strokeColor="#000000"
             android:strokeWidth="4"
             android:strokeLineCap="round" />
         <path
             android:pathData="M38,38 L52,38"
-            android:strokeColor="#FAFAFA"
+            android:strokeColor="#000000"
             android:strokeWidth="4"
             android:strokeLineCap="round" />
         <path
             android:pathData="M38,48 L55,48"
-            android:strokeColor="#FAFAFA"
+            android:strokeColor="#000000"
             android:strokeWidth="4"
             android:strokeLineCap="round" />
     </group>

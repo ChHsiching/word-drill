@@ -1,9 +1,26 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. 颜色完全由 Compose WordDrillTheme 控制，
-         这里只用透明系统栏（edge-to-edge）。窗口背景设透明避免闪烁白色。 -->
+    <!-- Ticket #24 — 系统 SplashScreen 主题。
+         颜色完全由 Compose WordDrillTheme 控制；这里只用透明系统栏（edge-to-edge）。
+         窗口背景设透明避免闪烁白色。
+
+         关键：postSplashScreenTheme 指向自身（base application theme），
+         installSplashScreen() 在 super.onCreate 前调用；启动结束后系统切回此主题。 -->
     <style name="Theme.WordDrill" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+
+    <!-- Ticket #24 — 启动画面主题（API 31+ 系统强制）。
+         parent 必须是 Theme.SplashScreen，且 postSplashScreenTheme 指向正式主题。
+         windowSplashScreenBackground = 应用主背景色（无缝衔接）；
+         windowSplashScreenAnimatedIcon = 透明 drawable（与背景同色，视觉上无系统 logo），
+         让自定义 Compose 启动动画从首帧起就是用户看到的唯一动画。
+         android:windowBackground 也设为同色，避免 compat 库 parent 的默认渐变泄露。 -->
+    <style name="Theme.WordDrill.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_invisible</item>
+        <item name="android:windowBackground">@color/ic_launcher_background</item>
+        <item name="postSplashScreenTheme">@style/Theme.WordDrill</item>
     </style>
 </resources>

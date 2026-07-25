@@ -17,6 +17,10 @@ truth = "1.4.4"
 junit = "4.13.2"
 androidxTestExtJunit = "1.2.1"
 espresso = "3.6.1"
+# Ticket #24：AndroidX SplashScreen —— API 31+ 强制系统启动画面，
+# 用此库把系统 splash 的 icon 设为透明 drawable，视觉上等于纯色背景，
+# 让自定义 Compose 启动动画无缝接管（避免「先大 logo 后动画」）。
+splashscreen = "1.0.1"
 # Ticket #21：JVM 单测需要 XmlPullParser 实现（Android 上框架自带，JVM 上要 kxml2）。
 # 仅 testImplementation，不进生产 APK。
 kxml2 = "2.3.0"
@@ -57,6 +61,8 @@ kxml2 = { group = "net.sf.kxml", name = "kxml2", version.ref = "kxml2" }
 xmlpull = { group = "xmlpull", name = "xmlpull", version.ref = "xmlpull" }
 # Ticket #21：PDF 表格提取（PDFBox 的 Android 移植）
 pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfboxAndroid" }
+# Ticket #24：core-splashscreen（API 23+ 兼容层）
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

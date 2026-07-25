@@ -13,8 +13,8 @@ android {
         applicationId = "com.github.chsiching.worddrill"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.1.0-dev27"
+        versionCode = 14
+        versionName = "0.1.0-dev28"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -81,6 +81,10 @@ dependencies {
 
     // DataStore（首启导入幂等标记 / 后续当前词书等设置）
     implementation(libs.androidx.datastore.preferences)
+
+    // Ticket #24：AndroidX SplashScreen —— 把系统启动画面 icon 设为透明，
+    // 让自定义 Compose 启动动画无缝接管（API 31+ 系统强制 splash）。
+    implementation(libs.androidx.core.splashscreen)
 
     // Ticket #21：PDF 表格提取。tabula-java 依赖 PDFBox 2.0.x（用 java.awt，Android 不存在）
     // 且项目自 2021 无更新；改用 PdfBox-Android（PDFBox 2.0.27 的 Android 移植）。
