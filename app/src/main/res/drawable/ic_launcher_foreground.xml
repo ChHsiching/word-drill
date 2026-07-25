@@ -13,7 +13,7 @@
         android:scaleX="0.825"
         android:scaleY="0.825"
         android:translateX="21"
-        android:translateY="21">
+        android:translateY="16">
         <!-- 后卡轮廓：rect 14,22 37×50 rx=6 → 转圆角矩形 path -->
         <path
             android:pathData="M20,22 L45,22 A6,6 0 0 1 51,28 L51,72 A6,6 0 0 1 45,78 L20,78 A6,6 0 0 1 14,72 L14,28 A6,6 0 0 1 20,22 Z"

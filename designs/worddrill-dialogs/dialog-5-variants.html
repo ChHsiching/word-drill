@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>弹窗五版样式对比 — 精致度进化</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #FAFAFA; --surface: #FFFFFF; --text-primary: #1A1A1A;
+  --text-secondary: #86868B; --text-tertiary: #AEAEB2;
+  --separator: rgba(0,0,0,0.08); --chip-bg: #F5F5F7; --error: #FF3B30;
+}
+[data-theme="dark"] {
+  --bg: #000; --surface: #1C1C1E; --text-primary: #FFF;
+  --text-secondary: #98989F; --text-tertiary: #636366;
+  --separator: rgba(255,255,255,0.1); --chip-bg: #2C2C2E;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "SF Pro Text", "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+  background: #0a0a0a; color: #fff; padding: 40px;
+  -webkit-font-smoothing: antialiased;
+}
+h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+h2 { font-size: 15px; font-weight: 600; color: #ccc; margin: 40px 0 4px; }
+.variant-desc { color: #777; font-size: 12px; margin-bottom: 16px; max-width: 600px; line-height: 1.6; }
+.intro { color: #888; font-size: 13px; margin-bottom: 32px; max-width: 700px; line-height: 1.7; }
+
+.row { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 16px; }
+.cell { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.cell-label { font-size: 11px; font-weight: 600; color: #888; }
+
+.phone {
+  width: 260px; height: 460px; border-radius: 24px;
+  position: relative; overflow: hidden;
+  box-shadow: 0 0 0 2px #222, 0 8px 30px rgba(0,0,0,0.5);
+  background: var(--bg);
+}
+.scrim { position: absolute; inset: 0; }
+
+/* ═══ Version A: frosted glass dialog (iOS 16+ style) ═══ */
+.a .scrim { background: rgba(0,0,0,0.3); backdrop-filter: blur(20px) saturate(150%); -webkit-backdrop-filter: blur(20px) saturate(150%); }
+.a .dialog {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 240px; background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(40px) saturate(200%); -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border-radius: 20px; overflow: hidden;
+  border: 0.5px solid rgba(255,255,255,0.5);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.05);
+  color: #1A1A1A;
+}
+.a .dialog-body { padding: 20px; }
+.a .title { font-size: 17px; font-weight: 600; text-align: center; margin-bottom: 4px; }
+.a .msg { font-size: 13px; color: rgba(60,60,67,0.6); text-align: center; line-height: 1.5; margin-bottom: 16px; }
+.a .input {
+  width: 100%; padding: 11px 14px; background: rgba(118,118,128,0.08);
+  border-radius: 10px; border: none; outline: none;
+  font-size: 15px; color: #1A1A1A; font-family: inherit;
+}
+.a .input::placeholder { color: rgba(60,60,67,0.3); }
+.a .btns { display: flex; border-top: 0.5px solid rgba(60,60,67,0.12); }
+.a .btn { flex: 1; padding: 12px; font-size: 16px; text-align: center; cursor: pointer; }
+.a .btn + .btn { border-left: 0.5px solid rgba(60,60,67,0.12); }
+.a .btn.primary { font-weight: 600; }
+
+/* ═══ Version B: elevated card (sharp shadow, solid white, like iPad) ═══ */
+.b .scrim { background: rgba(0,0,0,0.25); backdrop-filter: blur(2px); }
+.b .dialog {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 244px; background: var(--surface);
+  border-radius: 16px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 16px 48px rgba(0,0,0,0.16);
+  color: var(--text-primary);
+}
+.b .dialog-body { padding: 22px 20px 18px; }
+.b .title { font-size: 17px; font-weight: 600; text-align: center; margin-bottom: 4px; }
+.b .msg { font-size: 13px; color: var(--text-secondary); text-align: center; line-height: 1.5; margin-bottom: 16px; }
+.b .input {
+  width: 100%; padding: 10px 0; background: transparent;
+  border: none; border-bottom: 1.5px solid var(--separator);
+  outline: none; font-size: 16px; color: var(--text-primary); font-family: inherit;
+  border-radius: 0; transition: border-color 0.2s;
+}
+.b .input:focus { border-bottom-color: var(--text-primary); }
+.b .input::placeholder { color: var(--text-tertiary); }
+.b .btns { display: flex; margin-top: 20px; }
+.b .btn { padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 10px; transition: background 0.15s; }
+.b .btn.cancel { color: var(--text-secondary); }
+.b .btn.primary { background: var(--text-primary); color: var(--bg); font-weight: 600; margin-left: auto; }
+.b .btn:active { opacity: 0.7; }
+
+/* ═══ Version C: bottom sheet (slides up from bottom, Apple Reminders style) ═══ */
+.c .scrim { background: rgba(0,0,0,0.35); backdrop-filter: blur(6px); }
+.c .dialog {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  background: rgba(248,248,248,0.92);
+  backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 40px rgba(0,0,0,0.15);
+  color: #1A1A1A; padding-bottom: 24px;
+}
+.c .handle { width: 36px; height: 5px; border-radius: 3px; background: rgba(60,60,67,0.3); margin: 8px auto 16px; }
+.c .dialog-body { padding: 0 20px; }
+.c .title { font-size: 17px; font-weight: 600; text-align: center; margin-bottom: 4px; }
+.c .msg { font-size: 13px; color: rgba(60,60,67,0.6); text-align: center; margin-bottom: 16px; }
+.c .input-group { background: #fff; border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+.c .input-group .input {
+  width: 100%; padding: 12px 14px; background: transparent; border: none; outline: none;
+  font-size: 16px; color: #1A1A1A; font-family: inherit;
+}
+.c .input-group .input + .input { border-top: 0.5px solid rgba(60,60,67,0.12); }
+.c .input::placeholder { color: rgba(60,60,67,0.3); }
+.c .btns { display: flex; gap: 10px; }
+.c .btn { flex: 1; padding: 13px; font-size: 16px; text-align: center; border-radius: 12px; cursor: pointer; }
+.c .btn.cancel { background: rgba(118,118,128,0.08); color: rgba(60,60,67,0.8); }
+.c .btn.primary { background: #1A1A1A; color: #fff; font-weight: 600; }
+
+/* ═══ Version D: minimal card (extreme simplicity, no blur, pure type) ═══ */
+.d .scrim { background: rgba(0,0,0,0.2); }
+.d .dialog {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 252px; background: var(--surface);
+  border-radius: 22px; overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  color: var(--text-primary);
+}
+.d .dialog-body { padding: 28px 24px 20px; }
+.d .title { font-size: 18px; font-weight: 600; text-align: center; margin-bottom: 6px; letter-spacing: -0.3px; }
+.d .msg { font-size: 14px; color: var(--text-secondary); text-align: center; line-height: 1.5; margin-bottom: 20px; }
+.d .input {
+  width: 100%; padding: 12px 16px; background: var(--chip-bg);
+  border: none; border-radius: 12px; outline: none;
+  font-size: 16px; color: var(--text-primary); font-family: inherit;
+  text-align: center;
+}
+.d .input::placeholder { color: var(--text-tertiary); }
+.d .btns { display: flex; gap: 8px; margin-top: 16px; padding: 0 4px 4px; }
+.d .btn { flex: 1; padding: 12px; font-size: 15px; text-align: center; border-radius: 12px; cursor: pointer; transition: opacity 0.15s; }
+.d .btn.cancel { background: var(--chip-bg); color: var(--text-secondary); }
+.d .btn.primary { background: var(--text-primary); color: var(--bg); font-weight: 600; }
+.d .btn:active { opacity: 0.7; }
+
+/* ═══ Version E: grouped form (iOS Settings style — grouped sections) ═══ */
+.e .scrim { background: rgba(0,0,0,0.3); backdrop-filter: blur(8px); }
+.e .dialog {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 248px; background: rgba(242,242,247,0.9);
+  backdrop-filter: blur(30px) saturate(150%); -webkit-backdrop-filter: blur(30px) saturate(150%);
+  border-radius: 14px; overflow: hidden;
+  box-shadow: 0 16px 56px rgba(0,0,0,0.2);
+  color: #1A1A1A;
+}
+.e .header { padding: 16px 16px 12px; }
+.e .title { font-size: 13px; font-weight: 400; color: rgba(60,60,67,0.6); text-align: center; text-transform: uppercase; letter-spacing: 0.5px; }
+.e .form-group { background: #fff; margin: 0 12px; border-radius: 10px; overflow: hidden; }
+.e .input {
+  width: 100%; padding: 12px 14px; background: transparent; border: none; outline: none;
+  font-size: 16px; color: #1A1A1A; font-family: inherit;
+}
+.e .input::placeholder { color: rgba(60,60,67,0.3); }
+.e .input-row { display: flex; align-items: center; padding: 0 14px; }
+.e .input-row .label { font-size: 15px; color: #1A1A1A; margin-right: auto; }
+.e .input-row .chevron { color: rgba(60,60,67,0.3); }
+.e .divider { height: 0.5px; background: rgba(60,60,67,0.12); margin-left: 14px; }
+.e .btns { display: flex; margin-top: 16px; }
+.e .btn { flex: 1; padding: 14px; font-size: 17px; text-align: center; cursor: pointer; background: #fff; }
+.e .btn:first-child { border-radius: 0 0 0 14px; }
+.e .btn:last-child { border-radius: 0 0 14px 0; }
+.e .btn + .btn { border-left: 0.5px solid rgba(60,60,67,0.12); }
+.e .btn.primary { font-weight: 600; color: #007AFF; }
+.e .btn.cancel { color: #007AFF; }
+</style>
+</head>
+<body>
+
+<h1>弹窗五版 — 精致度进化</h1>
+<p class="intro">
+  同一个弹窗（新建词书 + 输入），五种 Apple 风格。每种解决不同的精致度问题。
+  选一个方向，我应用到所有 11 个弹窗。
+</p>
+
+<!-- ═══ A: Frosted Glass ═══ -->
+<h2>A · 毛玻璃实体（Frosted Glass）</h2>
+<p class="variant-desc">
+  对话框本身半透明毛玻璃（backdrop-filter blur 40px），像 iOS 16+ 的通知。
+  透出底层内容的色彩和模糊轮廓，对话框像一块"实体玻璃"浮在界面上。
+  Apple Design §12 Materials 的直接体现。
+</p>
+<div class="row">
+  <div class="cell">
+    <div class="cell-label">浅色</div>
+    <div class="phone a">
+      <div style="position:absolute;inset:0;background:linear-gradient(135deg,#e8e8e8,#f5f5f5);"></div>
+      <div style="position:absolute;top:40%;left:10%;font-size:28px;color:#ddd;font-weight:700;">abandon</div>
+      <div style="position:absolute;top:45%;left:15%;font-size:14px;color:#ddd;">/əˈbændən/</div>
+      <div class="scrim"></div>
+      <div class="dialog">
+        <div class="dialog-body">
+          <div class="title">新建词书</div>
+          <div class="msg">输入词书名称</div>
+          <input class="input" placeholder="词书名称" />
+        </div>
+        <div class="btns">
+          <div class="btn">取消</div>
+          <div class="btn primary">创建</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cell">
+    <div class="cell-label">深色</div>
+    <div class="phone a" data-theme="dark">
+      <div style="position:absolute;inset:0;background:linear-gradient(135deg,#1a1a1a,#0a0a0a);"></div>
+      <div style="position:absolute;top:40%;left:10%;font-size:28px;color:#333;font-weight:700;">abandon</div>
+      <div style="position:absolute;top:45%;left:15%;font-size:14px;color:#333;">/əˈbændən/</div>
+      <div class="scrim"></div>
+      <div class="dialog" style="background:rgba(40,40,42,0.72);border-color:rgba(255,255,255,0.08);color:#fff;">
+        <div class="dialog-body">
+          <div class="title" style="color:#fff;">新建词书</div>
+          <div class="msg" style="color:rgba(235,235,245,0.6);">输入词书名称</div>
+          <input class="input" placeholder="词书名称" style="background:rgba(118,118,128,0.24);color:#fff;" />
+        </div>
+        <div class="btns" style="border-color:rgba(255,255,255,0.1);">
+          <div class="btn" style="border-color:rgba(255,255,255,0.1);color:#0A84FF;">取消</div>
+          <div class="btn primary" style="color:#0A84FF;border-left:0.5px solid rgba(255,255,255,0.1);">创建</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ B: Elevated Card ═══ -->
+<h2>B · 悬浮卡片（Elevated Card）</h2>
+<p class="variant-desc">
+  纯白实心卡片（不透明），精致的多层阴影（close shadow + ambient shadow），
+  底部线条输入框（无边框，只有底线，focus 时底线变黑）。按钮是 pill 形（圆角块）。
+  最接近 iPad / macOS 的对话框风格。Apple Design §12："bigger surfaces read as thicker"。
+</p>
+<div class="row">
+  <div class="cell">
+    <div class="cell-label">浅色</div>
+    <div class="phone b">
+      <div style="position:absolute;inset:0;background:linear-gradient(135deg,#e8e8e8,#f5f5f5);"></div>
+      <div style="position:absolute;top:40%;left:10%;font-size:28px;color:#ddd;font-weight:700;">abandon</div>
+      <div class="scrim"></div>
+      <div class="dialog">
+        <div class="dialog-body">
+          <div class="title">新建词书</div>
+          <div class="msg">输入词书名称</div>
+          <input class="input" placeholder="词书名称" />
+        </div>
+        <div class="btns">
+          <div class="btn cancel">取消</div>
+          <div class="btn primary">创建</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cell">
+    <div class="cell-label">深色</div>
+    <div class="phone b" data-theme="dark">
+      <div style="position:absolute;inset:0;background:#0a0a0a;"></div>
+      <div style="position:absolute;top:40%;left:10%;font-size:28px;color:#222;font-weight:700;">abandon</div>
+      <div class="scrim"></div>
+      <div class="dialog">
+        <div class="dialog-body">
+          <div class="title">新建词书</div>
+          <div class="msg">输入词书名称</div>
+          <input class="input" placeholder="词书名称" />
+        </div>
+        <div class="btns">
+          <div class="btn cancel">取消</div>
+          <div class="btn primary">创建</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ C: Bottom Sheet ═══ -->
+<h2>C · 底部弹出（Bottom Sheet）</h2>
+<p class="variant-desc">
+  从屏幕底部滑上来（不是居中），有 grabber handle（小横条）。
+  输入框分组在白色圆角组里（iOS Settings 风格的 grouped form）。
+  按钮是 pill 形块状。这是 iOS Reminders/Notes 创建东西的交互模式。
+  Apple Design §7 Spatial consistency：从底部来，回底部去。
+</p>
+<div class="row">
+  <div class="cell">
+    <div class="cell-label">浅色</div>
+    <div class="phone c">
+      <div style="position:absolute;inset:0;background:linear-gradient(135deg,#e8e8e8,#f5f5f5);"></div>
+      <div style="position:absolute;top:30%;left:10%;font-size:28px;color:#ddd;font-weight:700;">abandon</div>
+      <div class="scrim"></div>
+      <div class="dialog">
+        <div class="handle"></div>
+        <div class="dialog-body">
+          <div class="title">新建词书</div>
+          <div class="msg">输入词书名称</div>
+          <div class="input-group">
+            <input class="input" placeholder="词书名称" />
+          </div>
+          <div class="btns">
+            <div class="btn cancel">取消</div>
+            <div class="btn primary">创建</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cell">
+    <div class="cell-label">深色</div>
+    <div class="phone c" data-theme="dark">
+      <div style="position:absolute;inset:0;background:#0a0a0a;"></div>
+      <div style="position:absolute;top:30%;left:10%;font-size:28px;color:#222;font-weight:700;">abandon</div>
+      <div class="scrim" style="background:rgba(0,0,0,0.4);"></div>
+      <div class="dialog" style="background:rgba(28,28,30,0.92);color:#fff;">
+        <div class="handle" style="background:rgba(235,235,245,0.3);"></div>
+        <div class="dialog-body">
+          <div class="title" style="color:#fff;">新建词书</div>
+          <div class="msg" style="color:rgba(235,235,245,0.6);">输入词书名称</div>
+          <div class="input-group" style="background:#2C2C2E;">
+            <input class="input" placeholder="词书名称" style="color:#fff;" />
+          </div>
+          <div class="btns">
+            <div class="btn cancel" style="background:rgba(118,118,128,0.24);color:rgba(235,235,245,0.8);">取消</div>
+            <div class="btn primary" style="background:#fff;color:#000;">创建</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ D: Minimal Card ═══ -->
+<h2>D · 极简卡片（Minimal）</h2>
+<p class="variant-desc">
+  大圆角（22px），标题更大（18px），输入框居中文字，按钮是色块 pill。
+  最干净最克制的方案——去掉所有多余装饰，只留必要信息。
+  Apple Design §16 Simplicity："strip the unnecessary so the core purpose shines"。
+</p>
+<div class="row">
+  <div class="cell">
+    <div class="cell-label">浅色</div>
+    <div class="phone d">
+      <div style="position:absolute;inset:0;background:linear-gradient(135deg,#e8e8e8,#f5f5f5);"></div>
+      <div style="position:absolute;top:40%;left:10%;font-size:28px;color:#ddd;font-weight:700;">abandon</div>
+      <div class="scrim"></div>
+      <div class="dialog">
+        <div class="dialog-body">
+          <div class="title">新建词书</div>
+          <div class="msg">输入词书名称</div>
+          <input class="input" placeholder="词书名称" />
+        </div>
+        <div class="btns">
+          <div class="btn cancel">取消</div>
+          <div class="btn primary">创建</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cell">
+    <div class="cell-label">深色</div>
+    <div class="phone d" data-theme="dark">
+      <div style="position:absolute;inset:0;background:#0a0a0a;"></div>
+      <div style="position:absolute;top:40%;left:10%;font-size:28px;color:#222;font-weight:700;">abandon</div>
+      <div class="scrim"></div>
+      <div class="dialog">
+        <div class="dialog-body">
+          <div class="title">新建词书</div>
+          <div class="msg">输入词书名称</div>
+          <input class="input" placeholder="词书名称" />
+        </div>
+        <div class="btns">
+          <div class="btn cancel">取消</div>
+          <div class="btn primary">创建</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ E: Grouped Form ═══ -->
+<h2>E · 分组表单（Grouped Settings）</h2>
+<p class="variant-desc">
+  iOS Settings 的分组卡片风格。标题是小字大写灰色标签（不是粗体大标题），
+  输入框在白色圆角组里，底部按钮直接连着对话框底部（无间距）。
+  最有"系统原生"质感的方案，适合信息密度高的表单。
+  Apple Design §16 Familiarity：用用户最熟悉的 iOS 系统样式。
+</p>
+<div class="row">
+  <div class="cell">
+    <div class="cell-label">浅色</div>
+    <div class="phone e">
+      <div style="position:absolute;inset:0;background:linear-gradient(135deg,#e8e8e8,#f5f5f5);"></div>
+      <div style="position:absolute;top:40%;left:10%;font-size:28px;color:#ddd;font-weight:700;">abandon</div>
+      <div class="scrim"></div>
+      <div class="dialog">
+        <div class="header"><div class="title">新建词书</div></div>
+        <div class="form-group">
+          <input class="input" placeholder="名称" />
+        </div>
+        <div class="btns">
+          <div class="btn cancel">取消</div>
+          <div class="btn primary">创建</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cell">
+    <div class="cell-label">深色</div>
+    <div class="phone e" data-theme="dark">
+      <div style="position:absolute;inset:0;background:#0a0a0a;"></div>
+      <div style="position:absolute;top:40%;left:10%;font-size:28px;color:#222;font-weight:700;">abandon</div>
+      <div class="scrim"></div>
+      <div class="dialog" style="background:rgba(28,28,30,0.9);color:#fff;">
+        <div class="header"><div class="title" style="color:rgba(235,235,245,0.6);">新建词书</div></div>
+        <div class="form-group" style="background:#2C2C2E;">
+          <input class="input" placeholder="名称" style="color:#fff;" />
+        </div>
+        <div class="btns" style="margin-top:12px;">
+          <div class="btn cancel" style="background:#2C2C2E;color:#0A84FF;border-radius:10px 0 0 14px;">取消</div>
+          <div class="btn primary" style="background:#2C2C2E;color:#0A84FF;border-left:0.5px solid rgba(255,255,255,0.1);border-radius:0 0 14px 0;">创建</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

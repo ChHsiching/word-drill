@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WordDrill 设计变体对比</title>
+<style>
+:root {
+  --bg: #FAFAFA;
+  --surface: #FFFFFF;
+  --text-primary: #1A1A1A;
+  --text-secondary: #86868B;
+  --text-tertiary: #AEAEB2;
+  --separator: rgba(0,0,0,0.06);
+  --separator-strong: rgba(0,0,0,0.12);
+  --chip-bg: #F5F5F7;
+  --highlight: rgba(0,0,0,0.04);
+}
+[data-theme="dark"] {
+  --bg: #000000;
+  --surface: #1C1C1E;
+  --text-primary: #FFFFFF;
+  --text-secondary: #98989F;
+  --text-tertiary: #636366;
+  --separator: rgba(255,255,255,0.08);
+  --separator-strong: rgba(255,255,255,0.15);
+  --chip-bg: #2C2C2E;
+  --highlight: rgba(255,255,255,0.06);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, "SF Pro Text", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 40px 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+h2 { font-size: 18px; font-weight: 600; margin: 48px 0 8px; color: #ccc; }
+.intro { color: #888; font-size: 14px; margin-bottom: 32px; max-width: 800px; line-height: 1.6; }
+
+.variant-row {
+  display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-start;
+}
+.variant {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.variant-label {
+  font-size: 13px; font-weight: 500; color: #aaa; letter-spacing: 0.5px;
+}
+.variant-desc {
+  font-size: 12px; color: #666; text-align: center; max-width: 280px; line-height: 1.5;
+}
+
+/* Mini card frame */
+.card-frame {
+  width: 320px; height: 400px;
+  background: var(--bg);
+  border-radius: 24px;
+  padding: 32px 28px;
+  display: flex; flex-direction: column;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+
+/* Book list frame */
+.book-frame {
+  width: 320px;
+  background: var(--bg);
+  border-radius: 24px;
+  padding: 24px 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+
+.word-en {
+  font-size: 40px; font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.5px; line-height: 1.1;
+  text-align: center;
+}
+
+.sense-row {
+  display: flex; align-items: baseline; gap: 8px;
+  flex-wrap: wrap; justify-content: center; max-width: 280px;
+}
+.sense-pos {
+  font-size: 15px; color: var(--text-tertiary);
+}
+.sense-zh {
+  font-size: 22px; color: var(--text-primary); line-height: 1.4;
+}
+
+.divider {
+  width: 32px; height: 1px;
+  background: var(--separator-strong);
+  margin: 18px 0;
+}
+
+/* Book list items */
+.book-item {
+  display: flex; align-items: center; padding: '14px 12px';
+  borderRadius: 12, cursor: 'pointer', marginBottom: 2;
+}
+.book-name {
+  font-size: 17px; font-weight: 500;
+  color: var(--text-primary); line-height: 1.3;
+}
+.book-sub {
+  font-size: 13px; color: var(--text-tertiary); marginTop: 2;
+}
+
+/* Selected states for book variants */
+.sel-bg { background: var(--highlight); }
+.sel-pill {
+  background: var(--text-primary);
+  color: var(--bg);
+  padding: 2px 12px;
+  border-radius: 100px;
+  font-size: 13px; font-weight: 500;
+}
+</style>
+</head>
+<body>
+
+<h1>WordDrill 设计变体对比</h1>
+<p class="intro">
+  三组对比，每组看一个具体问题。看完告诉我每组的偏好。
+</p>
+
+<!-- ════════════════════════════════════════════ -->
+<h2>① 音标 + 词性字体</h2>
+<div class="variant-row" data-theme="light">
+
+  <!-- 方案 A: 音标用系统常规字体（非等宽），词性去斜体 -->
+  <div class="variant">
+    <div class="variant-label">A · 系统字体（推荐）</div>
+    <div class="card-frame">
+      <div class="word-en">abandon</div>
+      <div style="font-size:16px; color:var(--text-secondary); margin-top:10px; text-align:center; letter-spacing:0.3px;">
+        /əˈbændən/
+      </div>
+      <div class="divider"></div>
+      <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+        <div class="sense-row">
+          <span class="sense-pos" style="font-weight:400;">v.</span>
+          <span class="sense-zh" style="font-family:-apple-system,'PingFang SC','Noto Sans SC',sans-serif;">放弃；抛弃</span>
+        </div>
+        <div class="sense-row">
+          <span class="sense-pos" style="font-weight:400;">n.</span>
+          <span class="sense-zh" style="font-family:-apple-system,'PingFang SC','Noto Sans SC',sans-serif;">放任；狂热</span>
+        </div>
+      </div>
+    </div>
+    <div class="variant-desc">音标用系统字体（非等宽），IPA 字符基线自然对齐。中文用思源黑体统一。</div>
+  </div>
+
+  <!-- 方案 B: 音标用衬线字体，词性小写斜体（传统词典风） -->
+  <div class="variant">
+    <div class="variant-label">B · 衬线词典风</div>
+    <div class="card-frame">
+      <div class="word-en" style="font-family:'Georgia','Times New Roman',serif;">abandon</div>
+      <div style="font-size:16px; color:var(--text-secondary); margin-top:10px; text-align:center; font-family:'Georgia',serif; letter-spacing:0.5px;">
+        /əˈbændən/
+      </div>
+      <div class="divider"></div>
+      <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+        <div class="sense-row">
+          <span class="sense-pos" style="font-style:italic; font-family:'Georgia',serif;">v.</span>
+          <span class="sense-zh" style="font-family:'Songti SC','Noto Serif SC','STSong',serif;">放弃；抛弃</span>
+        </div>
+        <div class="sense-row">
+          <span class="sense-pos" style="font-style:italic; font-family:'Georgia',serif;">n.</span>
+          <span class="sense-zh" style="font-family:'Songti SC','Noto Serif SC','STSong',serif;">放任；狂热</span>
+        </div>
+      </div>
+    </div>
+    <div class="variant-desc">英文和音标用 Georgia 衬线，中文用宋体。传统词典质感，更有"学习"氛围。</div>
+  </div>
+
+  <!-- 方案 C: 无音标，最纯粹 -->
+  <div class="variant">
+    <div class="variant-label">C · 无音标</div>
+    <div class="card-frame">
+      <div class="word-en">abandon</div>
+      <div class="divider" style="margin-top:28px;"></div>
+      <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+        <div class="sense-row">
+          <span class="sense-pos" style="font-weight:400;">v.</span>
+          <span class="sense-zh" style="font-family:-apple-system,'PingFang SC','Noto Sans SC',sans-serif;">放弃；抛弃</span>
+        </div>
+        <div class="sense-row">
+          <span class="sense-pos" style="font-weight:400;">n.</span>
+          <span class="sense-zh" style="font-family:-apple-system,'PingFang SC','Noto Sans SC',sans-serif;">放任；狂热</span>
+        </div>
+      </div>
+    </div>
+    <div class="variant-desc">音标占空间且观感差，直接不要。卡片最简洁。</div>
+  </div>
+
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<h2>② 词书选中状态</h2>
+<div class="variant-row" data-theme="light">
+
+  <!-- 方案 A: 浅色高亮背景 + check，spring 动画 -->
+  <div class="variant">
+    <div class="variant-label">A · 高亮背景 + check（推荐）</div>
+    <div class="book-frame">
+      <div class="book-item sel-bg" style="background:var(--highlight); padding:14px 12px; border-radius:12px; display:flex; align-items:center; margin-bottom:2px;">
+        <div style="flex:1;">
+          <div class="book-name">CET-4</div>
+          <div class="book-sub" style="margin-top:2px;">4,523 词 · 预置</div>
+        </div>
+        <span style="color:var(--text-primary);">✓</span>
+      </div>
+      <div class="book-item" style="padding:14px 12px; border-radius:12px; display:flex; align-items:center; margin-bottom:2px;">
+        <div style="flex:1;">
+          <div class="book-name">CET-6</div>
+          <div class="book-sub" style="margin-top:2px;">6,022 词 · 预置</div>
+        </div>
+      </div>
+    </div>
+    <div class="variant-desc">点选后原地高亮（背景渐现），不跳转。用户确认后再手动去刷卡。</div>
+  </div>
+
+  <!-- 方案 B: 选中行变实心圆角块（黑底白字 pill） -->
+  <div class="variant">
+    <div class="variant-label">B · 实心选中块</div>
+    <div class="book-frame">
+      <div style="background:var(--text-primary); color:var(--bg); padding:14px 16px; border-radius:14px; margin-bottom:2px;">
+        <div style="font-size:17px; font-weight:600;">CET-4</div>
+        <div style="font-size:13px; opacity:0.7; margin-top:2px;">4,523 词 · 预置</div>
+      </div>
+      <div style="padding:14px 16px; border-radius:14px; margin-bottom:2px;">
+        <div class="book-name">CET-6</div>
+        <div class="book-sub" style="margin-top:2px;">6,022 词 · 预置</div>
+      </div>
+    </div>
+    <div class="variant-desc">选中行反色成黑底白字，选中态最强烈。对比鲜明。</div>
+  </div>
+
+  <!-- 方案 C: 左侧竖线标记 + 文字加粗，无背景 -->
+  <div class="variant">
+    <div class="variant-label">C · 左竖线标记</div>
+    <div class="book-frame">
+      <div style="padding:14px 16px 14px 12px; border-radius:12px; border-left:3px solid var(--text-primary); margin-bottom:2px;">
+        <div class="book-name" style="font-weight:600;">CET-4</div>
+        <div class="book-sub" style="margin-top:2px;">4,523 词 · 预置</div>
+      </div>
+      <div style="padding:14px 16px 14px 15px; border-radius:12px; border-left:3px solid transparent; margin-bottom:2px;">
+        <div class="book-name">CET-6</div>
+        <div class="book-sub" style="margin-top:2px;">6,022 词 · 预置</div>
+      </div>
+    </div>
+    <div class="variant-desc">左侧竖线 + 文字加粗。最克制，像 iOS 选中标签。</div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>词性 + 中文 字体方案对比</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --text-primary: #1A1A1A;
+  --text-secondary: #86868B;
+  --text-tertiary: #AEAEB2;
+  --separator-strong: rgba(0,0,0,0.12);
+  --bg: #FAFAFA;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "SF Pro Text", "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+  background: #1a1a1a; color: #fff; padding: 40px 24px;
+  -webkit-font-smoothing: antialiased;
+}
+h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+.intro { color: #888; font-size: 14px; margin-bottom: 32px; max-width: 800px; line-height: 1.6; }
+.variant-row { display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-start; }
+.variant { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.variant-label { font-size: 13px; font-weight: 500; color: #aaa; letter-spacing: 0.5px; }
+.variant-desc { font-size: 12px; color: #666; text-align: center; max-width: 280px; line-height: 1.5; }
+
+.card-frame {
+  width: 320px; min-height: 360px;
+  background: var(--bg);
+  border-radius: 24px;
+  padding: 32px 28px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+.word-en {
+  font-size: 40px; font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.5px; line-height: 1.1;
+  text-align: center;
+}
+.phonetic {
+  font-size: 17px; color: var(--text-secondary);
+  margin-top: 10px; letter-spacing: 0.5px;
+  font-family: "Charis SIL", serif;
+}
+.divider {
+  width: 32px; height: 1px;
+  background: var(--separator-strong);
+  margin: 18px 0;
+}
+.senses { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.sense-row {
+  display: flex; align-items: baseline; gap: 8px;
+  flex-wrap: wrap; justify-content: center; max-width: 280px;
+}
+</style>
+</head>
+<body>
+
+<h1>词性 + 中文 释义字体方案</h1>
+<p class="intro">
+  四个方案，看词性标记和中文释义怎么搭配最好。单词始终用系统无衬线，音标用 Charis SIL。
+  变化的是词性的呈现方式 + 中文字体/字重。
+</p>
+
+<div class="variant-row">
+
+  <!-- 方案 A: 词性最淡灰，中文常规字重（当前方案） -->
+  <div class="variant">
+    <div class="variant-label">A · 词性最淡（当前）</div>
+    <div class="card-frame">
+      <div class="word-en">abandon</div>
+      <div class="phonetic">/əˈbændən/</div>
+      <div class="divider"></div>
+      <div class="senses">
+        <div class="sense-row">
+          <span style="font-size:15px; font-weight:400; color:var(--text-tertiary);">v.</span>
+          <span lang="zh" style="font-size:22px; font-weight:400; color:var(--text-primary); line-height:1.4;">放弃；抛弃</span>
+        </div>
+        <div class="sense-row">
+          <span style="font-size:15px; font-weight:400; color:var(--text-tertiary);">n.</span>
+          <span lang="zh" style="font-size:22px; font-weight:400; color:var(--text-primary); line-height:1.4;">放任；狂热</span>
+        </div>
+      </div>
+    </div>
+    <div class="variant-desc">词性用最淡灰(#AEAEB2)，退到最远。中文常规字重。层次靠颜色分层。</div>
+  </div>
+
+  <!-- 方案 B: 词性用 small-caps 风格（小型大写），中文中等字重 -->
+  <div class="variant">
+    <div class="variant-label">B · 词性 small-caps</div>
+    <div class="card-frame">
+      <div class="word-en">abandon</div>
+      <div class="phonetic">/əˈbændən/</div>
+      <div class="divider"></div>
+      <div class="senses">
+        <div class="sense-row">
+          <span style="font-size:13px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">v.</span>
+          <span lang="zh" style="font-size:22px; font-weight:500; color:var(--text-primary); line-height:1.4;">放弃；抛弃</span>
+        </div>
+        <div class="sense-row">
+          <span style="font-size:13px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">n.</span>
+          <span lang="zh" style="font-size:22px; font-weight:500; color:var(--text-primary); line-height:1.4;">放任；狂热</span>
+        </div>
+      </div>
+    </div>
+    <div class="variant-desc">词性小型大写+加粗，像标签徽章。中文中等字重，更醒目。层次最强。</div>
+  </div>
+
+  <!-- 方案 C: 词性用括号包裹的淡灰标记，中文用思源黑体 Medium -->
+  <div class="variant">
+    <div class="variant-label">C · 括号标记</div>
+    <div class="card-frame">
+      <div class="word-en">abandon</div>
+      <div class="phonetic">/əˈbændən/</div>
+      <div class="divider"></div>
+      <div class="senses">
+        <div class="sense-row">
+          <span style="font-size:15px; font-weight:400; color:var(--text-tertiary);">(v.)</span>
+          <span lang="zh" style="font-size:22px; font-weight:500; color:var(--text-primary); line-height:1.4; font-family:'Noto Sans SC',sans-serif;">放弃；抛弃</span>
+        </div>
+        <div class="sense-row">
+          <span style="font-size:15px; font-weight:400; color:var(--text-tertiary);">(n.)</span>
+          <span lang="zh" style="font-size:22px; font-weight:500; color:var(--text-primary); line-height:1.4; font-family:'Noto Sans SC',sans-serif;">放任；狂热</span>
+        </div>
+      </div>
+    </div>
+    <div class="variant-desc">词性用括号包裹，像传统词典的排版。中文用思源黑体 Medium，更有分量。</div>
+  </div>
+
+  <!-- 方案 D: 词性大写首字母 + 句号，无衬线，中文最常规 -->
+  <div class="variant">
+    <div class="variant-label">D · 词典标准</div>
+    <div class="card-frame">
+      <div class="word-en">abandon</div>
+      <div class="phonetic">/əˈbændən/</div>
+      <div class="divider"></div>
+      <div class="senses">
+        <div class="sense-row">
+          <span style="font-size:14px; font-weight:500; color:var(--text-secondary);">v.</span>
+          <span lang="zh" style="font-size:21px; font-weight:400; color:var(--text-primary); line-height:1.4;">放弃；抛弃</span>
+        </div>
+        <div class="sense-row">
+          <span style="font-size:14px; font-weight:500; color:var(--text-secondary);">n.</span>
+          <span lang="zh" style="font-size:21px; font-weight:400; color:var(--text-primary); line-height:1.4;">放任；狂热</span>
+        </div>
+      </div>
+    </div>
+    <div class="variant-desc">词性中灰+中等字重，标准词典排版。中文略小一号（21px），整体更紧凑平衡。</div>
+  </div>
+
+</div>
+
+</body>
+</html>

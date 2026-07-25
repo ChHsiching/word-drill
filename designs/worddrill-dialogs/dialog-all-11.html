@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WordDrill — 全部弹窗重做（精修版）</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #FAFAFA; --surface: #FFFFFF;
+  --text-primary: #1A1A1A;
+  --text-secondary: rgba(60,60,67,0.6);
+  --text-tertiary: rgba(60,60,67,0.3);
+  --separator: rgba(60,60,67,0.12);
+  --chip-bg: #F5F5F7;
+  --error: #FF3B30;
+}
+[data-theme="dark"] {
+  --bg: #000; --surface: #1C1C1E;
+  --text-primary: #FFF;
+  --text-secondary: rgba(235,235,245,0.6);
+  --text-tertiary: rgba(235,235,245,0.3);
+  --separator: rgba(84,84,88,0.5);
+  --chip-bg: #2C2C2E;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "SF Pro Text", "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+  background: #0a0a0a; color: #fff; padding: 40px;
+  -webkit-font-smoothing: antialiased;
+}
+h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+h2 { font-size: 15px; font-weight: 600; color: #ccc; margin: 48px 0 4px; }
+.group-desc { color: #777; font-size: 12px; margin-bottom: 20px; }
+.intro { color: #888; font-size: 13px; margin-bottom: 32px; max-width: 700px; line-height: 1.7; }
+
+.grid { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+.cell { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.cell-label { font-size: 11px; font-weight: 600; color: #888; }
+
+/* Phone frame — shows actual app content behind dialog */
+.phone {
+  width: 280px; height: 500px;
+  border-radius: 28px; overflow: hidden;
+  position: relative;
+  box-shadow: 0 0 0 2px #222, 0 8px 32px rgba(0,0,0,0.5);
+  background: var(--bg);
+}
+/* Fake app content behind dialog */
+.app-bg {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 4px; padding: 40px;
+}
+.app-word { font-size: 36px; font-weight: 600; color: rgba(128,128,128,0.15); letter-spacing: -0.5px; }
+.app-phon { font-size: 14px; color: rgba(128,128,128,0.1); }
+
+/* Scrim — Apple style: dim + slight blur */
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.35); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+
+/* Dialog — the refined card */
+.dialog {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 250px; background: var(--surface);
+  border-radius: 20px; overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08), 0 24px 48px rgba(0,0,0,0.12);
+  color: var(--text-primary);
+}
+.dialog-body { padding: 22px 20px 18px; }
+.dialog-title { font-size: 17px; font-weight: 600; text-align: center; letter-spacing: -0.3px; margin-bottom: 4px; }
+.dialog-message { font-size: 13px; color: var(--text-secondary); text-align: center; line-height: 1.5; }
+
+/* Input — filled style, focus adds subtle ring */
+.input {
+  width: 100%; padding: 11px 12px;
+  background: var(--chip-bg);
+  border: 1px solid transparent;
+  border-radius: 10px; outline: none;
+  font-size: 15px; color: var(--text-primary);
+  font-family: inherit;
+  margin-top: 14px;
+  transition: border-color 0.2s;
+}
+.input:first-child { margin-top: 0; }
+.input::placeholder { color: var(--text-tertiary); }
+.input:focus { border-color: var(--text-primary); }
+
+/* POS select */
+.pos-select {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 11px 12px; background: var(--chip-bg);
+  border: 1px solid transparent; border-radius: 10px;
+  font-size: 15px; color: var(--text-primary);
+  margin-top: 8px; cursor: pointer;
+}
+
+/* Error text */
+.error-text { font-size: 12px; color: var(--error); text-align: center; margin-top: 6px; }
+
+/* Stats list */
+.stat-list { margin-top: 14px; }
+.stat-row { display: flex; justify-content: space-between; padding: 7px 0; font-size: 14px; }
+.stat-label { color: var(--text-secondary); }
+.stat-value { color: var(--text-primary); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* Buttons */
+.btns { display: flex; border-top: 0.5px solid var(--separator); }
+.btn {
+  flex: 1; padding: 13px; font-size: 16px;
+  text-align: center; cursor: pointer;
+  background: transparent; color: var(--text-primary);
+  transition: background 0.15s;
+}
+.btn:active { background: var(--chip-bg); }
+.btn + .btn { border-left: 0.5px solid var(--separator); }
+.btn.primary { font-weight: 600; }
+.btn.destructive { color: var(--error); }
+.btn.single { font-weight: 600; }
+
+/* Vertical buttons (for destructive confirmations) */
+.btns.vertical { flex-direction: column; }
+.btns.vertical .btn + .btn { border-left: none; border-top: 0.5px solid var(--separator); }
+
+/* File select button */
+.file-btn {
+  display: flex; justify-content: center; margin-top: 14px;
+}
+.file-btn-inner {
+  padding: 10px 24px; background: var(--chip-bg);
+  border-radius: 10px; font-size: 15px; font-weight: 500;
+  color: var(--text-primary); cursor: pointer;
+}
+.file-selected { text-align: center; font-size: 12px; color: var(--text-tertiary); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>WordDrill — 全部弹窗重做（精修版）</h1>
+<p class="intro">
+  基于"还可以"的第一版，微调精致度（圆角 20px、负字距、Apple 灰色色值、轻微 scrim blur）。
+  全部 11 个弹窗浅色+深色预览。背景透出 app 内容模拟真实场景。
+</p>
+
+<!-- ═══ ① 输入类 ═══ -->
+<h2>① 输入类弹窗（4 个）</h2>
+<p class="group-desc">新建词书 · 重命名词书 · 添加词条 · 编辑释义。统一：标题居中 + chip-bg 输入框 + 水平按钮。</p>
+<div class="grid">
+
+  <!-- 1. 新建词书 -->
+  <div class="cell">
+    <div class="cell-label">1 · 新建词书（浅）</div>
+    <div class="phone">
+      <div class="app-bg"><div class="app-word">abandon</div><div class="app-phon">/əˈbændən/</div></div>
+      <div class="scrim"></div>
+      <div class="dialog"><div class="dialog-body">
+        <div class="dialog-title">新建词书</div>
+        <input class="input" placeholder="词书名称" />
+      </div><div class="btns"><div class="btn">取消</div><div class="btn primary">创建</div></div></div>
+    </div>
+  </div>
+
+  <!-- 2. 重命名（深色+错误态） -->
+  <div class="cell">
+    <div class="cell-label">2 · 重命名（深·错误）</div>
+    <div class="phone" data-theme="dark">
+      <div class="app-bg"><div class="app-word">abandon</div><div class="app-phon">/əˈbændən/</div></div>
+      <div class="scrim"></div>
+      <div class="dialog"><div class="dialog-body">
+        <div class="dialog-title">重命名</div>
+        <input class="input" placeholder="" value="" style="border-color:var(--error)" />
+        <div class="error-text">名称不能为空</div>
+      </div><div class="btns"><div class="btn">取消</div><div class="btn primary">确定</div></div></div>
+    </div>
+  </div>
+
+  <!-- 3. 添加词条 -->
+  <div class="cell">
+    <div class="cell-label">3 · 添加词条（浅）</div>
+    <div class="phone">
+      <div class="app-bg"><div class="app-word">library</div><div class="app-phon">/ˈlaɪbrəri/</div></div>
+      <div class="scrim"></div>
+      <div class="dialog"><div class="dialog-body">
+        <div class="dialog-title">添加词条</div>
+        <input class="input" placeholder="单词" />
+        <div class="pos-select"><span>形容词 adj.</span><span style="color:var(--text-tertiary)">▾</span></div>
+        <input class="input" placeholder="释义" style="margin-top:8px" />
+      </div><div class="btns"><div class="btn">取消</div><div class="btn primary">添加</div></div></div>
+    </div>
+  </div>
+
+  <!-- 4. 编辑释义（深色） -->
+  <div class="cell">
+    <div class="cell-label">4 · 编辑释义（深）</div>
+    <div class="phone" data-theme="dark">
+      <div class="app-bg"><div class="app-word">benefit</div><div class="app-phon">/ˈbenɪfɪt/</div></div>
+      <div class="scrim"></div>
+      <div class="dialog"><div class="dialog-body">
+        <div class="dialog-title">编辑释义</div>
+        <div class="pos-select"><span>名词 n.</span><span style="color:var(--text-tertiary)">▾</span></div>
+        <input class="input" placeholder="释义" value="利益；好处" style="margin-top:8px" />
+      </div><div class="btns"><div class="btn">取消</div><div class="btn primary">保存</div></div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ ② 确认类 ═══ -->
+<h2>② 确认类弹窗（3 个）</h2>
+<p class="group-desc">删除词书 · 删除词条 · 永久删除。统一：垂直按钮，destructive 在上，取消在下。</p>
+<div class="grid">
+
+  <!-- 5. 删除词书 -->
+  <div class="cell">
+    <div class="cell-label">5 · 删除词书（浅）</div>
+    <div class="phone">
+      <div class="app-bg"><div class="app-word">library</div></div>
+      <div class="scrim"></div>
+      <div class="dialog"><div class="dialog-body">
+        <div class="dialog-title">删除词书</div>
+        <div class="dialog-message">确定删除「我的生词本」？<br/>此操作不可撤销。</div>
+      </div><div class="btns vertical"><div class="btn destructive">删除</div><div class="btn">取消</div></div></div>
+    </div>
+  </div>
+
+  <!-- 6. 删除词条（深色） -->
+  <div class="cell">
+    <div class="cell-label">6 · 删除词条（深）</div>
+    <div class="phone" data-theme="dark">
+      <div class="app-bg"><div class="app-word">benefit</div></div>
+      <div class="scrim"></div>
+      <div class="dialog"><div class="dialog-body">
+        <div class="dialog-title">删除词条</div>
+        <div class="dialog-message">确定从「CET-4」中删除 benefit？<br/>可从回收站恢复。</div>
+      </div><div class="btns vertical"><div class="btn destructive">删除</div><div class="btn">取消</div></div></div>
+    </div>
+  </div>
+
+  <!-- 7. 永久删除 -->
+  <div class="cell">
+    <div class="cell-label">7 · 永久删除（浅）</div>
+    <div class="phone">
+      <div class="app-bg"><div class="app-word">recycle</div></div>
+      <div class="scrim"></div>
+      <div class="dialog"><div class="dialog-body">
+        <div class="dialog-title" style="color:var(--error)">永久删除</div>
+        <div class="dialog-message">永久删除后无法恢复。<br/>确定继续？</div>
+      </div><div class="btns vertical"><div class="btn destructive">永久删除</div><div class="btn">取消</div></div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ ③ 信息类 ═══ -->
+<h2>③ 信息类弹窗（2 个）</h2>
+<p class="group-desc">导入完成 · 关于。单按钮。</p>
+<div class="grid">
+
+  <!-- 8. 导入完成 -->
+  <div class="cell">
+    <div class="cell-label">8 · 导入完成（浅）</div>
+    <div class="phone">
+      <div class="app-bg"><div class="app-word">library</div></div>
+      <div class="scrim"></div>
+      <div class="dialog"><div class="dialog-body">
+        <div class="dialog-title">导入完成</div>
+        <div class="stat-list">
+          <div class="stat-row"><span class="stat-label">成功导入</span><span class="stat-value">248 个</span></div>
+          <div class="stat-row"><span class="stat-label">数据不完整已跳过</span><span class="stat-value">3 个</span></div>
+        </div>
+      </div><div class="btns"><div class="btn single">完成</div></div></div>
+    </div>
+  </div>
+
+  <!-- 9. 关于（深色） -->
+  <div class="cell">
+    <div class="cell-label">9 · 关于（深）</div>
+    <div class="phone" data-theme="dark">
+      <div class="app-bg"><div class="app-word">me</div></div>
+      <div class="scrim"></div>
+      <div class="dialog"><div class="dialog-body">
+        <div class="dialog-title">关于</div>
+        <div class="dialog-message">
+          WordDrill<br/>
+          <span style="color:var(--text-tertiary)">版本 0.1.0-dev28</span><br/><br/>
+          <span style="font-size:12px;color:var(--text-tertiary)">极简英语学习闪卡</span>
+        </div>
+      </div><div class="btns"><div class="btn single">关闭</div></div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ ④ 操作类 ═══ -->
+<h2>④ 操作类弹窗（2 个）</h2>
+<p class="group-desc">导入词书（选文件）· 导出数据。</p>
+<div class="grid">
+
+  <!-- 10. 导入词书 -->
+  <div class="cell">
+    <div class="cell-label">10 · 导入词书（浅）</div>
+    <div class="phone">
+      <div class="app-bg"><div class="app-word">library</div></div>
+      <div class="scrim"></div>
+      <div class="dialog"><div class="dialog-body">
+        <div class="dialog-title">从文件导入</div>
+        <div class="dialog-message">选择 Excel、文本或 PDF 文件</div>
+        <div class="file-btn"><div class="file-btn-inner">选择文件</div></div>
+        <div class="file-selected">已选：vocab.xlsx</div>
+      </div><div class="btns"><div class="btn">取消</div><div class="btn primary">导入</div></div></div>
+    </div>
+  </div>
+
+  <!-- 11. 导出数据（深色） -->
+  <div class="cell">
+    <div class="cell-label">11 · 导出数据（深）</div>
+    <div class="phone" data-theme="dark">
+      <div class="app-bg"><div class="app-word">me</div></div>
+      <div class="scrim"></div>
+      <div class="dialog"><div class="dialog-body">
+        <div class="dialog-title">导出数据</div>
+        <div class="dialog-message">导出所有词书和统计数据</div>
+        <input class="input" placeholder="昵称（可选）" />
+      </div><div class="btns"><div class="btn">取消</div><div class="btn primary">导出</div></div></div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

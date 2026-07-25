@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WordDrill — 线条 Icon + 启动动画原型</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
+  background: #0a0a0a; color: #fff; padding: 40px;
+  -webkit-font-smoothing: antialiased;
+}
+h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+.intro { color: #888; font-size: 13px; margin-bottom: 36px; max-width: 700px; line-height: 1.7; }
+
+/* Each candidate: static icon (light+dark) + animated splash preview */
+.candidate {
+  display: flex; gap: 32px; align-items: flex-start;
+  margin-bottom: 48px; padding: 24px;
+  background: #141414; border-radius: 16px;
+}
+.candidate-info { flex-shrink: 0; width: 200px; }
+.candidate-num { font-size: 11px; font-weight: 600; color: #555; letter-spacing: 1px; margin-bottom: 4px; }
+.candidate-name { font-size: 16px; font-weight: 600; color: #ccc; margin-bottom: 8px; }
+.candidate-desc { font-size: 12px; color: #777; line-height: 1.6; margin-bottom: 16px; }
+
+.icon-static-row { display: flex; gap: 10px; }
+.icon-box {
+  width: 80px; height: 80px; border-radius: 18px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.icon-light { background: #FAFAFA; }
+.icon-dark { background: #000; border: 1px solid #222; }
+
+/* Splash animation preview — phone screen */
+.splash-preview {
+  flex: 1; max-width: 280px;
+  height: 500px;
+  background: #000;
+  border-radius: 28px;
+  overflow: hidden; position: relative;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  border: 2px solid #222;
+  cursor: pointer;
+}
+.splash-preview.light-splash { background: #FAFAFA; }
+.splash-content {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.replay-hint {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; color: #555; letter-spacing: 0.5px;
+  opacity: 0; transition: opacity 0.3s;
+}
+.splash-preview:hover .replay-hint { opacity: 1; }
+
+/* Reveal content (what shows after animation) */
+.reveal-content {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; opacity: 0;
+}
+.reveal-content.show { opacity: 1; transition: opacity 0.4s ease; }
+.reveal-word { font-size: 32px; font-weight: 600; }
+.reveal-phonetic { font-size: 14px; color: #888; font-family: Georgia, serif; }
+</style>
+</head>
+<body>
+
+<h1>WordDrill — 线条 Icon + 启动动画</h1>
+<p class="intro">
+  每个方案的 icon 由简洁线条构成，专为启动动画设计。
+  点击右侧预览区域播放动画 — 线条从 icon 形态动起来，飞散/绘制/旋转后揭示 App 内容。
+  <strong>点击黑色预览区触发动画。</strong>
+</p>
+
+<!-- ════════ 01: 三线汇聚 W（线条从外飞入组成 W，然后飞散揭示内容） ════════ -->
+<div class="candidate">
+  <div class="candidate-info">
+    <div class="candidate-num">01</div>
+    <div class="candidate-name">三线 W</div>
+    <div class="candidate-desc">W 由 3 条 V 形线条组成。启动时线条从屏幕外飞入汇聚成 W，停留瞬间后向外飞散，揭示内容。</div>
+    <div class="icon-static-row">
+      <div class="icon-box icon-light"><svg width="48" height="48" viewBox="0 0 80 80"><path d="M12 20 L26 60 L40 32 L54 60 L68 20" fill="none" stroke="#1A1A1A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="icon-box icon-dark"><svg width="48" height="48" viewBox="0 0 80 80"><path d="M12 20 L26 60 L40 32 L54 60 L68 20" fill="none" stroke="#FFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+  </div>
+  <div class="splash-preview" onclick="playSplash01(this)">
+    <div class="splash-content">
+      <svg width="100" height="100" viewBox="0 0 80 80" id="svg01">
+        <path class="line01" d="M12 20 L26 60 L40 32" fill="none" stroke="#FFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" style="opacity:0"/>
+        <path class="line02" d="M40 32 L54 60 L68 20" fill="none" stroke="#FFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" style="opacity:0"/>
+      </svg>
+    </div>
+    <div class="reveal-content"><div class="reveal-word" style="color:#FFF">abandon</div><div class="reveal-phonetic">/əˈbændən/</div></div>
+    <div class="replay-hint">点击重播</div>
+  </div>
+</div>
+
+<!-- ════════ 02: 描绘 W（stroke-dasharray 动画，像手写画出来） ════════ -->
+<div class="candidate">
+  <div class="candidate-info">
+    <div class="candidate-num">02</div>
+    <div class="candidate-name">手绘 W</div>
+    <div class="candidate-desc">W 的笔画一笔一笔"画"出来（stroke-dashoffset 动画），画完后整体放大淡出，揭示内容。像 WWDC 的线条过场。</div>
+    <div class="icon-static-row">
+      <div class="icon-box icon-light"><svg width="48" height="48" viewBox="0 0 80 80"><path d="M12 20 L26 60 L40 32 L54 60 L68 20" fill="none" stroke="#1A1A1A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="icon-box icon-dark"><svg width="48" height="48" viewBox="0 0 80 80"><path d="M12 20 L26 60 L40 32 L54 60 L68 20" fill="none" stroke="#FFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+  </div>
+  <div class="splash-preview" onclick="playSplash02(this)">
+    <div class="splash-content">
+      <svg width="120" height="120" viewBox="0 0 80 80" id="svg02">
+        <path id="draw02" d="M12 20 L26 60 L40 32 L54 60 L68 20" fill="none" stroke="#FFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="200" stroke-dashoffset="200"/>
+      </svg>
+    </div>
+    <div class="reveal-content"><div class="reveal-word" style="color:#FFF">abandon</div><div class="reveal-phonetic">/əˈbændən/</div></div>
+    <div class="replay-hint">点击重播</div>
+  </div>
+</div>
+
+<!-- ════════ 03: 卡片翻转（两条卡片线从两侧滑入交叠，然后翻转飞散） ════════ -->
+<div class="candidate">
+  <div class="candidate-info">
+    <div class="candidate-num">03</div>
+    <div class="candidate-name">双卡飞入</div>
+    <div class="candidate-desc">两条卡片轮廓线从屏幕左右滑入交叠成 icon，停顿后向外旋转飞散，揭示内容。</div>
+    <div class="icon-static-row">
+      <div class="icon-box icon-light"><svg width="48" height="48" viewBox="0 0 80 80"><rect x="14" y="22" width="37" height="50" rx="6" fill="none" stroke="#1A1A1A" stroke-width="5"/><rect x="29" y="14" width="37" height="50" rx="6" fill="none" stroke="#1A1A1A" stroke-width="5"/></svg></div>
+      <div class="icon-box icon-dark"><svg width="48" height="48" viewBox="0 0 80 80"><rect x="14" y="22" width="37" height="50" rx="6" fill="none" stroke="#FFF" stroke-width="5"/><rect x="29" y="14" width="37" height="50" rx="6" fill="none" stroke="#FFF" stroke-width="5"/></svg></div>
+    </div>
+  </div>
+  <div class="splash-preview" onclick="playSplash03(this)">
+    <div class="splash-content">
+      <svg width="100" height="100" viewBox="0 0 80 80" id="svg03">
+        <rect class="card03a" x="14" y="22" width="37" height="50" rx="6" fill="none" stroke="#FFF" stroke-width="5" style="transform:translateX(-100px);opacity:0;transition:all 0.5s cubic-bezier(0.22,1,0.36,1)"/>
+        <rect class="card03b" x="29" y="14" width="37" height="50" rx="6" fill="none" stroke="#FFF" stroke-width="5" style="transform:translateX(100px);opacity:0;transition:all 0.5s cubic-bezier(0.22,1,0.36,1)"/>
+      </svg>
+    </div>
+    <div class="reveal-content"><div class="reveal-word" style="color:#FFF">abandon</div><div class="reveal-phonetic">/əˈbændən/</div></div>
+    <div class="replay-hint">点击重播</div>
+  </div>
+</div>
+
+<!-- ════════ 04: 三横线扩展（三条短线从中心向外伸展变长，然后飞散） ════════ -->
+<div class="candidate">
+  <div class="candidate-info">
+    <div class="candidate-num">04</div>
+    <div class="candidate-name">三线伸展</div>
+    <div class="candidate-desc">三条短横线从中心点向外伸展变长（像单词行展开），形成 icon 后向上飞散消失，内容从下方升起。</div>
+    <div class="icon-static-row">
+      <div class="icon-box icon-light"><svg width="48" height="48" viewBox="0 0 80 80"><line x1="16" y1="24" x2="57" y2="24" stroke="#1A1A1A" stroke-width="6" stroke-linecap="round"/><line x1="22" y1="40" x2="64" y2="40" stroke="#1A1A1A" stroke-width="6" stroke-linecap="round"/><line x1="19" y1="56" x2="48" y2="56" stroke="#1A1A1A" stroke-width="6" stroke-linecap="round"/></svg></div>
+      <div class="icon-box icon-dark"><svg width="48" height="48" viewBox="0 0 80 80"><line x1="16" y1="24" x2="57" y2="24" stroke="#FFF" stroke-width="6" stroke-linecap="round"/><line x1="22" y1="40" x2="64" y2="40" stroke="#FFF" stroke-width="6" stroke-linecap="round"/><line x1="19" y1="56" x2="48" y2="56" stroke="#FFF" stroke-width="6" stroke-linecap="round"/></svg></div>
+    </div>
+  </div>
+  <div class="splash-preview" onclick="playSplash04(this)">
+    <div class="splash-content">
+      <svg width="100" height="100" viewBox="0 0 80 80" id="svg04">
+        <line class="line04a" x1="40" y1="24" x2="40" y2="24" stroke="#FFF" stroke-width="6" stroke-linecap="round" style="transition:all 0.4s cubic-bezier(0.22,1,0.36,1)"/>
+        <line class="line04b" x1="40" y1="40" x2="40" y2="40" stroke="#FFF" stroke-width="6" stroke-linecap="round" style="transition:all 0.4s 0.1s cubic-bezier(0.22,1,0.36,1)"/>
+        <line class="line04c" x1="40" y1="56" x2="40" y2="56" stroke="#FFF" stroke-width="6" stroke-linecap="round" style="transition:all 0.4s 0.2s cubic-bezier(0.22,1,0.36,1)"/>
+      </svg>
+    </div>
+    <div class="reveal-content"><div class="reveal-word" style="color:#FFF">abandon</div><div class="reveal-phonetic">/əˈbændən/</div></div>
+    <div class="replay-hint">点击重播</div>
+  </div>
+</div>
+
+<!-- ════════ 05: 圆环呼吸（一个细圆环画出来，内部出现 W，然后圆环扩展消散） ════════ -->
+<div class="candidate">
+  <div class="candidate-info">
+    <div class="candidate-num">05</div>
+    <div class="candidate-name">圆环 W</div>
+    <div class="candidate-desc">细圆环从无到有画出来，内部 W 浮现，然后圆环向外扩展消散（像水波），W 淡入内容。</div>
+    <div class="icon-static-row">
+      <div class="icon-box icon-light"><svg width="48" height="48" viewBox="0 0 80 80"><circle cx="40" cy="40" r="30" fill="none" stroke="#1A1A1A" stroke-width="3"/><path d="M24 28 L32 52 L40 38 L48 52 L56 28" fill="none" stroke="#1A1A1A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="icon-box icon-dark"><svg width="48" height="48" viewBox="0 0 80 80"><circle cx="40" cy="40" r="30" fill="none" stroke="#FFF" stroke-width="3"/><path d="M24 28 L32 52 L40 38 L48 52 L56 28" fill="none" stroke="#FFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+  </div>
+  <div class="splash-preview" onclick="playSplash05(this)">
+    <div class="splash-content">
+      <svg width="120" height="120" viewBox="0 0 80 80" id="svg05">
+        <circle id="ring05" cx="40" cy="40" r="30" fill="none" stroke="#FFF" stroke-width="3" stroke-dasharray="189" stroke-dashoffset="189"/>
+        <path id="w05" d="M24 28 L32 52 L40 38 L48 52 L56 28" fill="none" stroke="#FFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="opacity:0;transition:opacity 0.3s 0.5s"/>
+      </svg>
+    </div>
+    <div class="reveal-content"><div class="reveal-word" style="color:#FFF">abandon</div><div class="reveal-phonetic">/əˈbændən/</div></div>
+    <div class="replay-hint">点击重播</div>
+  </div>
+</div>
+
+<!-- ════════ 06: 点阵脉冲（点从中心向外扩散排列，形成矩阵后飞散） ════════ -->
+<div class="candidate">
+  <div class="candidate-info">
+    <div class="candidate-num">06</div>
+    <div class="candidate-name">点阵脉冲</div>
+    <div class="candidate-desc">9 个点从中心向外扩散到矩阵位置，停顿后整体放大消散。极简几何感，运动清晰。</div>
+    <div class="icon-static-row">
+      <div class="icon-box icon-light"><svg width="48" height="48" viewBox="0 0 80 80"><circle cx="24" cy="24" r="5" fill="#1A1A1A"/><circle cx="40" cy="24" r="5" fill="#1A1A1A"/><circle cx="56" cy="24" r="5" fill="#1A1A1A"/><circle cx="24" cy="40" r="5" fill="#1A1A1A"/><circle cx="40" cy="40" r="5" fill="#1A1A1A"/><circle cx="56" cy="40" r="5" fill="#1A1A1A"/><circle cx="24" cy="56" r="5" fill="#1A1A1A"/><circle cx="40" cy="56" r="5" fill="#1A1A1A"/><circle cx="56" cy="56" r="5" fill="#1A1A1A"/></svg></div>
+      <div class="icon-box icon-dark"><svg width="48" height="48" viewBox="0 0 80 80"><circle cx="24" cy="24" r="5" fill="#FFF"/><circle cx="40" cy="24" r="5" fill="#FFF"/><circle cx="56" cy="24" r="5" fill="#FFF"/><circle cx="40" cy="40" r="5" fill="#FFF"/><circle cx="40" cy="40" r="5" fill="#FFF"/><circle cx="56" cy="40" r="5" fill="#FFF"/><circle cx="24" cy="56" r="5" fill="#FFF"/><circle cx="40" cy="56" r="5" fill="#FFF"/><circle cx="56" cy="56" r="5" fill="#FFF"/></svg></div>
+    </div>
+  </div>
+  <div class="splash-preview" onclick="playSplash06(this)">
+    <div class="splash-content">
+      <svg width="100" height="100" viewBox="0 0 80 80" id="svg06"></svg>
+    </div>
+    <div class="reveal-content"><div class="reveal-word" style="color:#FFF">abandon</div><div class="reveal-phonetic">/əˈbændən/</div></div>
+    <div class="replay-hint">点击重播</div>
+  </div>
+</div>
+
+<script>
+// Helper: reset and get elements
+function reset(preview) {
+  const reveal = preview.querySelector('.reveal-content');
+  reveal.classList.remove('show');
+}
+
+// 01: Three lines fly in to form W, then fly out
+function playSplash01(preview) {
+  reset(preview);
+  const l1 = preview.querySelector('.line01');
+  const l2 = preview.querySelector('.line02');
+  const svg = preview.querySelector('#svg01');
+  const reveal = preview.querySelector('.reveal-content');
+  // Reset
+  [l1,l2].forEach(l => { l.style.transition='none'; l.style.opacity=0; l.style.transform='translateX(-80px)'; });
+  svg.style.transition = 'none'; svg.style.transform = 'scale(1)'; svg.style.opacity = 1;
+  void preview.offsetWidth;
+  // Phase 1: fly in
+  l1.style.transition = 'all 0.4s cubic-bezier(0.22,1,0.36,1)'; l1.style.opacity=1; l1.style.transform='translateX(0)';
+  setTimeout(() => { l2.style.transition = 'all 0.4s cubic-bezier(0.22,1,0.36,1)'; l2.style.opacity=1; l2.style.transform='translateX(0)'; }, 150);
+  // Phase 2: hold
+  setTimeout(() => { svg.style.transition='all 0.5s cubic-bezier(0.45,0,0.55,1)'; svg.style.transform='scale(1.5)'; svg.style.opacity=0; }, 900);
+  // Phase 3: reveal
+  setTimeout(() => { reveal.classList.add('show'); }, 1300);
+}
+
+// 02: Draw W with stroke-dashoffset, then scale out
+function playSplash02(preview) {
+  reset(preview);
+  const draw = preview.querySelector('#draw02');
+  const svg = preview.querySelector('#svg02');
+  const reveal = preview.querySelector('.reveal-content');
+  draw.style.transition = 'none'; draw.style.strokeDashoffset = '200';
+  svg.style.transition = 'none'; svg.style.transform = 'scale(1)'; svg.style.opacity = 1;
+  void preview.offsetWidth;
+  draw.style.transition = 'stroke-dashoffset 0.8s cubic-bezier(0.45,0,0.55,1)';
+  draw.style.strokeDashoffset = '0';
+  setTimeout(() => { svg.style.transition='all 0.5s ease'; svg.style.transform='scale(1.5)'; svg.style.opacity=0; }, 1000);
+  setTimeout(() => { reveal.classList.add('show'); }, 1400);
+}
+
+// 03: Two cards fly in from sides
+function playSplash03(preview) {
+  reset(preview);
+  const a = preview.querySelector('.card03a');
+  const b = preview.querySelector('.card03b');
+  const svg = preview.querySelector('#svg03');
+  const reveal = preview.querySelector('.reveal-content');
+  [a,b].forEach(el => { el.style.transition='none'; el.style.opacity=0; });
+  a.style.transform='translateX(-100px)'; b.style.transform='translateX(100px)';
+  svg.style.transition='none'; svg.style.opacity=1;
+  void preview.offsetWidth;
+  a.style.transition='all 0.5s cubic-bezier(0.22,1,0.36,1)'; a.style.opacity=1; a.style.transform='translateX(0)';
+  b.style.transition='all 0.5s 0.1s cubic-bezier(0.22,1,0.36,1)'; b.style.opacity=1; b.style.transform='translateX(0)';
+  setTimeout(() => { svg.style.transition='all 0.6s cubic-bezier(0.45,0,0.55,1)'; svg.style.transform='scale(1.8) rotate(15deg)'; svg.style.opacity=0; }, 900);
+  setTimeout(() => { reveal.classList.add('show'); }, 1400);
+}
+
+// 04: Three lines expand from center
+function playSplash04(preview) {
+  reset(preview);
+  const lines = [preview.querySelector('.line04a'), preview.querySelector('.line04b'), preview.querySelector('.line04c')];
+  const svg = preview.querySelector('#svg04');
+  const reveal = preview.querySelector('.reveal-content');
+  // Reset to center points
+  lines[0].setAttribute('x1',40); lines[0].setAttribute('x2',40);
+  lines[1].setAttribute('x1',40); lines[1].setAttribute('x2',40);
+  lines[2].setAttribute('x1',40); lines[2].setAttribute('x2',40);
+  lines.forEach(l => { l.style.opacity=0; l.style.transition='none'; });
+  svg.style.transition='none'; svg.style.transform='scale(1)'; svg.style.opacity=1;
+  void preview.offsetWidth;
+  // Expand
+  lines.forEach((l,i) => { l.style.transition=`all 0.4s ${i*0.1}s cubic-bezier(0.22,1,0.36,1)`; l.style.opacity=1; });
+  setTimeout(() => {
+    lines[0].setAttribute('x1',16); lines[0].setAttribute('x2',57);
+    lines[1].setAttribute('x1',22); lines[1].setAttribute('x2',64);
+    lines[2].setAttribute('x1',19); lines[2].setAttribute('x2',48);
+  }, 50);
+  // Fly up
+  setTimeout(() => { svg.style.transition='all 0.5s cubic-bezier(0.45,0,0.55,1)'; svg.style.transform='translateY(-60px) scale(1.3)'; svg.style.opacity=0; }, 800);
+  setTimeout(() => { reveal.classList.add('show'); }, 1200);
+}
+
+// 05: Ring draws, W appears, ring expands and fades
+function playSplash05(preview) {
+  reset(preview);
+  const ring = preview.querySelector('#ring05');
+  const w = preview.querySelector('#w05');
+  const svg = preview.querySelector('#svg05');
+  const reveal = preview.querySelector('.reveal-content');
+  ring.style.transition='none'; ring.style.strokeDashoffset='189';
+  w.style.opacity=0; w.style.transition='opacity 0.3s 0.5s';
+  svg.style.transition='none'; svg.style.transform='scale(1)'; svg.style.opacity=1;
+  void preview.offsetWidth;
+  ring.style.transition='stroke-dashoffset 0.6s cubic-bezier(0.45,0,0.55,1)';
+  ring.style.strokeDashoffset='0';
+  setTimeout(() => { w.style.opacity=1; }, 500);
+  setTimeout(() => {
+    ring.style.transition='all 0.6s cubic-bezier(0.45,0,0.55,1)';
+    ring.setAttribute('r',50); ring.style.strokeWidth=1; ring.style.opacity=0;
+    w.style.transition='opacity 0.4s'; w.style.opacity=0;
+  }, 1100);
+  setTimeout(() => { reveal.classList.add('show'); }, 1600);
+}
+
+// 06: Dots spread from center to matrix, then scale out
+function playSplash06(preview) {
+  reset(preview);
+  const svg = preview.querySelector('#svg06');
+  const reveal = preview.querySelector('.reveal-content');
+  svg.innerHTML = '';
+  const positions = [[24,24],[40,24],[56,24],[24,40],[40,40],[56,40],[24,56],[40,56],[56,56]];
+  const dots = positions.map(([x,y]) => {
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',40); c.setAttribute('cy',40); c.setAttribute('r',5);
+    c.setAttribute('fill','#FFF'); c.style.opacity=0;
+    c.style.transition='all 0.5s cubic-bezier(0.22,1,0.36,1)';
+    svg.appendChild(c); return c;
+  });
+  svg.style.transition='none'; svg.style.transform='scale(1)'; svg.style.opacity=1;
+  void preview.offsetWidth;
+  dots.forEach((d,i) => { setTimeout(() => { d.style.opacity=1; d.setAttribute('cx',positions[i][0]); d.setAttribute('cy',positions[i][1]); }, i*60); });
+  setTimeout(() => { svg.style.transition='all 0.6s cubic-bezier(0.45,0,0.55,1)'; svg.style.transform='scale(2)'; svg.style.opacity=0; }, 700 + 9*60);
+  setTimeout(() => { reveal.classList.add('show'); }, 700 + 9*60 + 500);
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>弹窗五版全量对比 — 11 弹窗 × 5 风格</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "SF Pro Text", "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+  background: #0a0a0a; color: #fff; padding: 32px 24px;
+  -webkit-font-smoothing: antialiased;
+}
+h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+.intro { color: #888; font-size: 12px; margin-bottom: 20px; max-width: 700px; line-height: 1.7; }
+
+/* Style switcher */
+.switcher { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+.switcher button {
+  padding: 8px 16px; border-radius: 8px; border: 1px solid #333;
+  background: #141414; color: #aaa; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.2s; font-family: inherit;
+}
+.switcher button.active { background: #fff; color: #000; border-color: #fff; }
+.switcher button:hover { border-color: #666; }
+
+/* Dialog grid */
+.grid { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+.cell { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.cell-label { font-size: 10px; font-weight: 600; color: #777; }
+
+/* Phone frame */
+.phone {
+  width: 250px; height: 440px;
+  border-radius: 24px; overflow: hidden;
+  position: relative;
+  box-shadow: 0 0 0 2px #222, 0 6px 24px rgba(0,0,0,0.5);
+}
+.app-bg {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 4px;
+}
+.app-word { font-size: 32px; font-weight: 600; letter-spacing: -0.5px; }
+.app-phon { font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+// ═══ Design tokens per style ═══
+const STYLES = {
+  A: { name: 'A · 精修版', desc: '居中卡片 + 填充输入 + hairline 按钮（基准）' },
+  B: { name: 'B · iOS 原生', desc: 'iOS 系统精确比例 + 蓝色文字按钮 #007AFF' },
+  C: { name: 'C · 底部弹出', desc: '从底部滑入 + grabber handle + 分组表单' },
+  D: { name: 'D · 大留白极简', desc: '加大内边距 + 纯底线输入 + 居中色块按钮' },
+  E: { name: 'E · 卡片+pill', desc: '居中卡片 + pill 色块按钮（非 hairline）' },
+};
+
+const DIALOGS = [
+  { id: 1, label: '新建词书', type: 'input', title: '新建词书', placeholder: '词书名称', btns: ['取消','创建'] },
+  { id: 2, label: '重命名(错)', type: 'input', title: '重命名', placeholder: '', error: '名称不能为空', btns: ['取消','确定'], dark: true },
+  { id: 3, label: '添加词条', type: 'multi', title: '添加词条', fields: ['单词','释义'], pos: true, btns: ['取消','添加'] },
+  { id: 4, label: '编辑释义', type: 'multi', title: '编辑释义', fields: ['释义'], pos: true, btns: ['取消','保存'], dark: true, prefill: '利益；好处' },
+  { id: 5, label: '删除词书', type: 'confirm', title: '删除词书', msg: '确定删除「我的生词本」？\n此操作不可撤销。', destructive: true, btns: ['删除','取消'] },
+  { id: 6, label: '删除词条', type: 'confirm', title: '删除词条', msg: '确定从「CET-4」中删除 benefit？\n可从回收站恢复。', destructive: true, btns: ['删除','取消'], dark: true },
+  { id: 7, label: '永久删除', type: 'confirm', title: '永久删除', msg: '永久删除后无法恢复。\n确定继续？', destructive: true, titleError: true, btns: ['永久删除','取消'] },
+  { id: 8, label: '导入完成', type: 'info', title: '导入完成', stats: [['成功导入','248 个'],['数据不完整','3 个']], btns: ['完成'] },
+  { id: 9, label: '关于', type: 'info', title: '关于', info: 'WordDrill\n版本 0.1.0-dev28\n极简英语学习闪卡', btns: ['关闭'], dark: true },
+  { id: 10, label: '导入词书', type: 'action', title: '从文件导入', msg: '选择 Excel、文本或 PDF 文件', fileBtn: '选择文件', fileSel: '已选：vocab.xlsx', btns: ['取消','导入'] },
+  { id: 11, label: '导出数据', type: 'action', title: '导出数据', msg: '导出所有词书和统计数据', input: '昵称（可选）', btns: ['取消','导出'], dark: true },
+];
+
+// ═══ Style renderers ═══
+function DialogA({ d, dark }) {
+  const bg = dark ? '#000' : '#FAFAFA';
+  const surface = dark ? '#1C1C1E' : '#FFFFFF';
+  const tp = dark ? '#FFF' : '#1A1A1A';
+  const ts = dark ? 'rgba(235,235,245,0.6)' : 'rgba(60,60,67,0.6)';
+  const tt = dark ? 'rgba(235,235,245,0.3)' : 'rgba(60,60,67,0.3)';
+  const sep = dark ? 'rgba(84,84,88,0.5)' : 'rgba(60,60,67,0.12)';
+  const chip = dark ? '#2C2C2E' : '#F5F5F7';
+  const accent = dark ? '#0A84FF' : '#007AFF';
+  const err = '#FF3B30';
+  return (
+    <div className="phone" style={{background:bg}}>
+      <div className="app-bg"><span className="app-word" style={{color:'rgba(128,128,128,0.12)'}}>abandon</span></div>
+      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.35)',backdropFilter:'blur(2px)'}}></div>
+      <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',width:'225px',background:surface,borderRadius:20,overflow:'hidden',boxShadow:'0 2px 8px rgba(0,0,0,0.08),0 24px 48px rgba(0,0,0,0.12)',color:tp}}>
+        <div style={{padding:'22px 18px 16px'}}>
+          <div style={{fontSize:17,fontWeight:600,textAlign:'center',letterSpacing:'-0.3px',marginBottom:4,color:d.titleError?err:tp}}>{d.title}</div>
+          {d.msg && <div style={{fontSize:13,color:ts,textAlign:'center',lineHeight:1.5}}>{d.msg.split('\n').map((l,i)=><div key={i}>{l}</div>)}</div>}
+          {d.type==='input' && <input placeholder={d.placeholder} style={{width:'100%',padding:'11px 12px',background:chip,border:`1px solid ${d.error?err:'transparent'}`,borderRadius:10,outline:'none',fontSize:15,color:tp,fontFamily:'inherit',marginTop:14}} />}
+          {d.error && <div style={{fontSize:12,color:err,textAlign:'center',marginTop:6}}>{d.error}</div>}
+          {d.type==='multi' && <div>
+            {d.fields?.map((f,i)=><input key={i} placeholder={f} defaultValue={i===0&&d.prefill?d.prefill:''} style={{width:'100%',padding:'11px 12px',background:chip,border:'1px solid transparent',borderRadius:10,outline:'none',fontSize:15,color:tp,fontFamily:'inherit',marginTop:i===0&&!d.pos?14:8}} />)}
+            {d.pos && <div style={{display:'flex',justifyContent:'space-between',padding:'11px 12px',background:chip,borderRadius:10,fontSize:15,color:tp,marginTop:8}}>形容词 adj.<span style={{color:tt}}>▾</span></div>}
+          </div>}
+          {d.type==='action' && <>
+            {d.input && <input placeholder={d.input} style={{width:'100%',padding:'11px 12px',background:chip,border:'1px solid transparent',borderRadius:10,outline:'none',fontSize:15,color:tp,fontFamily:'inherit',marginTop:14}} />}
+            {d.fileBtn && <div style={{display:'flex',justifyContent:'center',marginTop:14}}><div style={{padding:'10px 24px',background:chip,borderRadius:10,fontSize:15,fontWeight:500,color:tp}}>{d.fileBtn}</div></div>}
+            {d.fileSel && <div style={{textAlign:'center',fontSize:12,color:tt,marginTop:8}}>{d.fileSel}</div>}
+          </>}
+          {d.type==='info' && d.stats && <div style={{marginTop:14}}>{d.stats.map((s,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',fontSize:14}}><span style={{color:ts}}>{s[0]}</span><span style={{color:tp,fontWeight:500}}>{s[1]}</span></div>)}</div>}
+          {d.type==='info' && d.info && <div style={{fontSize:13,color:ts,textAlign:'center',lineHeight:1.8,marginTop:8}}>{d.info.split('\n').map((l,i)=><div key={i} style={i===1?{color:tt,fontSize:13}:{fontSize:15,color:tp,fontWeight:600}}>{l}</div>)}</div>}
+        </div>
+        <div style={{display:'flex',borderTop:`0.5px solid ${sep}`}}>
+          {d.btns.map((b,i)=><div key={i} style={{flex:1,padding:'13px',fontSize:16,textAlign:'center',color:d.destructive&&i===0?err:b==='取消'||b==='关闭'||b==='完成'?accent:tp,fontWeight:i===d.btns.length-1&&b!=='取消'?600:400,borderLeft:i>0?`0.5px solid ${sep}`:'none'}}>{b}</div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DialogB({ d, dark }) {
+  // iOS native: exact proportions, blue text buttons, no chip-bg inputs, plain text field
+  const bg = dark ? '#000' : '#FAFAFA';
+  const surface = dark ? '#1C1C1E' : 'rgba(255,255,255,0.95)';
+  const tp = dark ? '#FFF' : '#1A1A1A';
+  const accent = dark ? '#0A84FF' : '#007AFF';
+  const err = '#FF453A';
+  return (
+    <div className="phone" style={{background:bg}}>
+      <div className="app-bg"><span className="app-word" style={{color:'rgba(128,128,128,0.12)'}}>abandon</span></div>
+      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.4)',backdropFilter:'blur(6px)'}}></div>
+      <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',width:'230px',background:surface,backdropFilter:'blur(20px)',borderRadius:14,overflow:'hidden',boxShadow:'0 20px 50px rgba(0,0,0,0.2)',color:tp}}>
+        <div style={{padding:'20px 16px 8px'}}>
+          <div style={{fontSize:17,fontWeight:600,textAlign:'center',marginBottom:4,letterSpacing:'-0.3px',color:d.titleError?err:tp}}>{d.title}</div>
+          {d.msg && <div style={{fontSize:13,color:'rgba(60,60,67,0.6)',textAlign:'center',lineHeight:1.5}}>{d.msg.split('\n').map((l,i)=><div key={i}>{l}</div>)}</div>}
+          {d.type==='input' && <input placeholder={d.placeholder} style={{width:'100%',padding:'8px 0',background:'transparent',border:'none',borderBottom:'1px solid rgba(60,60,67,0.2)',outline:'none',fontSize:17,color:tp,textAlign:'center',fontFamily:'inherit',marginTop:12}} />}
+          {d.error && <div style={{fontSize:12,color:err,textAlign:'center',marginTop:6}}>{d.error}</div>}
+          {d.type==='multi' && <div style={{marginTop:12}}>
+            {d.fields?.map((f,i)=><div key={i} style={{borderBottom:'1px solid rgba(60,60,67,0.2)',padding:'8px 0'}}><input placeholder={f} defaultValue={i===0&&d.prefill?d.prefill:''} style={{width:'100%',background:'transparent',border:'none',outline:'none',fontSize:16,color:tp,fontFamily:'inherit'}} /></div>)}
+            {d.pos && <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',fontSize:16,color:tp}}>形容词 adj.<span style={{color:'rgba(60,60,67,0.3)'}}>▾</span></div>}
+          </div>}
+          {d.type==='action' && <>
+            {d.input && <input placeholder={d.input} style={{width:'100%',padding:'8px 0',background:'transparent',border:'none',borderBottom:'1px solid rgba(60,60,67,0.2)',outline:'none',fontSize:16,color:tp,fontFamily:'inherit',marginTop:12}} />}
+            {d.fileBtn && <div style={{display:'flex',justifyContent:'center',marginTop:14}}><div style={{padding:'8px 20px',background:accent,color:'#fff',borderRadius:8,fontSize:15,fontWeight:600}}>{d.fileBtn}</div></div>}
+            {d.fileSel && <div style={{textAlign:'center',fontSize:12,color:'rgba(60,60,67,0.4)',marginTop:8}}>{d.fileSel}</div>}
+          </>}
+          {d.type==='info' && d.stats && <div style={{marginTop:12}}>{d.stats.map((s,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',fontSize:14}}><span style={{color:'rgba(60,60,67,0.6)'}}>{s[0]}</span><span style={{color:tp,fontWeight:500}}>{s[1]}</span></div>)}</div>}
+          {d.type==='info' && d.info && <div style={{textAlign:'center',lineHeight:1.8,marginTop:8}}>{d.info.split('\n').map((l,i)=><div key={i} style={i===0?{fontSize:17,fontWeight:600,color:tp}:{fontSize:13,color:'rgba(60,60,67,0.5)'}}>{l}</div>)}</div>}
+        </div>
+        <div style={{display:'flex',borderTop:'0.5px solid rgba(60,60,67,0.12)'}}>
+          {d.btns.map((b,i)=><div key={i} style={{flex:1,padding:'14px',fontSize:17,textAlign:'center',color:d.destructive&&i===0?err:accent,fontWeight:i===d.btns.length-1?600:400,borderLeft:i>0?'0.5px solid rgba(60,60,67,0.12)':'none'}}>{b}</div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DialogC({ d, dark }) {
+  // Bottom sheet: slides from bottom, grabber handle, grouped form
+  const bg = dark ? '#000' : '#FAFAFA';
+  const surface = dark ? 'rgba(28,28,30,0.92)' : 'rgba(248,248,248,0.92)';
+  const tp = dark ? '#FFF' : '#1A1A1A';
+  const ts = dark ? 'rgba(235,235,245,0.6)' : 'rgba(60,60,67,0.6)';
+  const fieldBg = dark ? '#2C2C2E' : '#FFF';
+  const accent = dark ? '#0A84FF' : '#007AFF';
+  const err = '#FF453A';
+  return (
+    <div className="phone" style={{background:bg}}>
+      <div className="app-bg"><span className="app-word" style={{color:'rgba(128,128,128,0.12)'}}>abandon</span></div>
+      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.4)',backdropFilter:'blur(8px)'}}></div>
+      <div style={{position:'absolute',left:0,right:0,bottom:0,background:surface,backdropFilter:'blur(30px)',borderRadius:'16px 16px 0 0',boxShadow:'0 -4px 40px rgba(0,0,0,0.15)',paddingBottom:24,color:tp}}>
+        <div style={{width:36,height:5,borderRadius:3,background:dark?'rgba(235,235,245,0.3)':'rgba(60,60,67,0.3)',margin:'8px auto 16px'}}></div>
+        <div style={{padding:'0 20px'}}>
+          <div style={{fontSize:17,fontWeight:600,textAlign:'center',marginBottom:4,letterSpacing:'-0.3px',color:d.titleError?err:tp}}>{d.title}</div>
+          {d.msg && <div style={{fontSize:13,color:ts,textAlign:'center',lineHeight:1.5,marginBottom:12}}>{d.msg.split('\n').map((l,i)=><span key={i}>{l}<br/></span>)}</div>}
+          {(d.type==='input'||d.type==='multi'||d.type==='action') && <div style={{background:fieldBg,borderRadius:12,overflow:'hidden',marginBottom:16}}>
+            {d.type==='input' && <input placeholder={d.placeholder} style={{width:'100%',padding:'12px 14px',background:'transparent',border:'none',outline:'none',fontSize:16,color:tp,fontFamily:'inherit'}} />}
+            {d.type==='multi' && <>
+              {d.fields?.map((f,i)=><div key={i}><input placeholder={f} defaultValue={i===0&&d.prefill?d.prefill:''} style={{width:'100%',padding:'12px 14px',background:'transparent',border:'none',outline:'none',fontSize:16,color:tp,fontFamily:'inherit'}} />{i<d.fields.length-1||d.pos?<div style={{height:'0.5px',background:dark?'rgba(255,255,255,0.08)':'rgba(60,60,67,0.12)',marginLeft:14}}></div>:null}</div>)}
+              {d.pos && <div style={{display:'flex',justifyContent:'space-between',padding:'12px 14px',fontSize:16,color:tp}}>形容词 adj.<span style={{color:ts}}>▾</span></div>}
+            </>}
+            {d.type==='action' && d.input && <input placeholder={d.input} style={{width:'100%',padding:'12px 14px',background:'transparent',border:'none',outline:'none',fontSize:16,color:tp,fontFamily:'inherit'}} />}
+          </div>}
+          {d.type==='action' && d.fileBtn && <div style={{marginBottom:12}}>
+            <div style={{display:'flex',justifyContent:'center'}}><div style={{padding:'12px 28px',background:accent,color:'#fff',borderRadius:12,fontSize:16,fontWeight:600}}>{d.fileBtn}</div></div>
+            {d.fileSel && <div style={{textAlign:'center',fontSize:12,color:ts,marginTop:8}}>{d.fileSel}</div>}
+          </div>}
+          {d.type==='info' && d.stats && <div style={{background:fieldBg,borderRadius:12,marginBottom:16,padding:'4px 14px'}}>{d.stats.map((s,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'10px 0',fontSize:15,borderBottom:i<d.stats.length-1?('0.5px solid '+(dark?'rgba(255,255,255,0.08)':'rgba(60,60,67,0.12)')):'none'}}><span style={{color:ts}}>{s[0]}</span><span style={{color:tp,fontWeight:500}}>{s[1]}</span></div>)}</div>}
+          {d.type==='info' && d.info && <div style={{textAlign:'center',lineHeight:1.8,marginBottom:16}}>{d.info.split('\n').map((l,i)=><div key={i} style={i===0?{fontSize:18,fontWeight:600,color:tp}:{fontSize:13,color:ts}}>{l}</div>)}</div>}
+          {d.error && <div style={{fontSize:12,color:err,textAlign:'center',marginBottom:8}}>{d.error}</div>}
+          <div style={{display:'flex',gap:10}}>
+            {d.btns.map((b,i)=><div key={i} style={{flex:1,padding:'13px',fontSize:16,textAlign:'center',borderRadius:12,fontWeight:i===d.btns.length-1&&b!=='取消'?600:400,background:i===d.btns.length-1&&b!=='取消'?(dark?'#FFF':'#1A1A1A'):(dark?'rgba(118,118,128,0.24)':'rgba(118,118,128,0.08)'),color:i===d.btns.length-1&&b!=='取消'?(dark?'#000':'#FFF'):(d.destructive&&i===0?err:(dark?'rgba(235,235,245,0.8)':'rgba(60,60,67,0.8)'))}}>{b}</div>)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DialogD({ d, dark }) {
+  // Large whitespace minimal: big padding, underline-only inputs, centered pill buttons
+  const bg = dark ? '#000' : '#FAFAFA';
+  const surface = dark ? '#1C1C1E' : '#FFF';
+  const tp = dark ? '#FFF' : '#1A1A1A';
+  const ts = dark ? 'rgba(235,235,245,0.6)' : 'rgba(60,60,67,0.6)';
+  const chip = dark ? '#2C2C2E' : '#F5F5F7';
+  const err = '#FF453A';
+  return (
+    <div className="phone" style={{background:bg}}>
+      <div className="app-bg"><span className="app-word" style={{color:'rgba(128,128,128,0.12)'}}>abandon</span></div>
+      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.3)'}}></div>
+      <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',width:'235px',background:surface,borderRadius:22,overflow:'hidden',boxShadow:'0 8px 32px rgba(0,0,0,0.12)',color:tp}}>
+        <div style={{padding:'28px 24px 16px'}}>
+          <div style={{fontSize:18,fontWeight:600,textAlign:'center',letterSpacing:'-0.3px',marginBottom:6,color:d.titleError?err:tp}}>{d.title}</div>
+          {d.msg && <div style={{fontSize:14,color:ts,textAlign:'center',lineHeight:1.5,marginBottom:16}}>{d.msg.split('\n').map((l,i)=><div key={i}>{l}</div>)}</div>}
+          {d.type==='input' && <input placeholder={d.placeholder} style={{width:'100%',padding:'12px 0',background:'transparent',border:'none',borderBottom:`1.5px solid ${d.error?err:'rgba(60,60,67,0.15)'}`,outline:'none',fontSize:16,color:tp,textAlign:'center',fontFamily:'inherit',transition:'border-color 0.2s'}} />}
+          {d.error && <div style={{fontSize:12,color:err,textAlign:'center',marginTop:6}}>{d.error}</div>}
+          {d.type==='multi' && <div>
+            {d.fields?.map((f,i)=><input key={i} placeholder={f} defaultValue={i===0&&d.prefill?d.prefill:''} style={{width:'100%',padding:'10px 0',background:'transparent',border:'none',borderBottom:'1.5px solid rgba(60,60,67,0.15)',outline:'none',fontSize:16,color:tp,textAlign:'center',fontFamily:'inherit',marginBottom:4}} />)}
+            {d.pos && <div style={{display:'flex',justifyContent:'center',padding:'10px 0',borderBottom:'1.5px solid rgba(60,60,67,0.15)',fontSize:16,color:tp,gap:8}}>形容词 adj.<span style={{color:ts}}>▾</span></div>}
+          </div>}
+          {d.type==='action' && <>
+            {d.input && <input placeholder={d.input} style={{width:'100%',padding:'12px 0',background:'transparent',border:'none',borderBottom:'1.5px solid rgba(60,60,67,0.15)',outline:'none',fontSize:16,color:tp,textAlign:'center',fontFamily:'inherit'}} />}
+            {d.fileBtn && <div style={{display:'flex',justifyContent:'center',marginTop:14}}><div style={{padding:'10px 28px',background:chip,borderRadius:100,fontSize:15,fontWeight:500,color:tp}}>{d.fileBtn}</div></div>}
+            {d.fileSel && <div style={{textAlign:'center',fontSize:12,color:ts,marginTop:8}}>{d.fileSel}</div>}
+          </>}
+          {d.type==='info' && d.stats && <div style={{marginTop:12}}>{d.stats.map((s,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',fontSize:15,borderBottom:'1px solid rgba(60,60,67,0.08)'}}><span style={{color:ts}}>{s[0]}</span><span style={{color:tp,fontWeight:500}}>{s[1]}</span></div>)}</div>}
+          {d.type==='info' && d.info && <div style={{textAlign:'center',lineHeight:1.8,marginTop:12}}>{d.info.split('\n').map((l,i)=><div key={i} style={i===0?{fontSize:18,fontWeight:600,color:tp}:{fontSize:13,color:ts}}>{l}</div>)}</div>}
+        </div>
+        <div style={{display:'flex',gap:8,padding:'0 20px 20px'}}>
+          {d.btns.map((b,i)=><div key={i} style={{flex:1,padding:'13px',fontSize:15,textAlign:'center',borderRadius:100,fontWeight:i===d.btns.length-1&&b!=='取消'?600:400,background:i===d.btns.length-1&&b!=='取消'?(dark?'#FFF':'#1A1A1A'):(dark?'rgba(118,118,128,0.24)':chip),color:i===d.btns.length-1&&b!=='取消'?(dark?'#000':'#FFF'):(d.destructive&&i===0?err:ts)}}>{b}</div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DialogE({ d, dark }) {
+  // Card + pill buttons at bottom (like Apple Pay)
+  const bg = dark ? '#000' : '#FAFAFA';
+  const surface = dark ? '#1C1C1E' : '#FFF';
+  const tp = dark ? '#FFF' : '#1A1A1A';
+  const ts = dark ? 'rgba(235,235,245,0.6)' : 'rgba(60,60,67,0.6)';
+  const chip = dark ? '#2C2C2E' : '#F5F5F7';
+  const err = '#FF453A';
+  return (
+    <div className="phone" style={{background:bg}}>
+      <div className="app-bg"><span className="app-word" style={{color:'rgba(128,128,128,0.12)'}}>abandon</span></div>
+      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.35)',backdropFilter:'blur(3px)'}}></div>
+      <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',width:'230px',background:surface,borderRadius:18,overflow:'hidden',boxShadow:'0 4px 16px rgba(0,0,0,0.1),0 24px 48px rgba(0,0,0,0.1)',color:tp}}>
+        <div style={{padding:'20px 18px 14px'}}>
+          <div style={{fontSize:17,fontWeight:600,textAlign:'center',marginBottom:4,color:d.titleError?err:tp}}>{d.title}</div>
+          {d.msg && <div style={{fontSize:13,color:ts,textAlign:'center',lineHeight:1.5}}>{d.msg.split('\n').map((l,i)=><div key={i}>{l}</div>)}</div>}
+          {d.type==='input' && <input placeholder={d.placeholder} style={{width:'100%',padding:'11px 12px',background:chip,border:`1px solid ${d.error?err:'transparent'}`,borderRadius:10,outline:'none',fontSize:15,color:tp,fontFamily:'inherit',marginTop:12}} />}
+          {d.error && <div style={{fontSize:12,color:err,textAlign:'center',marginTop:6}}>{d.error}</div>}
+          {d.type==='multi' && <div style={{marginTop:12}}>
+            {d.fields?.map((f,i)=><input key={i} placeholder={f} defaultValue={i===0&&d.prefill?d.prefill:''} style={{width:'100%',padding:'11px 12px',background:chip,border:'1px solid transparent',borderRadius:10,outline:'none',fontSize:15,color:tp,fontFamily:'inherit',marginTop:i===0?0:6}} />)}
+            {d.pos && <div style={{display:'flex',justifyContent:'space-between',padding:'11px 12px',background:chip,borderRadius:10,fontSize:15,color:tp,marginTop:6}}>形容词 adj.<span style={{color:ts}}>▾</span></div>}
+          </div>}
+          {d.type==='action' && <>
+            {d.input && <input placeholder={d.input} style={{width:'100%',padding:'11px 12px',background:chip,border:'1px solid transparent',borderRadius:10,outline:'none',fontSize:15,color:tp,fontFamily:'inherit',marginTop:12}} />}
+            {d.fileBtn && <div style={{display:'flex',justifyContent:'center',marginTop:12}}><div style={{padding:'10px 24px',background:chip,borderRadius:10,fontSize:15,fontWeight:500,color:tp}}>{d.fileBtn}</div></div>}
+            {d.fileSel && <div style={{textAlign:'center',fontSize:12,color:ts,marginTop:8}}>{d.fileSel}</div>}
+          </>}
+          {d.type==='info' && d.stats && <div style={{marginTop:12}}>{d.stats.map((s,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',fontSize:14}}><span style={{color:ts}}>{s[0]}</span><span style={{color:tp,fontWeight:500}}>{s[1]}</span></div>)}</div>}
+          {d.type==='info' && d.info && <div style={{textAlign:'center',lineHeight:1.8,marginTop:8}}>{d.info.split('\n').map((l,i)=><div key={i} style={i===0?{fontSize:17,fontWeight:600,color:tp}:{fontSize:13,color:ts}}>{l}</div>)}</div>}
+        </div>
+        <div style={{display:'flex',gap:8,padding:'0 16px 16px'}}>
+          {d.btns.map((b,i)=>{const isPrimary=i===d.btns.length-1&&b!=='取消';const isDestructive=d.destructive&&i===0;return (
+            <div key={i} style={{flex:1,padding:'12px',fontSize:16,textAlign:'center',borderRadius:12,fontWeight:isPrimary?600:500,background:isPrimary?(dark?'#FFF':'#1A1A1A'):(isDestructive?'rgba(255,69,58,0.12)':chip),color:isPrimary?(dark?'#000':'#FFF'):(isDestructive?err:ts)}}>{b}</div>
+          )})}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const RENDERERS = { A: DialogA, B: DialogB, C: DialogC, D: DialogD, E: DialogE };
+
+function App() {
+  const [style, setStyle] = React.useState('A');
+  const Renderer = RENDERERS[style];
+  return (
+    <>
+      <h1>弹窗五版全量对比 — 11 弹窗 × 5 风格</h1>
+      <div className="intro">顶部切换风格，每个风格展示全部 11 个弹窗（浅深交替）。背景透出 app 内容模拟真实场景。</div>
+      <div className="switcher">
+        {Object.entries(STYLES).map(([k,v])=>(
+          <button key={k} className={style===k?'active':''} onClick={()=>setStyle(k)}>{v.name}</button>
+        ))}
+      </div>
+      <div style={{color:'#999',fontSize:13,marginBottom:20}}>{STYLES[style].desc}</div>
+      <div className="grid">
+        {DIALOGS.map(d=>(
+          <div key={d.id} className="cell">
+            <div className="cell-label">{d.id} · {d.label}{d.dark?' (深)':' (浅)'}</div>
+            <Renderer d={d} dark={d.dark} />
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

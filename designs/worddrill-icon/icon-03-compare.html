@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 双卡 Icon — 样式对比</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
+  background: #0a0a0a; color: #fff; padding: 60px 40px;
+  -webkit-font-smoothing: antialiased;
+}
+h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+.intro { color: #888; font-size: 13px; margin-bottom: 40px; }
+.compare { display: flex; gap: 60px; flex-wrap: wrap; }
+.variant { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.variant-label { font-size: 16px; font-weight: 600; color: #ccc; }
+.variant-desc { font-size: 12px; color: #777; text-align: center; max-width: 240px; line-height: 1.6; }
+
+.icon-row { display: flex; gap: 12px; align-items: center; }
+.icon-box {
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 22px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.size-120 { width: 120px; height: 120px; }
+.size-87 { width: 87px; height: 87px; border-radius: 19px; }
+.size-60 { width: 60px; height: 60px; border-radius: 13px; }
+.light { background: #FAFAFA; }
+.dark { background: #000; border: 1px solid #1a1a1a; }
+
+.section-title { font-size: 12px; color: #666; margin-top: 8px; letter-spacing: 0.5px; }
+</style>
+</head>
+<body>
+
+<h1>03 双卡 Icon — 样式对比</h1>
+<p class="intro">同一种构图（双卡交叠），区别是卡片填色方式。看哪种更像苹果原生 App icon。</p>
+
+<div class="compare">
+
+  <!-- 方案 A: 双线轮廓 -->
+  <div class="variant">
+    <div class="variant-label">A · 双线轮廓</div>
+    <div class="icon-row">
+      <div class="icon-box size-120 light"><svg width="72" height="72" viewBox="0 0 80 80"><rect x="14" y="22" width="37" height="50" rx="6" fill="none" stroke="#1A1A1A" stroke-width="5"/><rect x="29" y="14" width="37" height="50" rx="6" fill="none" stroke="#1A1A1A" stroke-width="5"/></svg></div>
+      <div class="icon-box size-120 dark"><svg width="72" height="72" viewBox="0 0 80 80"><rect x="14" y="22" width="37" height="50" rx="6" fill="none" stroke="#FFF" stroke-width="5"/><rect x="29" y="14" width="37" height="50" rx="6" fill="none" stroke="#FFF" stroke-width="5"/></svg></div>
+    </div>
+    <div class="section-title">小尺寸</div>
+    <div class="icon-row">
+      <div class="icon-box size-87 light"><svg width="52" height="52" viewBox="0 0 80 80"><rect x="14" y="22" width="37" height="50" rx="6" fill="none" stroke="#1A1A1A" stroke-width="5"/><rect x="29" y="14" width="37" height="50" rx="6" fill="none" stroke="#1A1A1A" stroke-width="5"/></svg></div>
+      <div class="icon-box size-60 light"><svg width="36" height="36" viewBox="0 0 80 80"><rect x="14" y="22" width="37" height="50" rx="6" fill="none" stroke="#1A1A1A" stroke-width="5"/><rect x="29" y="14" width="37" height="50" rx="6" fill="none" stroke="#1A1A1A" stroke-width="5"/></svg></div>
+    </div>
+    <div class="variant-desc">两张卡片都是空心轮廓。最简约，和启动动画的线条飞入完全一致。纯粹几何感。</div>
+  </div>
+
+  <!-- 方案 B: 前实心后轮廓 -->
+  <div class="variant">
+    <div class="variant-label">B · 前实心后轮廓</div>
+    <div class="icon-row">
+      <div class="icon-box size-120 light"><svg width="72" height="72" viewBox="0 0 80 80"><rect x="14" y="22" width="37" height="50" rx="6" fill="none" stroke="#1A1A1A" stroke-width="5"/><rect x="29" y="14" width="37" height="50" rx="6" fill="#1A1A1A"/><line x1="38" y1="28" x2="58" y2="28" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/><line x1="38" y1="38" x2="52" y2="38" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/><line x1="38" y1="48" x2="55" y2="48" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/></svg></div>
+      <div class="icon-box size-120 dark"><svg width="72" height="72" viewBox="0 0 80 80"><rect x="14" y="22" width="37" height="50" rx="6" fill="none" stroke="#FFF" stroke-width="5"/><rect x="29" y="14" width="37" height="50" rx="6" fill="#FFF"/><line x1="38" y1="28" x2="58" y2="28" stroke="#000" stroke-width="4" stroke-linecap="round"/><line x1="38" y1="38" x2="52" y2="38" stroke="#000" stroke-width="4" stroke-linecap="round"/><line x1="38" y1="48" x2="55" y2="48" stroke="#000" stroke-width="4" stroke-linecap="round"/></svg></div>
+    </div>
+    <div class="section-title">小尺寸</div>
+    <div class="icon-row">
+      <div class="icon-box size-87 light"><svg width="52" height="52" viewBox="0 0 80 80"><rect x="14" y="22" width="37" height="50" rx="6" fill="none" stroke="#1A1A1A" stroke-width="5"/><rect x="29" y="14" width="37" height="50" rx="6" fill="#1A1A1A"/><line x1="38" y1="28" x2="58" y2="28" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/><line x1="38" y1="38" x2="52" y2="38" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/><line x1="38" y1="48" x2="55" y2="48" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/></svg></div>
+      <div class="icon-box size-60 light"><svg width="36" height="36" viewBox="0 0 80 80"><rect x="14" y="22" width="37" height="50" rx="6" fill="none" stroke="#1A1A1A" stroke-width="5"/><rect x="29" y="14" width="37" height="50" rx="6" fill="#1A1A1A"/><line x1="38" y1="28" x2="58" y2="28" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/><line x1="38" y1="38" x2="52" y2="38" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/><line x1="38" y1="48" x2="55" y2="48" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/></svg></div>
+    </div>
+    <div class="variant-desc">前卡实心 + 三条文字线，后卡轮廓。有层次和内容暗示，辨识度更高。</div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WordDrill Icon — 10 个方案</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
+  background: #1a1a1a; color: #fff; padding: 50px 40px;
+  -webkit-font-smoothing: antialiased;
+}
+h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
+.intro { color: #888; font-size: 13px; margin-bottom: 40px; max-width: 700px; line-height: 1.7; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 32px;
+  max-width: 1100px;
+}
+.cell { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.cell-num { font-size: 11px; font-weight: 600; color: #666; letter-spacing: 1px; }
+.cell-desc { font-size: 11px; color: #888; text-align: center; max-width: 160px; line-height: 1.5; }
+
+.icon-row { display: flex; gap: 8px; align-items: center; }
+.icon {
+  width: 100px; height: 100px;
+  border-radius: 22px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+}
+.icon-sm {
+  width: 48px; height: 48px;
+  border-radius: 11px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.light { background: #FAFAFA; }
+.dark { background: #000; }
+</style>
+</head>
+<body>
+
+<h1>WordDrill Icon — 10 个方案</h1>
+<p class="intro">
+  每个方案三个尺寸：浅色大图（100px）+ 深色大图（100px）+ 浅色小图（48px 模拟主屏）。
+  全部纯黑白，Apple Design 简约原则。点你喜欢的编号。
+</p>
+
+<div class="grid">
+
+  <!-- 1: W 粗笔（之前的 A 优化版，更紧凑） -->
+  <div class="cell">
+    <div class="cell-num">01</div>
+    <div class="icon-row">
+      <div class="icon light"><svg width="60" height="60" viewBox="0 0 100 100"><path d="M15 25 L30 75 L50 40 L70 75 L85 25" fill="none" stroke="#1A1A1A" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="icon dark"><svg width="60" height="60" viewBox="0 0 100 100"><path d="M15 25 L30 75 L50 40 L70 75 L85 25" fill="none" stroke="#FFF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+    <div class="icon-row"><div class="icon-sm light"><svg width="28" height="28" viewBox="0 0 100 100"><path d="M15 25 L30 75 L50 40 L70 75 L85 25" fill="none" stroke="#1A1A1A" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+    <div class="cell-desc">W 粗笔圆角。经典字母标记。</div>
+  </div>
+
+  <!-- 2: W 极简细笔 -->
+  <div class="cell">
+    <div class="cell-num">02</div>
+    <div class="icon-row">
+      <div class="icon light"><svg width="60" height="60" viewBox="0 0 100 100"><path d="M18 28 L32 72 L50 42 L68 72 L82 28" fill="none" stroke="#1A1A1A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="icon dark"><svg width="60" height="60" viewBox="0 0 100 100"><path d="M18 28 L32 72 L50 42 L68 72 L82 28" fill="none" stroke="#FFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+    <div class="icon-row"><div class="icon-sm light"><svg width="28" height="28" viewBox="0 0 100 100"><path d="M18 28 L32 72 L50 42 L68 72 L82 28" fill="none" stroke="#1A1A1A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+    <div class="cell-desc">W 细笔。更优雅轻盈。</div>
+  </div>
+
+  <!-- 3: 双卡交叠（之前的 B） -->
+  <div class="cell">
+    <div class="cell-num">03</div>
+    <div class="icon-row">
+      <div class="icon light"><svg width="60" height="60" viewBox="0 0 100 100"><rect x="18" y="28" width="46" height="62" rx="8" fill="none" stroke="#1A1A1A" stroke-width="6"/><rect x="36" y="18" width="46" height="62" rx="8" fill="#1A1A1A"/><line x1="46" y1="36" x2="72" y2="36" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/><line x1="46" y1="48" x2="64" y2="48" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/></svg></div>
+      <div class="icon dark"><svg width="60" height="60" viewBox="0 0 100 100"><rect x="18" y="28" width="46" height="62" rx="8" fill="none" stroke="#FFF" stroke-width="6"/><rect x="36" y="18" width="46" height="62" rx="8" fill="#FFF"/><line x1="46" y1="36" x2="72" y2="36" stroke="#000" stroke-width="4" stroke-linecap="round"/><line x1="46" y1="48" x2="64" y2="48" stroke="#000" stroke-width="4" stroke-linecap="round"/></svg></div>
+    </div>
+    <div class="icon-row"><div class="icon-sm light"><svg width="28" height="28" viewBox="0 0 100 100"><rect x="18" y="28" width="46" height="62" rx="8" fill="none" stroke="#1A1A1A" stroke-width="6"/><rect x="36" y="18" width="46" height="62" rx="8" fill="#1A1A1A"/><line x1="46" y1="36" x2="72" y2="36" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/><line x1="46" y1="48" x2="64" y2="48" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/></svg></div></div>
+    <div class="cell-desc">双卡交叠。闪卡概念。</div>
+  </div>
+
+  <!-- 4: 单卡 + 文字行 -->
+  <div class="cell">
+    <div class="cell-num">04</div>
+    <div class="icon-row">
+      <div class="icon light"><svg width="60" height="60" viewBox="0 0 100 100"><rect x="22" y="18" width="56" height="64" rx="10" fill="#1A1A1A"/><line x1="32" y1="36" x2="68" y2="36" stroke="#FAFAFA" stroke-width="5" stroke-linecap="round"/><line x1="32" y1="50" x2="58" y2="50" stroke="#FAFAFA" stroke-width="5" stroke-linecap="round"/><line x1="32" y1="64" x2="64" y2="64" stroke="#FAFAFA" stroke-width="5" stroke-linecap="round"/></svg></div>
+      <div class="icon dark"><svg width="60" height="60" viewBox="0 0 100 100"><rect x="22" y="18" width="56" height="64" rx="10" fill="#FFF"/><line x1="32" y1="36" x2="68" y2="36" stroke="#000" stroke-width="5" stroke-linecap="round"/><line x1="32" y1="50" x2="58" y2="50" stroke="#000" stroke-width="5" stroke-linecap="round"/><line x1="32" y1="64" x2="64" y2="64" stroke="#000" stroke-width="5" stroke-linecap="round"/></svg></div>
+    </div>
+    <div class="icon-row"><div class="icon-sm light"><svg width="28" height="28" viewBox="0 0 100 100"><rect x="22" y="18" width="56" height="64" rx="10" fill="#1A1A1A"/><line x1="32" y1="36" x2="68" y2="36" stroke="#FAFAFA" stroke-width="5" stroke-linecap="round"/><line x1="32" y1="50" x2="58" y2="50" stroke="#FAFAFA" stroke-width="5" stroke-linecap="round"/><line x1="32" y1="64" x2="64" y2="64" stroke="#FAFAFA" stroke-width="5" stroke-linecap="round"/></svg></div></div>
+    <div class="cell-desc">单张实心卡 + 三行文字。简洁有力。</div>
+  </div>
+
+  <!-- 5: 滑动横线 + 箭头（之前的 C） -->
+  <div class="cell">
+    <div class="cell-num">05</div>
+    <div class="icon-row">
+      <div class="icon light"><svg width="60" height="60" viewBox="0 0 100 100"><line x1="20" y1="30" x2="72" y2="30" stroke="#1A1A1A" stroke-width="8" stroke-linecap="round"/><line x1="28" y1="50" x2="80" y2="50" stroke="#1A1A1A" stroke-width="8" stroke-linecap="round"/><line x1="24" y1="70" x2="60" y2="70" stroke="#1A1A1A" stroke-width="8" stroke-linecap="round"/><path d="M76 78 L84 86 L76 94" fill="none" stroke="#1A1A1A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="icon dark"><svg width="60" height="60" viewBox="0 0 100 100"><line x1="20" y1="30" x2="72" y2="30" stroke="#FFF" stroke-width="8" stroke-linecap="round"/><line x1="28" y1="50" x2="80" y2="50" stroke="#FFF" stroke-width="8" stroke-linecap="round"/><line x1="24" y1="70" x2="60" y2="70" stroke="#FFF" stroke-width="8" stroke-linecap="round"/><path d="M76 78 L84 86 L76 94" fill="none" stroke="#FFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+    <div class="icon-row"><div class="icon-sm light"><svg width="28" height="28" viewBox="0 0 100 100"><line x1="20" y1="30" x2="72" y2="30" stroke="#1A1A1A" stroke-width="8" stroke-linecap="round"/><line x1="28" y1="50" x2="80" y2="50" stroke="#1A1A1A" stroke-width="8" stroke-linecap="round"/><line x1="24" y1="70" x2="60" y2="70" stroke="#1A1A1A" stroke-width="8" stroke-linecap="round"/><path d="M76 78 L84 86 L76 94" fill="none" stroke="#1A1A1A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+    <div class="cell-desc">横线 + 箭头。刷词浏览。</div>
+  </div>
+
+  <!-- 6: W 嵌入卡片 -->
+  <div class="cell">
+    <div class="cell-num">06</div>
+    <div class="icon-row">
+      <div class="icon light"><svg width="60" height="60" viewBox="0 0 100 100"><rect x="18" y="18" width="64" height="64" rx="12" fill="none" stroke="#1A1A1A" stroke-width="6"/><path d="M32 38 L42 62 L50 48 L58 62 L68 38" fill="none" stroke="#1A1A1A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="icon dark"><svg width="60" height="60" viewBox="0 0 100 100"><rect x="18" y="18" width="64" height="64" rx="12" fill="none" stroke="#FFF" stroke-width="6"/><path d="M32 38 L42 62 L50 48 L58 62 L68 38" fill="none" stroke="#FFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+    <div class="icon-row"><div class="icon-sm light"><svg width="28" height="28" viewBox="0 0 100 100"><rect x="18" y="18" width="64" height="64" rx="12" fill="none" stroke="#1A1A1A" stroke-width="6"/><path d="M32 38 L42 62 L50 48 L58 62 L68 38" fill="none" stroke="#1A1A1A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+    <div class="cell-desc">卡片轮廓 + W。字母与闪卡结合。</div>
+  </div>
+
+  <!-- 7: 对话气泡（单词/释义对话感） -->
+  <div class="cell">
+    <div="cell-num">07</div>
+    <div class="icon-row">
+      <div class="icon light"><svg width="60" height="60" viewBox="0 0 100 100"><path d="M20 25 Q20 18 28 18 L72 18 Q80 18 80 25 L80 55 Q80 62 72 62 L45 62 L35 72 L37 62 L28 62 Q20 62 20 55 Z" fill="#1A1A1A"/><line x1="32" y1="32" x2="68" y2="32" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/><line x1="32" y1="46" x2="56" y2="46" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/></svg></div>
+      <div class="icon dark"><svg width="60" height="60" viewBox="0 0 100 100"><path d="M20 25 Q20 18 28 18 L72 18 Q80 18 80 25 L80 55 Q80 62 72 62 L45 62 L35 72 L37 62 L28 62 Q20 62 20 55 Z" fill="#FFF"/><line x1="32" y1="32" x2="68" y2="32" stroke="#000" stroke-width="4" stroke-linecap="round"/><line x1="32" y1="46" x2="56" y2="46" stroke="#000" stroke-width="4" stroke-linecap="round"/></svg></div>
+    </div>
+    <div class="icon-row"><div class="icon-sm light"><svg width="28" height="28" viewBox="0 0 100 100"><path d="M20 25 Q20 18 28 18 L72 18 Q80 18 80 25 L80 55 Q80 62 72 62 L45 62 L35 72 L37 62 L28 62 Q20 62 20 55 Z" fill="#1A1A1A"/><line x1="32" y1="32" x2="68" y2="32" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/><line x1="32" y1="46" x2="56" y2="46" stroke="#FAFAFA" stroke-width="4" stroke-linecap="round"/></svg></div></div>
+    <div class="cell-desc">对话气泡 + 文字行。语言学习感。</div>
+  </div>
+
+  <!-- 8: 书本翻开（词书概念） -->
+  <div class="cell">
+    <div class="cell-num">08</div>
+    <div class="icon-row">
+      <div class="icon light"><svg width="60" height="60" viewBox="0 0 100 100"><path d="M50 28 Q38 22 22 24 L22 72 Q38 70 50 76 Z" fill="#1A1A1A"/><path d="M50 28 Q62 22 78 24 L78 72 Q62 70 50 76 Z" fill="none" stroke="#1A1A1A" stroke-width="5" stroke-linejoin="round"/></svg></div>
+      <div class="icon dark"><svg width="60" height="60" viewBox="0 0 100 100"><path d="M50 28 Q38 22 22 24 L22 72 Q38 70 50 76 Z" fill="#FFF"/><path d="M50 28 Q62 22 78 24 L78 72 Q62 70 50 76 Z" fill="none" stroke="#FFF" stroke-width="5" stroke-linejoin="round"/></svg></div>
+    </div>
+    <div class="icon-row"><div class="icon-sm light"><svg width="28" height="28" viewBox="0 0 100 100"><path d="M50 28 Q38 22 22 24 L22 72 Q38 70 50 76 Z" fill="#1A1A1A"/><path d="M50 28 Q62 22 78 24 L78 72 Q62 70 50 76 Z" fill="none" stroke="#1A1A1A" stroke-width="5" stroke-linejoin="round"/></svg></div></div>
+    <div class="cell-desc">翻开的书。左页实心右页轮廓。词书概念。</div>
+  </div>
+
+  <!-- 9: W 实心块（字母做负空间） -->
+  <div class="cell">
+    <div class="cell-num">09</div>
+    <div class="icon-row">
+      <div class="icon light"><svg width="60" height="60" viewBox="0 0 100 100"><rect x="15" y="15" width="70" height="70" rx="14" fill="#1A1A1A"/><path d="M28 32 L38 68 L50 48 L62 68 L72 32" fill="none" stroke="#FAFAFA" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="icon dark"><svg width="60" height="60" viewBox="0 0 100 100"><rect x="15" y="15" width="70" height="70" rx="14" fill="#FFF"/><path d="M28 32 L38 68 L50 48 L62 68 L72 32" fill="none" stroke="#000" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+    <div class="icon-row"><div class="icon-sm light"><svg width="28" height="28" viewBox="0 0 100 100"><rect x="15" y="15" width="70" height="70" rx="14" fill="#1A1A1A"/><path d="M28 32 L38 68 L50 48 L62 68 L72 32" fill="none" stroke="#FAFAFA" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+    <div class="cell-desc">实心块 + W 负空间。强烈视觉冲击。</div>
+  </div>
+
+  <!-- 10: 极简圆点矩阵（Aa 抽象） -->
+  <div class="cell">
+    <div class="cell-num">10</div>
+    <div class="icon-row">
+      <div class="icon light"><svg width="60" height="60" viewBox="0 0 100 100"><circle cx="30" cy="30" r="8" fill="#1A1A1A"/><circle cx="50" cy="30" r="8" fill="#1A1A1A"/><circle cx="70" cy="30" r="8" fill="#1A1A1A"/><circle cx="30" cy="50" r="8" fill="#1A1A1A"/><circle cx="50" cy="50" r="8" fill="#1A1A1A"/><circle cx="70" cy="50" r="8" fill="#1A1A1A"/><circle cx="30" cy="70" r="8" fill="none" stroke="#1A1A1A" stroke-width="5"/><circle cx="50" cy="70" r="8" fill="none" stroke="#1A1A1A" stroke-width="5"/><circle cx="70" cy="70" r="8" fill="none" stroke="#1A1A1A" stroke-width="5"/></svg></div>
+      <div class="icon dark"><svg width="60" height="60" viewBox="0 0 100 100"><circle cx="30" cy="30" r="8" fill="#FFF"/><circle cx="50" cy="30" r="8" fill="#FFF"/><circle cx="70" cy="30" r="8" fill="#FFF"/><circle cx="30" cy="50" r="8" fill="#FFF"/><circle cx="50" cy="50" r="8" fill="#FFF"/><circle cx="70" cy="50" r="8" fill="#FFF"/><circle cx="30" cy="70" r="8" fill="none" stroke="#FFF" stroke-width="5"/><circle cx="50" cy="70" r="8" fill="none" stroke="#FFF" stroke-width="5"/><circle cx="70" cy="70" r="8" fill="none" stroke="#FFF" stroke-width="5"/></svg></div>
+    </div>
+    <div class="icon-row"><div class="icon-sm light"><svg width="28" height="28" viewBox="0 0 100 100"><circle cx="30" cy="30" r="8" fill="#1A1A1A"/><circle cx="50" cy="30" r="8" fill="#1A1A1A"/><circle cx="70" cy="30" r="8" fill="#1A1A1A"/><circle cx="30" cy="50" r="8" fill="#1A1A1A"/><circle cx="50" cy="50" r="8" fill="#1A1A1A"/><circle cx="70" cy="50" r="8" fill="#1A1A1A"/><circle cx="30" cy="70" r="8" fill="none" stroke="#1A1A1A" stroke-width="5"/><circle cx="50" cy="70" r="8" fill="none" stroke="#1A1A1A" stroke-width="5"/><circle cx="70" cy="70" r="8" fill="none" stroke="#1A1A1A" stroke-width="5"/></svg></div></div>
+    <div class="cell-desc">圆点矩阵，上实下空。抽象"已学/未学"。</div>
+  </div>
+
+</div>
+
+</body>
+</html>
