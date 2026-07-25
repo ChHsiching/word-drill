@@ -75,10 +75,6 @@ WordDrill 是一个靠**不断滑动浏览**做被动重复记忆的闪卡 App�
 
 需要 JDK 17+。
 
-## 开发流程
-
-本项目使用 issue tracker 驱动开发（见 `docs/agents/`）。每个功能从规格（Issue #1）拆分为 ticket，TDD 实现，code-review 后合并到 main。
-
 ## License
 
 [MIT](LICENSE) © 2026 ChHsiching
