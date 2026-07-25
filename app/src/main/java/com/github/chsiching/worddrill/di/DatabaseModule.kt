@@ -36,10 +36,12 @@ object DatabaseModule {
             // - v1→v2 (Ticket #14)：word 表加 phonetic 列
             // - v2→v3 (Ticket #19)：新增 dictionary 表（只读 ECDICT 词典）
             // - v3→v4 (Ticket #20)：book_word 表加 skipped 列（跳过标记，词书级独立）
+            // - v4→v5 (Ticket #22)：book_word 表加 deleted 列（软删除标记，词书级独立，进回收站）
             .addMigrations(
                 WordDrillDatabase.MIGRATION_1_2,
                 WordDrillDatabase.MIGRATION_2_3,
                 WordDrillDatabase.MIGRATION_3_4,
+                WordDrillDatabase.MIGRATION_4_5,
             )
             .build()
 

@@ -18,9 +18,9 @@
     <string name="library_name_hint">词书名称</string>
     <string name="library_cancel">取消</string>
     <string name="library_confirm">确定</string>
-    <!-- Ticket #18：删除词书二次确认 -->
+    <!-- Ticket #18：删除词书二次确认（Ticket #22 起改为软删，可从回收站恢复） -->
     <string name="library_delete_title">删除词书</string>
-    <string name="library_delete_message">确定删除「%1$s」？此操作不可撤销。</string>
+    <string name="library_delete_message">确定删除「%1$s」？可从回收站恢复。</string>
     <string name="library_delete_confirm">删除</string>
     <!-- 「库」Tab 词书内词条列表（Ticket #7）-->
     <string name="word_list_add">新增词条</string>
@@ -30,6 +30,24 @@
     <string name="word_list_pos_hint">词性</string>
     <string name="word_list_meaning_hint">释义</string>
     <string name="word_list_preset_readonly">预置词书不可编辑</string>
+    <!-- Ticket #22：删除词条二次确认（软删进回收站，可恢复） -->
+    <string name="word_list_delete">删除</string>
+    <string name="word_list_delete_title">删除词条</string>
+    <string name="word_list_delete_message">确定删除「%1$s」？可从回收站恢复。</string>
+    <string name="word_list_delete_confirm">删除</string>
+    <!-- Ticket #22：回收站 -->
+    <string name="recycle_bin_title">回收站</string>
+    <string name="recycle_bin_section_books">词书</string>
+    <string name="recycle_bin_section_entries">词条</string>
+    <string name="recycle_bin_book_subtitle">词书：%1$s</string>
+    <string name="recycle_bin_entry">%1$s（从 %2$s 移除）</string>
+    <string name="recycle_bin_restore">恢复</string>
+    <string name="recycle_bin_purge">永久删除</string>
+    <string name="recycle_bin_purge_title">永久删除</string>
+    <string name="recycle_bin_purge_message">永久删除「%1$s」？此操作不可撤销。</string>
+    <string name="recycle_bin_purge_confirm">永久删除</string>
+    <string name="recycle_bin_empty">回收站为空</string>
+    <string name="me_setting_recycle_bin">回收站</string>
     <!-- 输入校验错误文案（Ticket #12：不硬编码到 Kotlin，走 R.string）-->
     <string name="validation_word_empty">单词不能为空</string>
     <string name="validation_pos_empty">词性不能为空</string>

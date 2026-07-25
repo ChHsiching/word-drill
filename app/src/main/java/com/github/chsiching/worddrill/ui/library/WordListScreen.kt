@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -118,7 +119,12 @@ fun WordListScreen(
                                 meaning = sense.meaning,
                             )
                         },
-                        onRemoveWord = { viewModel.removeWordFromBook(wordWithSenses.word.wordId) },
+                        onDeleteWord = {
+                            viewModel.openDeleteDialog(
+                                wordId = wordWithSenses.word.wordId,
+                                wordText = wordWithSenses.word.text,
+                            )
+                        },
                     )
                 }
             }
@@ -142,6 +148,11 @@ fun WordListScreen(
             onConfirm = viewModel::submitEdit,
             onDismiss = viewModel::dismissDialog,
         )
+        is WordListDialog.Delete -> DeleteWordDialog(
+            wordText = dialog.wordText,
+            onConfirm = viewModel::submitDelete,
+            onDismiss = viewModel::dismissDialog,
+        )
     }
 }
 
@@ -150,7 +161,7 @@ private fun WordRow(
     wordWithSenses: WordWithSenses,
     readOnly: Boolean,
     onEditSense: (com.github.chsiching.worddrill.data.local.entity.Sense) -> Unit,
-    onRemoveWord: () -> Unit,
+    onDeleteWord: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -185,10 +196,10 @@ private fun WordRow(
                 }
             }
             if (!readOnly) {
-                IconButton(onClick = onRemoveWord, modifier = Modifier.size(32.dp)) {
+                IconButton(onClick = onDeleteWord, modifier = Modifier.size(32.dp)) {
                     Icon(
                         imageVector = Icons.Outlined.Delete,
-                        contentDescription = stringResource(R.string.word_list_remove),
+                        contentDescription = stringResource(R.string.word_list_delete),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -333,6 +344,36 @@ private fun EditSenseDialog(
             TextButton(onClick = onConfirm, enabled = state.error == null && state.pos.isNotBlank()) {
                 Text(stringResource(R.string.library_confirm))
             }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_cancel)) }
+        },
+    )
+}
+
+/**
+ * 删除词条二次确认对话框（Ticket #22）。
+ * 与 [com.github.chsiching.worddrill.ui.library.LibraryScreen] 的 DeleteBookDialog 同模式：
+ * 取消是安全选项（默认）；删除用 error 色提示破坏性。
+ * 语义：软删（deleted=1，进回收站，可恢复），文案明确告知「可从回收站恢复」。
+ */
+@Composable
+private fun DeleteWordDialog(
+    wordText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.word_list_delete_title)) },
+        text = { Text(stringResource(R.string.word_list_delete_message, wordText)) },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
+            ) { Text(stringResource(R.string.word_list_delete_confirm)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_cancel)) }

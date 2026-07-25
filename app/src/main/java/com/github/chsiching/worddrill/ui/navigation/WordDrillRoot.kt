@@ -64,11 +64,15 @@ import com.github.chsiching.worddrill.ui.library.LibraryScreen
 import com.github.chsiching.worddrill.ui.library.WordListScreen
 import com.github.chsiching.worddrill.ui.me.MeScreen
 import com.github.chsiching.worddrill.ui.me.SettingsViewModel
+import com.github.chsiching.worddrill.ui.recyclebin.RecycleBinScreen
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 import kotlin.math.roundToInt
 
 /** 「库」Tab 二级页路由（Ticket #7）：navigate("library/$bookId") 与 composable route 共用。 */
 private const val WORD_LIST_ROUTE = "library/{bookId}"
+
+/** 回收站页面路由（Ticket #22）：从「我的」Tab 通用组进入。 */
+private const val RECYCLE_BIN_ROUTE = "recycle_bin"
 
 /**
  * 应用根 Composable（Ticket #16 重写）：自定义底部导航 + NavHost。
@@ -143,7 +147,12 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
             ) {
                 WordListScreen(onBack = { navController.popBackStack() })
             }
-            composable(TopDestination.Me.route) { MeScreen() }
+            composable(TopDestination.Me.route) {
+                MeScreen(onNavigateToRecycleBin = { navController.navigate(RECYCLE_BIN_ROUTE) })
+            }
+            composable(RECYCLE_BIN_ROUTE) {
+                RecycleBinScreen(onBack = { navController.popBackStack() })
+            }
         }
 
         // 导航栏浮在内容上方

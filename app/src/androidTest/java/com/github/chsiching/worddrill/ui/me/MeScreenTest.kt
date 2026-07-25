@@ -118,6 +118,7 @@ class MeScreenTest {
             WordDrillTheme {
                 Surface {
                     MeScreen(
+                        onNavigateToRecycleBin = {},
                         viewModel = viewModel,
                         settingsViewModel = settingsViewModel,
                         exportImportViewModel = exportImportViewModel,

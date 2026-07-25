@@ -3,6 +3,7 @@ package com.github.chsiching.worddrill.ui.library
 import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -203,29 +204,52 @@ class WordListScreenTest {
     }
 
     @Test
-    fun removeWord_disappearsFromList_butStaysInGlobalPool() {
+    fun deleteWord_opensConfirmDialog_thenSoftDeletesOnConfirm() {
         setContentFor(customBookId)
-        // 点「从词书移除」（IconButton contentDescription）
-        composeRule.onNodeWithContentDescription("从词书移除").performClick()
+        // 点「删除」（IconButton contentDescription）→ 先弹二次确认对话框
+        composeRule.onNodeWithContentDescription("删除").performClick()
+        composeRule.waitForIdle()
+        // 确认对话框展示（标题 + 词名 + 删除按钮）
+        composeRule.onNodeWithText("删除词条").assertIsDisplayed()
+        composeRule.onNodeWithText("确定删除「apple」？可从回收站恢复。").assertIsDisplayed()
+
+        // 点对话框里的「删除」确认按钮（确认按钮文案与标题同为「删除」，用精确匹配点确认按钮）
+        composeRule.onAllNodes(androidx.compose.ui.test.hasText("删除", substring = false)).onFirst().performClick()
         composeRule.waitForIdle()
 
         // 列表里 apple 应消失（UI 刷新验证）
         composeRule.onNodeWithText("apple").assertDoesNotExist()
-        // 但全局 word 表里 apple 仍在（只断 book_word 关联，不删全局词）
+        // 但全局 word 表里 apple 仍在（软删只标 deleted=1，不删全局词）
         val stillThere = runBlocking { db.wordDao().getByText("apple") != null }
         assertThat(stillThere).isTrue()
-        // book_word 关联应清空
-        val count = runBlocking { db.bookDao().countWordsInBook(customBookId) }
-        assertThat(count).isEqualTo(0)
+        // 关联行还在（软删 ≠ 真删），deleted 标记为 true
+        val deleted = runBlocking { db.bookDao().getDeleted(customBookId, 1L) }
+        assertThat(deleted).isTrue()
+    }
+
+    @Test
+    fun deleteWord_cancelDoesNotSoftDelete() {
+        setContentFor(customBookId)
+        composeRule.onNodeWithContentDescription("删除").performClick()
+        composeRule.waitForIdle()
+        // 取消是安全选项
+        composeRule.onNodeWithText("取消").performClick()
+        composeRule.waitForIdle()
+
+        // 列表里 apple 应还在
+        composeRule.onNodeWithText("apple").assertIsDisplayed()
+        // 关联行未被软删
+        val deleted = runBlocking { db.bookDao().getDeleted(customBookId, 1L) }
+        assertThat(deleted).isFalse()
     }
 
     @Test
     fun presetBook_isReadOnly_noAddEditRemoveEntries() {
         setContentFor(presetBookId)
-        // 预置词书验收：增/改/移三个入口都不渲染（规格："预置词书的词条不可增删改"）
+        // 预置词书验收：增/改/删三个入口都不渲染（规格："预置词书的词条不可增删改"）
         composeRule.onNodeWithContentDescription("新增词条").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("编辑释义").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("从词书移除").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("删除").assertDoesNotExist()
         // 顶部展示预置词书名
         composeRule.onNodeWithText("CET-4").assertIsDisplayed()
     }

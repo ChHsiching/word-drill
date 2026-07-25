@@ -24,7 +24,7 @@ import com.github.chsiching.worddrill.data.local.entity.Word
         SwipeLog::class,
         DictionaryEntry::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class WordDrillDatabase : RoomDatabase() {
@@ -91,6 +91,33 @@ abstract class WordDrillDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "ALTER TABLE book_word ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
+        /**
+         * Ticket #22：v4 → v5 给 book_word 和 book 表加 deleted 列（软删除标记）。
+         *
+         * - book_word.deleted：词书级独立（每条 (bookId, wordId) 关联单独标记），
+         *   CET-4 删 apple 不影响 CET-6 同词关联。与 [MIGRATION_3_4]（加 skipped）同模式。
+         * - book.deleted：整本词书的软删标记。删除自定义词书 = deleted=1（隐藏 + 进回收站），
+         *   恢复 = deleted=0。与 [BookWord.deleted] 平行但粒度不同。
+         *
+         * 与 [MIGRATION_3_4]（加 skipped）完全同模式：ALTER TABLE ADD COLUMN 在 SQLite
+         * 上保留旧数据，新列默认 0（未删）。Room Boolean 映射 INTEGER（0/1），
+         * migration 显式写 INTEGER NOT NULL DEFAULT 0 与 Room codegen 的列定义一致
+         * （否则 schema 校验会抛 IllegalStateException）。
+         *
+         * 老数据全部 deleted=0（未删），行为不变。软删的词/词书进回收站，可恢复（deleted 改回 0）；
+         * 永久删除走真 DELETE（带 deleted=1 兜底）。
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE book_word ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "ALTER TABLE book ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"
                 )
             }
         }

@@ -51,6 +51,9 @@ object DatabaseJsonSerializer {
                     put("bookId", b.bookId)
                     put("name", b.name)
                     put("isPreset", b.isPreset)
+                    // Ticket #22：软删标记写入导出（true = 已软删，重导回保留回收站状态）。
+                    // 与 bookWord.skipped/deleted 同策略：字段齐全写，反序列化无须猜测缺省。
+                    put("deleted", b.deleted)
                 })
             }
         })
@@ -83,6 +86,9 @@ object DatabaseJsonSerializer {
                     // Ticket #20：跳过标记写入导出（true = 已跳过，重导回不丢跳过状态）。
                     // 默认 false 的行也写，保持字段齐全，反序列化无须猜测缺省。
                     put("skipped", bw.skipped)
+                    // Ticket #22：软删标记写入导出（true = 已软删，重导回保留回收站状态）。
+                    // 与 skipped 同策略：字段齐全写，反序列化无须猜测缺省。
+                    put("deleted", bw.deleted)
                 })
             }
         })
@@ -106,10 +112,12 @@ object DatabaseJsonSerializer {
         val nickname = root.optString("nickname").trim().ifEmpty { null }
 
         val books = root.getJSONArray("books").toList { b ->
+            // Ticket #22：deleted 可空，兼容 #22 之前的导出文件（缺省 → false，未软删）。
             Book(
                 bookId = b.getLong("bookId"),
                 name = b.getString("name"),
                 isPreset = b.getBoolean("isPreset"),
+                deleted = b.optBoolean("deleted", false),
             )
         }
         val words = root.getJSONArray("words").toList { w ->
@@ -133,10 +141,12 @@ object DatabaseJsonSerializer {
         }
         val bookWords = root.getJSONArray("bookWords").toList { bw ->
             // Ticket #20：skipped 可空，兼容 #20 之前的导出文件（缺省 → false，未跳过）。
+            // Ticket #22：deleted 可空，兼容 #22 之前的导出文件（缺省 → false，未软删）。
             BookWord(
                 bookId = bw.getLong("bookId"),
                 wordId = bw.getLong("wordId"),
                 skipped = bw.optBoolean("skipped", false),
+                deleted = bw.optBoolean("deleted", false),
             )
         }
         val swipeLogs = root.getJSONArray("swipeLogs").toList { l ->

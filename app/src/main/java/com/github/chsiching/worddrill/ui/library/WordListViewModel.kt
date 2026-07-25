@@ -42,6 +42,7 @@ private const val DEBOUNCE_MS = 300L
  * 「库」Tab 二级页：词书内词条列表的对话框状态。
  * - [Add]：新增词条（text + pos + meaning；#9 起输入 text 后自动查词典带出 pos+meaning）
  * - [Edit]：编辑某条义项（pos + meaning；wordText 只读展示）
+ * - [Delete]：删除词条二次确认（Ticket #22，软删进回收站，可恢复）
  */
 sealed interface WordListDialog {
     data object None : WordListDialog
@@ -60,6 +61,8 @@ sealed interface WordListDialog {
         val meaning: String = "",
         @StringRes val error: Int? = null,
     ) : WordListDialog
+    /** Ticket #22：删除词条二次确认（wordText 用于对话框文案）。 */
+    data class Delete(val wordId: Long, val wordText: String) : WordListDialog
 }
 
 /**
@@ -82,8 +85,9 @@ data class WordListUiState(
  * - **Ticket #9**：[onTextInput] 后 debounce 查 [DictionaryDao]，命中自动填 pos + meaning
  *   （autoFilled=true 标记，用户后续手动改仍可）。
  * - 编辑：[WordDao.updateSense]。
- * - 移除：[BookDao.unlinkBookWord]（只断关联，不删全局 word，避免影响其他词书）。
- * - 预置词书：UI 由 isPreset 决定是否渲染新增/编辑/移除按钮（DAO 层不拦，规格只要求 UI 不可操作）。
+ * - 删除（Ticket #22）：[BookDao.setDeleted] 软删 book_word.deleted=1（词书级，
+ *   只动当前词书的关联；CET-4 删 apple 不影响 CET-6 同词关联）。词进回收站，可恢复。
+ * - 预置词书：UI 由 isPreset 决定是否渲染新增/编辑/删除按钮（DAO 层不拦，规格只要求 UI 不可操作）。
  */
 @HiltViewModel
 class WordListViewModel @Inject constructor(
@@ -248,10 +252,20 @@ class WordListViewModel @Inject constructor(
         }
     }
 
-    // ---- 从词书移除词条（断关联，不删全局词）----
+    // ---- 从词书删除词条（Ticket #22：软删进回收站，可恢复）----
 
-    fun removeWordFromBook(wordId: Long) {
-        viewModelScope.launch { bookDao.unlinkBookWord(bookId, wordId) }
+    /** 打开删除确认对话框（wordText 用于对话框文案）。 */
+    fun openDeleteDialog(wordId: Long, wordText: String) {
+        _dialog.value = WordListDialog.Delete(wordId = wordId, wordText = wordText)
+    }
+
+    /** 确认删除：软删 book_word.deleted=1（词书级，只动当前词书的关联）。 */
+    fun submitDelete() {
+        val d = _dialog.value as? WordListDialog.Delete ?: return
+        viewModelScope.launch {
+            bookDao.setDeleted(bookId, d.wordId, deleted = true)
+            _dialog.value = WordListDialog.None
+        }
     }
 
     fun dismissDialog() {

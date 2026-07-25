@@ -93,9 +93,9 @@ class LibraryScreenTest {
         composeRule.onNodeWithText("删除").performClick()
         composeRule.waitForIdle()
 
-        // 对话框标题 + 含书名的不可撤销提示出现
+        // 对话框标题 + 含书名的可恢复提示出现（Ticket #22：软删，文案改为「可从回收站恢复」）
         composeRule.onNodeWithText("删除词书").assertIsDisplayed()
-        composeRule.onNodeWithText("确定删除「我的生词本」？此操作不可撤销。").assertIsDisplayed()
+        composeRule.onNodeWithText("确定删除「我的生词本」？可从回收站恢复。").assertIsDisplayed()
         // 取消按钮存在（对话框渲染证据）
         composeRule.onNodeWithText("取消").assertIsDisplayed()
     }
@@ -118,7 +118,7 @@ class LibraryScreenTest {
     }
 
     @Test
-    fun confirmDelete_removesBook_fromListAndDb() {
+    fun confirmDelete_softDeletesBook_fromListAndDb() {
         setContent()
         composeRule.onNodeWithText("删除").performClick()
         composeRule.waitForIdle()
@@ -130,13 +130,16 @@ class LibraryScreenTest {
         deleteNodes[1].performClick()
         composeRule.waitForIdle()
 
-        // 列表里词书消失
+        // 列表里词书消失（Ticket #22：软删 deleted=1，observeAllWithCounts 过滤掉）
         composeRule.onNodeWithText("我的生词本", substring = false).assertDoesNotExist()
-        // 落库也消失
+        // 可见列表（deleted=0）里也消失
         val gone = runBlocking {
             db.bookDao().observeAllWithCounts().first().none { it.bookId == customBookId }
         }
         assertThat(gone).isTrue()
+        // 软删 ≠ 真删：词书行还在，deleted 标记为 true（可从回收站恢复）
+        val softDeleted = runBlocking { db.bookDao().getById(customBookId)?.deleted }
+        assertThat(softDeleted).isTrue()
     }
 
     @Test

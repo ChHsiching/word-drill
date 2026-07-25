@@ -37,6 +37,7 @@ interface WordDao {
     /**
      * 按词书查词条（含每个词的义项列表）。
      * Ticket #20：过滤 `bw.skipped = 0` —— 跳过的词不进刷卡卡片列表。
+     * Ticket #22：过滤 `bw.deleted = 0` —— 软删的词不进刷卡卡片列表。
      * @Transaction 保证 @Relation 的两步查询在一个事务里，读到一致快照。
      */
     @Transaction
@@ -44,7 +45,7 @@ interface WordDao {
         """
         SELECT w.* FROM word w
         INNER JOIN book_word bw ON w.wordId = bw.wordId
-        WHERE bw.bookId = :bookId AND bw.skipped = 0
+        WHERE bw.bookId = :bookId AND bw.skipped = 0 AND bw.deleted = 0
         ORDER BY w.text
         """
     )
@@ -54,6 +55,7 @@ interface WordDao {
      * Ticket #7：按词书响应式查词条（含义项列表）。
      * 词书列表页订阅，增删改后自动重发。
      * Ticket #20：过滤 `bw.skipped = 0`，词条列表页只显示未跳过的词。
+     * Ticket #22：过滤 `bw.deleted = 0`，词条列表页只显示未软删的词。
      * @Transaction 保证 @Relation 两步查询读一致快照。
      */
     @Transaction
@@ -61,7 +63,7 @@ interface WordDao {
         """
         SELECT w.* FROM word w
         INNER JOIN book_word bw ON w.wordId = bw.wordId
-        WHERE bw.bookId = :bookId AND bw.skipped = 0
+        WHERE bw.bookId = :bookId AND bw.skipped = 0 AND bw.deleted = 0
         ORDER BY w.text
         """
     )

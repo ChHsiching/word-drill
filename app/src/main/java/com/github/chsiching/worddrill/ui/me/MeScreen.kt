@@ -74,6 +74,7 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun MeScreen(
+    onNavigateToRecycleBin: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: MeViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel(),
@@ -156,6 +157,11 @@ fun MeScreen(
             DataSection(
                 status = exportStatus,
                 viewModel = exportImportViewModel,
+            )
+            InGroupSeparator()
+            DataRow(
+                label = stringResource(R.string.me_setting_recycle_bin),
+                onClick = onNavigateToRecycleBin,
             )
             InGroupSeparator()
             AboutRow(onClick = { showAbout = true })

@@ -195,24 +195,8 @@ class WordDrillDatabaseTest {
         assertThat(bookDao.getById(id)!!.name).isEqualTo("CET-4")
     }
 
-    @Test
-    fun deleteCustom_removesNonPresetBook() = runTest {
-        val bookDao = db.bookDao()
-        val id = bookDao.insert(Book(name = "mybook", isPreset = false))
-        val deleted = bookDao.deleteCustom(id)
-        assertThat(deleted).isEqualTo(1)
-        assertThat(bookDao.getById(id)).isNull()
-    }
-
-    @Test
-    fun deleteCustom_refusesPresetBook() = runTest {
-        val bookDao = db.bookDao()
-        val id = bookDao.insert(Book(name = "CET-4", isPreset = true))
-        val deleted = bookDao.deleteCustom(id)
-        // WHERE isPreset = 0 不匹配，受影响行数为 0
-        assertThat(deleted).isEqualTo(0)
-        assertThat(bookDao.getById(id)).isNotNull()
-    }
+    // Ticket #22：deleteCustom 现为软删（deleted=1），完整覆盖见下方 #22 段的
+    // deleteCustom_softDeletesInsteadOfPhysicalDelete / deleteCustom_refusesPresetBook。
 
     // ---- 词书-词条 关联 ----
 
@@ -251,16 +235,22 @@ class WordDrillDatabaseTest {
     }
 
     @Test
-    fun deleteBook_cascadesDeleteBookWordLinks() = runTest {
+    fun softDeleteBook_preservesBookWordLinks() = runTest {
+        // Ticket #22：词书软删（deleteCustom）不真删行，也不动其下 book_word 关联。
+        // CASCADE 只在永久删除（purgeBook）时触发，见 purgeBook_physicallyDeletesAndCascades。
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1", isPreset = false))
         val w1 = wordDao.insert(Word(text = "a"))
         bookDao.linkBookWord(BookWord(bookId, w1))
         assertThat(bookDao.countWordsInBook(bookId)).isEqualTo(1)
-        bookDao.deleteCustom(bookId)
-        // 对已删除的原 bookId 断言：CASCADE 必须清掉指向它的 book_word 行
-        assertThat(bookDao.countWordsInBook(bookId)).isEqualTo(0)
+
+        bookDao.deleteCustom(bookId) // 软删
+
+        // 关联行仍在（软删词书不动 book_word），countWordsInBook 仍能查到
+        assertThat(bookDao.countWordsInBook(bookId)).isEqualTo(1)
+        // 但词书从可见列表消失（observeAllWithCounts 过滤 deleted=0）
+        assertThat(bookDao.observeAllWithCounts().first().none { it.bookId == bookId }).isTrue()
     }
 
     // ---- 按词书查词条（含 sense）----
@@ -584,5 +574,339 @@ class WordDrillDatabaseTest {
         assertThat(bookDao.getSkipped(bookId, wApple)).isFalse()
         // run 仍处于跳过态,不被波及
         assertThat(bookDao.getSkipped(bookId, wRun)).isTrue()
+    }
+
+    // ---- Ticket #22：软删除（book_word.deleted，词书级独立，进回收站）----
+
+    @Test
+    fun insertBookWord_defaultsNotDeleted() = runTest {
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        val w1 = wordDao.insert(Word(text = "apple"))
+        bookDao.linkBookWord(BookWord(bookId, w1))
+
+        assertThat(bookDao.getDeleted(bookId, w1)).isFalse()
+    }
+
+    @Test
+    fun setDeleted_marksOnlyThatBookWordLink() = runTest {
+        // 词书级独立：CET-4 删 apple 只标记 CET-4 的关联，不影响 CET-6
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val cet4 = bookDao.insert(Book(name = "CET-4", isPreset = true))
+        val cet6 = bookDao.insert(Book(name = "CET-6", isPreset = true))
+        val wApple = wordDao.insert(Word(text = "apple"))
+        bookDao.linkBookWord(BookWord(cet4, wApple))
+        bookDao.linkBookWord(BookWord(cet6, wApple))
+
+        bookDao.setDeleted(cet4, wApple, deleted = true)
+
+        // CET-4 的关联被标记软删，CET-6 的同词关联仍为未删
+        assertThat(bookDao.getDeleted(cet4, wApple)).isTrue()
+        assertThat(bookDao.getDeleted(cet6, wApple)).isFalse()
+    }
+
+    @Test
+    fun setDeleted_isReversible() = runTest {
+        // 软删可恢复：setDeleted(false) 置回 0，词回到词书列表
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        val w1 = wordDao.insert(Word(text = "apple"))
+        bookDao.linkBookWord(BookWord(bookId, w1))
+
+        bookDao.setDeleted(bookId, w1, deleted = true)
+        assertThat(bookDao.getDeleted(bookId, w1)).isTrue()
+        bookDao.setDeleted(bookId, w1, deleted = false)
+        assertThat(bookDao.getDeleted(bookId, w1)).isFalse()
+    }
+
+    @Test
+    fun getWordsWithSensesByBook_excludesDeleted() = runTest {
+        // 刷卡只显示 deleted=0 的词 —— 软删的词从卡片列表消失
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        val wApple = wordDao.insert(Word(text = "apple"))
+        val wRun = wordDao.insert(Word(text = "run"))
+        bookDao.linkBookWord(BookWord(bookId, wApple))
+        bookDao.linkBookWord(BookWord(bookId, wRun))
+        bookDao.setDeleted(bookId, wApple, deleted = true)
+
+        val words = wordDao.getWordsWithSensesByBook(bookId).map { it.word.text }
+        assertThat(words).containsExactly("run")
+    }
+
+    @Test
+    fun getWordsWithSensesByBook_includesAllAfterRestore() = runTest {
+        // 恢复后词重新进刷卡列表
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        val wApple = wordDao.insert(Word(text = "apple"))
+        val wRun = wordDao.insert(Word(text = "run"))
+        bookDao.linkBookWord(BookWord(bookId, wApple))
+        bookDao.linkBookWord(BookWord(bookId, wRun))
+
+        bookDao.setDeleted(bookId, wApple, deleted = true)
+        assertThat(wordDao.getWordsWithSensesByBook(bookId).map { it.word.text })
+            .containsExactly("run")
+
+        bookDao.setDeleted(bookId, wApple, deleted = false)
+        assertThat(wordDao.getWordsWithSensesByBook(bookId).map { it.word.text })
+            .containsExactly("apple", "run")
+    }
+
+    @Test
+    fun countWordsInBook_excludesDeleted() = runTest {
+        // 词书列表副标题词数只计未软删
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        val w1 = wordDao.insert(Word(text = "a"))
+        val w2 = wordDao.insert(Word(text = "b"))
+        val w3 = wordDao.insert(Word(text = "c"))
+        bookDao.linkBookWord(BookWord(bookId, w1))
+        bookDao.linkBookWord(BookWord(bookId, w2))
+        bookDao.linkBookWord(BookWord(bookId, w3))
+
+        assertThat(bookDao.countWordsInBook(bookId)).isEqualTo(3)
+        bookDao.setDeleted(bookId, w1, deleted = true)
+        bookDao.setDeleted(bookId, w2, deleted = true)
+        assertThat(bookDao.countWordsInBook(bookId)).isEqualTo(1)
+    }
+
+    @Test
+    fun observeAllWithCounts_excludesDeletedFromCount() = runTest {
+        // 词库列表副标题的「X 词」只计未软删
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        val w1 = wordDao.insert(Word(text = "a"))
+        val w2 = wordDao.insert(Word(text = "b"))
+        bookDao.linkBookWord(BookWord(bookId, w1))
+        bookDao.linkBookWord(BookWord(bookId, w2))
+        bookDao.setDeleted(bookId, w1, deleted = true)
+
+        val book = bookDao.observeAllWithCounts().first().single()
+        assertThat(book.wordCount).isEqualTo(1)
+    }
+
+    @Test
+    fun deletedAndSkippedAreIndependent() = runTest {
+        // 两个标记互不影响：跳过的词不等于删除，删除的词不等于跳过
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        val w1 = wordDao.insert(Word(text = "apple"))
+        bookDao.linkBookWord(BookWord(bookId, w1))
+
+        bookDao.setSkipped(bookId, w1, skipped = true)
+        assertThat(bookDao.getDeleted(bookId, w1)).isFalse() // 跳过不等于删除
+
+        bookDao.setDeleted(bookId, w1, deleted = true)
+        assertThat(bookDao.getSkipped(bookId, w1)).isTrue() // 删除不改变跳过态
+    }
+
+    @Test
+    fun observeDeletedEntries_listsOnlyDeleted() = runTest {
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val cet4 = bookDao.insert(Book(name = "CET-4", isPreset = true))
+        val wApple = wordDao.insert(Word(text = "apple"))
+        val wRun = wordDao.insert(Word(text = "run"))
+        bookDao.linkBookWord(BookWord(cet4, wApple))
+        bookDao.linkBookWord(BookWord(cet4, wRun))
+
+        // 初始无软删 → 回收站空
+        assertThat(bookDao.observeDeletedEntries().first()).isEmpty()
+
+        bookDao.setDeleted(cet4, wApple, deleted = true)
+        val entries = bookDao.observeDeletedEntries().first()
+        assertThat(entries).hasSize(1)
+        assertThat(entries.single().wordText).isEqualTo("apple")
+        assertThat(entries.single().bookName).isEqualTo("CET-4")
+        assertThat(entries.single().bookId).isEqualTo(cet4)
+        assertThat(entries.single().wordId).isEqualTo(wApple)
+    }
+
+    @Test
+    fun observeDeletedEntries_isEmptyAfterRestore() = runTest {
+        // 恢复后条目从回收站消失
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        val w1 = wordDao.insert(Word(text = "apple"))
+        bookDao.linkBookWord(BookWord(bookId, w1))
+        bookDao.setDeleted(bookId, w1, deleted = true)
+        assertThat(bookDao.observeDeletedEntries().first()).hasSize(1)
+
+        bookDao.setDeleted(bookId, w1, deleted = false)
+        assertThat(bookDao.observeDeletedEntries().first()).isEmpty()
+    }
+
+    @Test
+    fun purgeDeleted_actuallyDeletesRow() = runTest {
+        // 永久删除 = 真 DELETE 关联行（不可恢复）
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        val w1 = wordDao.insert(Word(text = "apple"))
+        bookDao.linkBookWord(BookWord(bookId, w1))
+        bookDao.setDeleted(bookId, w1, deleted = true)
+
+        bookDao.purgeDeleted(bookId, w1)
+
+        // 关联行真删了，getDeleted 返回 null
+        assertThat(bookDao.getDeleted(bookId, w1)).isNull()
+        // 回收站也空了
+        assertThat(bookDao.observeDeletedEntries().first()).isEmpty()
+        // 但全局 word 池里 apple 还在（永久删除只删关联，不删全局词）
+        assertThat(wordDao.getByText("apple")).isNotNull()
+    }
+
+    @Test
+    fun purgeDeleted_refusesNonDeletedLink() = runTest {
+        // deleted=1 兜底：未软删的关联不会被 purgeDeleted 误删
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        val w1 = wordDao.insert(Word(text = "apple"))
+        bookDao.linkBookWord(BookWord(bookId, w1))
+
+        bookDao.purgeDeleted(bookId, w1) // 关联 deleted=0，兜底不删
+
+        assertThat(bookDao.getDeleted(bookId, w1)).isFalse() // 关联还在
+    }
+
+    // ---- Ticket #22：词书软删除（book.deleted）----
+
+    @Test
+    fun deleteCustom_softDeletesInsteadOfPhysicalDelete() = runTest {
+        // 删除自定义词书 = 软删（deleted=1），行还在，可恢复
+        val bookDao = db.bookDao()
+        val id = bookDao.insert(Book(name = "mybook", isPreset = false))
+        val affected = bookDao.deleteCustom(id)
+        assertThat(affected).isEqualTo(1)
+        // 行还在（软删），getById 能读到
+        val book = bookDao.getById(id)
+        assertThat(book).isNotNull()
+        assertThat(book!!.deleted).isTrue()
+    }
+
+    @Test
+    fun deleteCustom_refusesPresetBook() = runTest {
+        val bookDao = db.bookDao()
+        val id = bookDao.insert(Book(name = "CET-4", isPreset = true))
+        val affected = bookDao.deleteCustom(id)
+        assertThat(affected).isEqualTo(0)
+        assertThat(bookDao.getById(id)!!.deleted).isFalse()
+    }
+
+    @Test
+    fun observeAll_excludesSoftDeletedBooks() = runTest {
+        val bookDao = db.bookDao()
+        val visible = bookDao.insert(Book(name = "visible", isPreset = false))
+        val hidden = bookDao.insert(Book(name = "hidden", isPreset = false))
+        bookDao.deleteCustom(hidden)
+
+        val names = bookDao.observeAll().first().map { it.name }
+        assertThat(names).contains("visible")
+        assertThat(names).doesNotContain("hidden")
+    }
+
+    @Test
+    fun observeAllWithCounts_excludesSoftDeletedBooks() = runTest {
+        val bookDao = db.bookDao()
+        val visible = bookDao.insert(Book(name = "visible", isPreset = false))
+        val hidden = bookDao.insert(Book(name = "hidden", isPreset = false))
+        bookDao.deleteCustom(hidden)
+
+        val ids = bookDao.observeAllWithCounts().first().map { it.bookId }
+        assertThat(ids).contains(visible)
+        assertThat(ids).doesNotContain(hidden)
+    }
+
+    @Test
+    fun restoreBook_clearsDeletedFlag() = runTest {
+        val bookDao = db.bookDao()
+        val id = bookDao.insert(Book(name = "b1", isPreset = false))
+        bookDao.deleteCustom(id)
+        assertThat(bookDao.getById(id)!!.deleted).isTrue()
+
+        bookDao.restoreBook(id)
+        assertThat(bookDao.getById(id)!!.deleted).isFalse()
+        // 恢复后回到可见列表
+        assertThat(bookDao.observeAll().first().map { it.name }).contains("b1")
+    }
+
+    @Test
+    fun restoreBook_preservesBookWordLinks() = runTest {
+        // 软删/恢复词书不动其下 book_word 关联（含各自 deleted/skipped 状态）
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1", isPreset = false))
+        val w1 = wordDao.insert(Word(text = "apple"))
+        val w2 = wordDao.insert(Word(text = "run"))
+        bookDao.linkBookWord(BookWord(bookId, w1))
+        bookDao.linkBookWord(BookWord(bookId, w2))
+        bookDao.setDeleted(bookId, w1, deleted = true) // w1 关联软删
+        bookDao.setSkipped(bookId, w2, skipped = true) // w2 关联跳过
+
+        bookDao.deleteCustom(bookId) // 软删整本书
+        bookDao.restoreBook(bookId) // 恢复
+
+        // 关联行原样保留：w1 仍软删，w2 仍跳过
+        assertThat(bookDao.getDeleted(bookId, w1)).isTrue()
+        assertThat(bookDao.getSkipped(bookId, w2)).isTrue()
+        assertThat(bookDao.countWordsInBook(bookId)).isEqualTo(0) // w1 软删、w2 跳过，都不计
+    }
+
+    @Test
+    fun observeDeletedBooks_listsOnlySoftDeleted() = runTest {
+        val bookDao = db.bookDao()
+        val visible = bookDao.insert(Book(name = "visible", isPreset = false))
+        val hidden = bookDao.insert(Book(name = "hidden", isPreset = false))
+
+        assertThat(bookDao.observeDeletedBooks().first()).isEmpty()
+
+        bookDao.deleteCustom(hidden)
+        val deleted = bookDao.observeDeletedBooks().first()
+        assertThat(deleted).hasSize(1)
+        assertThat(deleted.single().name).isEqualTo("hidden")
+        assertThat(deleted.single().bookId).isEqualTo(hidden)
+    }
+
+    @Test
+    fun purgeBook_physicallyDeletesAndCascades() = runTest {
+        // 永久删除词书 = 真 DELETE book，CASCADE 清其下 book_word 关联
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1", isPreset = false))
+        val w1 = wordDao.insert(Word(text = "apple"))
+        bookDao.linkBookWord(BookWord(bookId, w1))
+        bookDao.deleteCustom(bookId) // 先软删进回收站
+
+        bookDao.purgeBook(bookId)
+
+        // 词书行真删了
+        assertThat(bookDao.getById(bookId)).isNull()
+        assertThat(bookDao.observeDeletedBooks().first()).isEmpty()
+        // CASCADE 清了关联行
+        assertThat(bookDao.getDeleted(bookId, w1)).isNull()
+        // 全局 word 池里 apple 还在（永久删词书不删全局词）
+        assertThat(wordDao.getByText("apple")).isNotNull()
+    }
+
+    @Test
+    fun purgeBook_refusesNonDeletedBook() = runTest {
+        // deleted=1 兜底：未软删的词书不会被 purgeBook 误删
+        val bookDao = db.bookDao()
+        val id = bookDao.insert(Book(name = "b1", isPreset = false))
+
+        bookDao.purgeBook(id) // 词书 deleted=0，兜底不删
+
+        assertThat(bookDao.getById(id)).isNotNull() // 词书还在
     }
 }
