@@ -28,16 +28,10 @@ WordDrill 是一个靠**不断滑动浏览**做被动重复记忆的闪卡 App�
 ## 截图
 
 <p align="center">
-  <em>截图待添加（用 <a href="https://deviceframes.com">deviceframes.com</a> 生成带设备外壳的展示图）</em>
+  <img src="docs/screenshot-1.png" width="260" alt="刷卡页" />
+  <img src="docs/screenshot-2.png" width="260" alt="词库页" />
+  <img src="docs/screenshot-3.png" width="260" alt="我的页" />
 </p>
-
-<!-- 截图准备好后替换上面的占位：
-<p align="center">
-  <img src="docs/screenshot-1.png" width="280" alt="刷卡页" />
-  <img src="docs/screenshot-2.png" width="280" alt="词库页" />
-  <img src="docs/screenshot-3.png" width="280" alt="我的页" />
-</p>
--->
 
 ## 核心功能
 

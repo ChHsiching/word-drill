@@ -48,7 +48,7 @@ interface BookDao {
      * 所有可见词书（Ticket #22：过滤 deleted=1 的软删词书）。
      * 排序：预置在前、name 升序。
      */
-    @Query("SELECT * FROM book WHERE deleted = 0 ORDER BY isPreset DESC, name ASC")
+    @Query("SELECT * FROM book WHERE deleted = 0 ORDER BY isPreset DESC, CASE WHEN name = '复习' THEN 1 ELSE 0 END, name ASC")
     fun observeAll(): Flow<List<Book>>
 
     /**
@@ -67,7 +67,7 @@ interface BookDao {
         LEFT JOIN book_word bw ON b.bookId = bw.bookId AND bw.skipped = 0 AND bw.deleted = 0
         WHERE b.deleted = 0
         GROUP BY b.bookId
-        ORDER BY b.isPreset DESC, b.name ASC
+        ORDER BY b.isPreset DESC, CASE WHEN b.name = '复习' THEN 1 ELSE 0 END, b.name ASC
         """
     )
     fun observeAllWithCounts(): Flow<List<BookWithCount>>
