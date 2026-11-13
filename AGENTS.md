@@ -76,7 +76,7 @@ Using the default five canonical triage labels. See `docs/agents/triage-labels.m
 
 ### Domain docs
 
-Single-context layout: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context layout: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
 ### Android emulator MCP
 
