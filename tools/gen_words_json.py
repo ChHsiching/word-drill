@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-从 ECDICT (MIT, https://github.com/skywind3000/ECDICT) 生成 app/src/main/assets/words.json。
+Generate app/src/main/assets/words.json from ECDICT (MIT, https://github.com/skywind3000/ECDICT).
 
-数据来源说明：
-- ECDICT 是 MIT 许可的英汉词典数据库，依据各类考试大纲与语料库标注词汇。
-- 三本预置词书的成员由 ECDICT 的 tag 字段确定：cet4 / cet6 / ky（考研）。
-- 词性 (POS) 与中文释义从 translation 字段逐行解析（cet4/cet6/ky 单词的 pos 列为空，
-  词性嵌在 translation 每行行首，如 "vt. 放弃..."）。
-- Ticket #14：phonetic（IPA 音标）取自 ECDICT 的 phonetic 字段，归一化为标准 IPA
-  并包裹斜杠，输出为 "phonetic": "/əˈbændən/"。
+About the data source:
+- ECDICT is an MIT-licensed English-Chinese dictionary database. It tags vocabulary
+  against exam syllabi and corpora.
+- The three preset books take their members from the ECDICT tag field: cet4, cet6, ky
+  (the postgraduate entrance exam).
+- POS and Chinese meanings are parsed line by line from the translation field. The pos
+  column is empty for cet4/cet6/ky words, so the POS sits at the start of each
+  translation line, as in "vt. 放弃...".
+- Ticket #14: the phonetic (IPA) comes from the ECDICT phonetic field, normalized to
+  standard IPA and wrapped in slashes, giving "phonetic": "/əˈbændən/".
 
-输出 JSON schema（与 Room 全局词条池对应）：
+Output JSON schema, matching the Room global word pool:
   {
     "source": "ECDICT (MIT)",
     "books": [
@@ -20,22 +23,28 @@
     ]
   }
 
-解析规则（保证 (wordId, pos) 唯一约束）：
-- translation 按 "\n" 拆行。
-- 行首匹配已知 POS 前缀（n./v./vt./vi./a./adv./prep./conj./num./pron./art./aux./int./abbr.）
-  → 新建一条 sense：pos=前缀，meaning=剩余中文文本。
-- 否则（如 "[经] 能力" 这类领域标注、或无前缀的补充行）→ 追加到上一条 sense 的 meaning
-  （分号分隔），不另起 sense。
-- 一个 POS 下若多行（极少见），同样合并进同一条 meaning。
+Parsing rules. They keep the (wordId, pos) unique constraint intact:
+- Split translation on "\n".
+- If a line starts with a known POS prefix
+  (n./v./vt./vi./a./adv./prep./conj./num./pron./art./aux./int./abbr.),
+  start a new sense whose pos is the prefix and whose meaning is the remaining
+  Chinese text.
+- Otherwise, for a domain label line such as "[经] 能力" or a continuation line
+  without a prefix, append to the previous sense's meaning, separated by a
+  semicolon. Do not start a new sense.
+- If one POS spans several lines, rare in practice, merge them into the same
+  meaning.
 
-音标归一化（normalize_phonetic）：
-- ECDICT 的 phonetic 用了几个非标准字符（西里尔字母 ә/є 代替 IPA schwa），重音用 "'" 而非 "ˈ"。
-  统一映射到标准 IPA：ә→ə、є→ə、'→ˈ，再去掉空白。
-- 包裹斜杠："buk" → "/buk/"，与 #14 acceptance 的 "/əˈbændən/" 格式一致。
-- 空字符串 → 返回 None（前端按 null 渲染"无音标"）。
+Phonetic normalization (normalize_phonetic):
+- The ECDICT phonetic field uses a few non-standard characters. Cyrillic ә and є
+  stand in for the IPA schwa, and the accent mark is "'" instead of "ˈ". Map them
+  to standard IPA: ә to ə, є to ə, ' to ˈ, then strip whitespace.
+- Wrap in slashes: "buk" gives "/buk/", matching the "/əˈbændən/" format in the
+  #14 acceptance criteria.
+- An empty string returns None. The UI renders null as having no phonetic.
 
-用法：python tools/gen_words_json.py <path/to/ecdict.csv>
-（默认读 ./ecdict.csv）
+Usage: python tools/gen_words_json.py <path/to/ecdict.csv>
+Reads ./ecdict.csv by default.
 """
 
 import csv
@@ -44,41 +53,47 @@ import os
 import re
 import sys
 
-# 已知英文词性缩写（行首前缀）。顺序无影响，但放完整 token 避免误匹配。
+# Known English POS abbreviations, matched as line-start prefixes. Order does not
+# matter, but each entry is a full token to avoid partial matches.
 POS_PREFIXES = (
     "prep.", "pron.", "conj.", "adv.", "num.", "art.", "aux.", "int.",
     "abbr.", "vt.", "vi.", "n.", "v.", "a.",
 )
 POS_RE = re.compile(r"^(" + "|".join(re.escape(p) for p in POS_PREFIXES) + r")")
 
-# ECDICT tag → 本 App 词书名映射
+# Maps ECDICT tags to the app's book names.
 BOOK_TAGS = [
     ("cet4", "CET-4"),
     ("cet6", "CET-6"),
     ("ky", "考研英语"),
 ]
 
-# ECDICT phonetic 字段里的非标准字符 → 标准 IPA（见模块 docstring 的字符普查依据）。
-# 注意 ә (U+04D9 西里尔 schwa) 和 є (U+0454 西里尔 ie) 在 ECDICT 里都代表 IPA ə (U+0259)。
-# "^" 在 ECDICT 里偶发作为重音标记出现（7 个 cet4/cet6/ky 词，如 "God"→"^ɔd"），
-# 与 "'" 同义（都表主重音）；统一映射成 IPA 主重音 ˈ。
+# Non-standard characters in the ECDICT phonetic field, mapped to standard IPA.
+# The character survey behind this lives in the module docstring.
+# Note that ә (U+04D9, Cyrillic schwa) and є (U+0454, Cyrillic ie) both stand for
+# IPA ə (U+0259) in ECDICT.
+# "^" occasionally appears as an accent mark in ECDICT, on 7 cet4/cet6/ky words,
+# such as "God" recorded as "^ɔd". It means the same as "'" (primary stress);
+# both map to the IPA primary-stress mark ˈ.
 PHONETIC_CHARMAP = str.maketrans({
-    "'": "\u02C8",   # ASCII apostrophe → IPA 主重音 ˈ (U+02C8)
-    "^": "\u02C8",   # caret → IPA 主重音 ˈ（ECDICT 的非标准重音记号）
-    "\u04D9": "\u0259",  # ә Cyrillic schwa → ə IPA schwa
-    "\u0454": "\u0259",  # є Cyrillic ie      → ə IPA schwa
+    "'": "\u02C8",   # ASCII apostrophe maps to IPA primary stress ˈ (U+02C8)
+    "^": "\u02C8",   # caret maps to IPA primary stress ˈ, a non-standard ECDICT accent mark
+    "\u04D9": "\u0259",  # Cyrillic schwa ә maps to IPA schwa ə
+    "\u0454": "\u0259",  # Cyrillic ie є maps to IPA schwa ə
 })
 
 
 def normalize_phonetic(raw):
     """
-    把 ECDICT phonetic 字段归一化为包裹斜杠的标准 IPA 字符串；空输入返回 None。
-    例："'bændәn" → "/ˈbændən/"，"buk" → "/buk/"，"" → None。
+    Normalize the ECDICT phonetic field into a standard IPA string wrapped in
+    slashes. Empty input returns None. For example "'bændәn" gives "/ˈbændən/",
+    "buk" gives "/buk/", and "" gives None.
     """
     if not raw:
         return None
     cleaned = raw.strip().translate(PHONETIC_CHARMAP)
-    # 去掉字间空白（ECDICT 偶有 "kəm'pju:tə" 之类无空格，但保险起见统一去空格）
+    # Strip whitespace between characters. ECDICT rarely has any, as in "kəm'pju:tə",
+    # but strip unconditionally to be safe.
     cleaned = re.sub(r"\s+", "", cleaned)
     if not cleaned:
         return None
@@ -87,15 +102,16 @@ def normalize_phonetic(raw):
 
 def parse_translation(translation):
     """
-    把 ECDICT 的 translation 字段解析成 [(pos, meaning), ...]。
-    每个 POS 至多一条（同 POS 多行合并），满足 Room 的 (wordId, pos) 唯一约束。
+    Parse the ECDICT translation field into [(pos, meaning), ...].
+    Each POS appears at most once, with same-POS lines merged, which satisfies
+    the Room (wordId, pos) unique constraint.
     """
     if not translation:
         return []
     senses = []          # list of [pos, meaning]
-    pos_index = {}       # pos -> index in senses（合并同 POS 用）
-    # ECDICT 的 translation 用字面量 "\n"（反斜杠 + n，两个字符）分隔多义行，
-    # 而非真实换行。先还原成真实换行再按行解析。
+    pos_index = {}       # pos -> index in senses, used to merge same-POS entries
+    # ECDICT separates sense lines with a literal "\n", backslash plus n as two
+    # characters, not a real newline. Restore real newlines before parsing by line.
     translation = translation.replace("\\n", "\n")
     for raw_line in translation.split("\n"):
         line = raw_line.strip()
@@ -108,7 +124,7 @@ def parse_translation(translation):
             if not meaning:
                 continue
             if pos in pos_index:
-                # 同 POS 已有，合并（理论上极少，保险）
+                # This POS already exists, so merge. Rare in theory; kept as a safety net.
                 idx = pos_index[pos]
                 if meaning not in senses[idx][1]:
                     senses[idx][1] = (senses[idx][1] + "； " + meaning) if senses[idx][1] else meaning
@@ -116,9 +132,10 @@ def parse_translation(translation):
                 pos_index[pos] = len(senses)
                 senses.append([pos, meaning])
         else:
-            # 无 POS 前缀的行（领域标注 [经]/[医]/[计] 或补充说明）→ 并入上一条 sense。
+            # A line without a POS prefix, such as a domain label [经]/[医]/[计] or a
+            # continuation note, joins the previous sense.
             extra = line
-            # 去掉常见领域方括号前缀，保留含义文本
+            # Drop the bracketed domain prefix and keep the meaning text.
             extra = re.sub(r"^\[[^\]]*\]\s*", "", extra).strip()
             if not extra:
                 continue
@@ -126,7 +143,8 @@ def parse_translation(translation):
                 if extra not in senses[-1][1]:
                     senses[-1][1] = (senses[-1][1] + "； " + extra) if senses[-1][1] else extra
             else:
-                # 整条 translation 没有 POS 前缀：退化为单条 n.（避免丢词）
+                # No POS prefix anywhere in the translation, so fall back to a single
+                # n. sense. This avoids dropping the word.
                 senses.append(["n.", extra])
                 pos_index["n."] = 0
     return [(p, m) for p, m in senses]
@@ -137,13 +155,13 @@ def main():
     if not os.path.exists(csv_path):
         sys.exit(f"ERROR: ecdict.csv not found at {csv_path}")
 
-    # 每个单词只解析一次（多个词书共享），缓存 text -> (senses, phonetic)
+    # Parse each word once and share it across books. Cache text -> (senses, phonetic).
     word_cache = {}
     books_payload = []
 
     with open(csv_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        # 预读：为每个 tag 收集词条
+        # First pass: collect words for each tag.
         by_tag = {tag: [] for tag, _ in BOOK_TAGS}
         skipped = 0
         for row in reader:
@@ -151,7 +169,8 @@ def main():
             if not any(t in tags for t, _ in BOOK_TAGS):
                 continue
             text = (row.get("word") or "").strip()
-            # 过滤带空格的短语/带撇号脏数据，只保留纯单词（降低数据噪声）
+            # Skip dirty rows such as phrases containing spaces, keeping only single
+            # words to reduce data noise.
             if not text or " " in text:
                 skipped += 1
                 continue
@@ -196,11 +215,11 @@ def main():
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
 
-    # 统计
+    # Stats.
     for tag, book_name in BOOK_TAGS:
         n = len(next(b for b in books_payload if b["name"] == book_name)["words"])
         print(f"{book_name}: {n} words")
-    # 全局唯一单词数
+    # Global unique word count.
     unique = len(word_cache)
     with_phonetic = sum(1 for _, ph in word_cache.values() if ph)
     print(f"global unique words: {unique} (with phonetic: {with_phonetic})")

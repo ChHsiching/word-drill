@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-Ticket #23：[gen_dictionary_json.parse_translation] 的 TDD 单测。
+TDD tests for gen_dictionary_json.parse_translation, covering Ticket #23.
 
-复现并锁死两类已确认污染：
-1. POS_PREFIXES 缺 adj. —— `adj.` 开头的行被当作无 POS 续接，并到上一行的 n./vi. 等。
-2. 无 POS 前缀的行被续接到上一行 —— 如 `cat` 的 CAT 缩写释义被并到 `vi. 呕吐`。
+Reproduces and locks two confirmed contamination sources:
+1. POS_PREFIXES lacked adj., so lines starting with `adj.` were treated as
+   POS-less continuations and merged into the previous n./vi. line.
+2. Lines without a POS prefix were continued onto the previous line. For
+   example, the CAT abbreviation gloss for `cat` merged into `vi. 呕吐`.
 
-期望（修复后）：
-- `adj. 轻的...` 作为独立 sense，不污染 n.
-- `计算机辅助教育...` 与 `[计] 计算机辅助教学...` 这类无 POS / 领域标记行不再并到上一行；
-  首行的无 POS 内容降级为 `n.`，非首行的丢弃（宁可少给，不可污染）。
+Expected behavior after the fix:
+- `adj. 轻的...` becomes its own sense and does not pollute n.
+- Lines with no POS or with domain labels, such as `计算机辅助教育...` or
+  `[计] 计算机辅助教学...`, no longer merge into the previous line. A POS-less
+  first line degrades to `n.`; later lines are dropped. Better to give less
+  than to contaminate.
 """
 
 import sys
@@ -20,10 +24,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_dictionary_json import parse_translation, normalize_phonetic  # noqa: E402
 
 
-# ---- Ticket #23 case 1：POS_PREFIXES 缺 adj. ----
+# ---- Ticket #23 case 1: POS_PREFIXES lacked adj. ----
 
 def test_adj_prefix_recognized_as_own_sense():
-    """`adj.` 行应作为独立 sense，不污染上一行的 n.。"""
+    """A line starting with `adj.` becomes its own sense and does not pollute the previous n. line."""
     trans = "n. 右派人士\\nadj. 右派的；右翼的"
     senses = parse_translation(trans)
     n_sense = next((m for p, m in senses if p == "n."), "")
@@ -34,7 +38,7 @@ def test_adj_prefix_recognized_as_own_sense():
 
 
 def test_adj_and_interj_recognized():
-    """adj. 与 interj. 都应作为独立 sense（不是无 POS 续接）。"""
+    """Both adj. and interj. become their own senses, not POS-less continuations."""
     trans = "interj. 再见\\nn. 告别"
     senses = parse_translation(trans)
     poses = [p for p, _ in senses]
@@ -42,10 +46,10 @@ def test_adj_and_interj_recognized():
     assert "n." in poses
 
 
-# ---- Ticket #23 case 2：无 POS 行不再续接上一行 ----
+# ---- Ticket #23 case 2: POS-less lines no longer continue the previous line ----
 
 def test_cat_no_pos_line_not_continued_to_prev():
-    """`cat` 的 CAT 缩写释义不应污染 `vi. 呕吐`。"""
+    """The CAT abbreviation gloss for `cat` must not pollute `vi. 呕吐`."""
     trans = (
         "n. 猫, 恶妇\\n"
         "vi. 呕吐\\n"
@@ -73,15 +77,15 @@ def test_aim_no_pos_line_not_continued():
         assert "应用接口模块" not in m, f"{p} polluted by AIM abbr: {m}"
 
 
-# ---- 退化路径：首行无 POS（不能丢词）----
+# ---- Fallback path: first line without POS, must not drop the word ----
 
 def test_first_line_no_pos_degraded_to_noun():
-    """整条 translation 首行无 POS 时降级为 n.（不丢词）。"""
+    """When the first line has no POS, the translation degrades to n. and the word survives."""
     senses = parse_translation("苹果, 果树")
     assert senses == [("n.", "苹果, 果树")], f"got {senses}"
 
 
-# ---- 已有契约不应破坏 ----
+# ---- Existing contracts must not break ----
 
 def test_basic_multi_pos():
     trans = "n. 苹果\\nvt. 喜欢"

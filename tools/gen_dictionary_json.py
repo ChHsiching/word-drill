@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-从 ECDICT (MIT, https://github.com/skywind3000/ECDICT) 生成 app/src/main/assets/dictionary.json。
+Generate app/src/main/assets/dictionary.json from ECDICT (MIT, https://github.com/skywind3000/ECDICT).
 
-Ticket #19：内置词典。打包约 10 万高频单词（仅单词，不含短语）为只读参考数据，
-首启导入到 Room 的 dictionary 表，供加词 / 文件导入时查词性 + 释义 + 音标用。
+Ticket #19: built-in dictionary. Bundle the top 100k frequent single words, no
+phrases, as read-only reference data. First launch imports it into the Room
+dictionary table, which backs POS, meaning and phonetic lookup when adding words
+or importing from files.
 
-数据规模：
-- ECDICT 完整 csv 约 77 万行，但里面含大量短语、生僻词。
-- 这里按词频筛 top 10 万单词（collins desc → bnc asc → frq asc → alpha），覆盖
-  日常 / 考试 / 一般阅读词汇。短语（含空格的 word）跳过。
-- 已验证 10 万词 compact JSON ≈ 11MB，APK 增大可接受。
+Scale:
+- The full ECDICT csv has about 770k rows, many of them phrases and rare words.
+- This script keeps the top 100k single words by frequency, ordered by collins
+  desc, then bnc asc, then frq asc, then alphabetically. That covers everyday,
+  exam and general reading vocabulary. Phrases, meaning words containing spaces,
+  are skipped.
+- Verified: 100k words as compact JSON is about 11MB, an acceptable APK size
+  increase.
 
-输出 JSON schema（与 Room dictionary 表的字段对应）：
+Output JSON schema, matching the fields of the Room dictionary table:
   {
     "source": "ECDICT (MIT License, ...)",
     "words": [
@@ -20,14 +25,16 @@ Ticket #19：内置词典。打包约 10 万高频单词（仅单词，不含短
       ...
     ]
   }
-注意：同一 word 的多个词性 = 多条 entries（POS 切分沿用 gen_words_json.py 的解析逻辑），
-便于 DAO findByWord 返回 List<DictionaryEntry> 后直接映射到 sense 表。
+Note: each POS of the same word becomes its own entry. POS splitting reuses the
+parsing logic of gen_words_json.py, so DAO findByWord can return
+List<DictionaryEntry> and map it straight into the sense table.
 
-音标归一化、POS 解析与 gen_words_json.py 完全一致（复用同一套规则与字符映射），
-详见 gen_words_json.py 的模块 docstring。
+Phonetic normalization and POS parsing are identical to gen_words_json.py, same
+rules and same character map. See that module's docstring for details.
 
-用法：python tools/gen_dictionary_json.py <path/to/ecdict.csv>
-（默认读 C:/Users/Administrator/AppData/Local/Temp/ecdict.csv，开发机缓存路径）
+Usage: python tools/gen_dictionary_json.py <path/to/ecdict.csv>
+Reads C:/Users/Administrator/AppData/Local/Temp/ecdict.csv by default, the dev
+machine's cache path.
 """
 
 import csv
@@ -36,17 +43,19 @@ import os
 import re
 import sys
 
-# 行首词性缩写表。Ticket #23：补 `adj.`（现代词典用 adj.，a. 只是古缩写）
-# 与 `interj.`（ECDICT 里 int. 与 interj. 都有出现）。
-# 注意：与 gen_words_json.py 不再保持完全一致——那个脚本只处理 cet4/cet6/ky 三本预置词书，
-# 不涉及本 ticket 的污染范围；为最小改动只在词典脚本修。
+# Line-start POS abbreviation table. Ticket #23 adds `adj.` (modern dictionaries
+# use adj.; a. is a legacy abbreviation) and `interj.` (ECDICT contains both int.
+# and interj.).
+# Note: this list no longer matches gen_words_json.py exactly. That script only
+# feeds the three preset books and is outside this ticket's contamination scope,
+# so the fix lands in the dictionary script alone.
 POS_PREFIXES = (
     "prep.", "pron.", "conj.", "adv.", "num.", "art.", "aux.", "int.",
     "interj.", "abbr.", "adj.", "vt.", "vi.", "n.", "v.", "a.",
 )
 POS_RE = re.compile(r"^(" + "|".join(re.escape(p) for p in POS_PREFIXES) + r")")
 
-# 与 gen_words_json.py 完全一致的 phonetic 字符映射
+# The phonetic character map, identical to gen_words_json.py.
 PHONETIC_CHARMAP = str.maketrans({
     "'": "\u02C8",
     "^": "\u02C8",
@@ -54,12 +63,13 @@ PHONETIC_CHARMAP = str.maketrans({
     "\u0454": "\u0259",
 })
 
-# Top-N 单词数：10 万。覆盖高频核心词汇；assets 体积约 11MB。
+# Top-N word count is 100000. Covers high-frequency core vocabulary; the asset
+# stays about 11MB.
 TOP_N = 100000
 
 
 def normalize_phonetic(raw):
-    """与 gen_words_json.py 同实现：包裹斜杠的标准 IPA；空输入返回 None。"""
+    """Same implementation as gen_words_json.py. Returns standard IPA wrapped in slashes, or None for empty input."""
     if not raw:
         return None
     cleaned = raw.strip().translate(PHONETIC_CHARMAP)
@@ -71,18 +81,24 @@ def normalize_phonetic(raw):
 
 def parse_translation(translation):
     """
-    把 ECDICT translation 解析为 [(pos, meaning), ...]，每个 POS 至多一条。
+    Parse the ECDICT translation into [(pos, meaning), ...], at most one entry
+    per POS.
 
-    Ticket #23 修复两类污染：
-    - POS_PREFIXES 已包含 `adj.`/`interj.`，不再被当作无 POS 行。
-    - 无 POS 前缀的行（领域标注 `[计]/[医]/[化]`、或缩写释义等）**不再续接到上一行**：
-      首行降级为 `n.`（避免丢词），非首行丢弃（无法可靠归类，宁可少给也不污染）。
+    Ticket #23 fixes two contamination sources:
+    - POS_PREFIXES now contains `adj.` and `interj.`, so those lines are no
+      longer treated as POS-less.
+    - A line without a POS prefix, such as a domain label `[计]/[医]/[化]` or an
+      abbreviation gloss, no longer continues the previous line. The first such
+      line degrades to `n.` so the word is not dropped. Later ones are dropped,
+      because they cannot be classified reliably. Better to give less than to
+      contaminate.
     """
     if not translation:
         return []
     senses = []
     pos_index = {}
-    # ECDICT 用字面量 "\n"（反斜杠 + n）分隔义行；同时去除残留的 \r（csv 解析后偶存）
+    # ECDICT separates sense lines with a literal "\n", backslash plus n. Also
+    # strip stray \r, which occasionally survives csv parsing.
     translation = translation.replace("\\r", "").replace("\\n", "\n")
     for raw_line in translation.split("\n"):
         line = raw_line.strip()
@@ -102,9 +118,12 @@ def parse_translation(translation):
                 pos_index[pos] = len(senses)
                 senses.append([pos, meaning])
         else:
-            # 无 POS 前缀的行（首行降级为 n.，非首行丢弃）。
-            # 见 ticket #23：ECDICT 中此类行多为另一义项但缺 POS 标记（常带领域前缀），
-            # 续接到上一行会造成跨义项污染；宁可少给也别污染。
+            # A line without a POS prefix. The first one degrades to n., later
+            # ones are dropped.
+            # See ticket #23: in ECDICT these lines are usually another sense
+            # missing its POS tag, often carrying a domain prefix. Continuing
+            # the previous line would smear senses across each other, so give
+            # less rather than contaminate.
             if senses:
                 continue
             extra = re.sub(r"^\[[^\]]*\]\s*", "", line).strip()
@@ -134,7 +153,7 @@ def main():
                 skipped_no_trans += 1
                 continue
             word = (row.get("word") or "").strip()
-            # 只保留单词（短语 / 带空格脏数据跳过）
+            # Keep single words only. Phrases and rows containing spaces are skipped.
             if not word or " " in word:
                 skipped_phrase += 1
                 continue
@@ -156,7 +175,8 @@ def main():
                 frq = 0
             rows.append((word, normalize_phonetic(row.get("phonetic") or ""), senses, collins, bnc, frq))
 
-    # 按词频排序：高频在前。collins 星级 desc → bnc asc（小=常用）→ frq asc → alpha
+    # Sort by frequency, most frequent first: collins stars desc, then bnc asc
+    # where a smaller rank means more common, then frq asc, then alphabetical.
     big = 10 ** 12
     rows.sort(key=lambda x: (
         -x[3],
@@ -169,7 +189,7 @@ def main():
     if len(top) < TOP_N:
         sys.stderr.write(f"WARN: only {len(top)} words available (target {TOP_N})\n")
 
-    # 展开为 (word, phonetic, pos, meaning) 多行 entries
+    # Expand into one entry row per (word, phonetic, pos, meaning).
     entries = []
     for word, phonetic, senses, _, _, _ in top:
         for pos, meaning in senses:
@@ -193,7 +213,7 @@ def main():
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
 
-    # 统计
+    # Stats.
     unique_words = len(set(e["word"] for e in entries))
     with_phonetic = sum(1 for e in entries if e["phonetic"])
     print(f"unique words: {unique_words}")
