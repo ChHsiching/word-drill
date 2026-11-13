@@ -82,9 +82,9 @@ dependencies {
     // DataStore (first-run import idempotence flag, current book and other settings)
     implementation(libs.androidx.datastore.preferences)
 
-    // Ticket #24: AndroidX SplashScreen -- set the system splash icon to a transparent
-    // drawable so the custom Compose launch animation takes over seamlessly
-    // (API 31+ forces a system splash).
+    // Ticket #24: AndroidX SplashScreen. API 31+ forces a system splash, so set the
+    // system splash icon to a transparent drawable and let the custom Compose launch
+    // animation take over seamlessly.
     implementation(libs.androidx.core.splashscreen)
 
     // Ticket #21: PDF table extraction. tabula-java depends on PDFBox 2.0.x (which uses

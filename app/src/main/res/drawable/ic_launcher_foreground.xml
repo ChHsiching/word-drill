@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ticket #24 — overlapping-cards icon foreground (design B: solid front card, outlined rear card).
+<!-- Ticket #24 overlapping-cards icon foreground. Design B: solid front card, outlined rear card.
      Design source: designs/worddrill-icon/icon-03-compare.html option B, viewBox 0 0 80 80.
      The foreground viewport is 108×108; the 80×80 design content is mapped into the centered
      66×66 safe zone via group scale=0.825 + translate ((0,0)→(21,21), (80,80)→(87,87), centered at 54,54).

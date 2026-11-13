@@ -17,12 +17,13 @@ truth = "1.4.4"
 junit = "4.13.2"
 androidxTestExtJunit = "1.2.1"
 espresso = "3.6.1"
-# Ticket #24: AndroidX SplashScreen -- API 31+ forces a system splash; this library
-# sets the splash icon to a transparent drawable (visually a solid background) so the
-# custom Compose launch animation takes over seamlessly (no "big logo, then animation").
+# Ticket #24: AndroidX SplashScreen. API 31+ forces a system splash. This library
+# sets the splash icon to a transparent drawable, which looks like a plain solid
+# background, so the custom Compose launch animation takes over seamlessly with no
+# "big logo first, then animation" step.
 splashscreen = "1.0.1"
 # Ticket #21: JVM unit tests need an XmlPullParser implementation (the Android framework
-# provides one on-device; kxml2 is required on the JVM). testImplementation only -- never
+# provides one on-device; kxml2 is required on the JVM). testImplementation only, never
 # ships in the production APK.
 kxml2 = "2.3.0"
 xmlpull = "1.1.3.1"
@@ -73,4 +74,4 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 # Note: the Hilt Gradle plugin is intentionally NOT enabled (its 2.59+ line requires AGP 9,
 # conflicting with this project's AGP 8.13.x). Hilt works via ksp(hilt-compiler) plus
-# manually extending the generated class -- see WordDrillApp / MainActivity.
+# manually extending the generated class. See WordDrillApp / MainActivity.

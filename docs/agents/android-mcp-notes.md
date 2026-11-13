@@ -1,87 +1,86 @@
-# Android Emulator MCP — 操作备忘
+# Android Emulator MCP working notes
 
-用 `android-emulator` MCP 辅助开发时反复踩的工具层坑，外加少数**跨文件、无法在单处代码注释承载**的代码层约定（见末节「代码层约定」）。其余代码层红线（别启用 Hilt Plugin、别升级 AndroidX 等）在各自代码注释里，不在此重复。
+Recurring tool-layer pitfalls hit while developing with the `android-emulator` MCP, plus a few cross-file code conventions that cannot live in a single code comment (see "Code conventions" at the end). The remaining code-level red lines, such as do-not-enable-the-Hilt-plugin and do-not-upgrade-AndroidX, live in their own code comments and are not repeated here.
 
-## 环境
+## Environment
 
-- JDK 17：`C:\jdk17`，所有 `./gradlew` 命令带 `JAVA_HOME=C:/jdk17` 前缀。
-- AVD：`Pixel_API_36`（serial `emulator-5554`，通常已启动）。
-- adb：`C:/Users/Administrator/AppData/Local/Android/Sdk/platform-tools/adb.exe`（MCP 已封装，raw adb 需全路径）。
+- JDK 17 lives at `C:\jdk17`. Prefix every `./gradlew` command with `JAVA_HOME=C:/jdk17`.
+- AVD: `Pixel_API_36`, serial `emulator-5554`, usually already running.
+- adb: `C:/Users/Administrator/AppData/Local/Android/Sdk/platform-tools/adb.exe`. The MCP wraps it; raw adb needs the full path.
 
-## 构建 / 运行
+## Build / run
 
-1. `android_preflight` 确认环境。
-2. 构建：`JAVA_HOME=C:/jdk17 ./gradlew :app:assembleDebug`。
-3. 装：`android_install_app`；启动：**`adb shell am start -n com.github.chsiching.worddrill/.MainActivity`**。
-   - `android_launch_app` / `android_build_and_run` 都走 monkey，手动 Hilt（无 Gradle Plugin）会报 "No activities found to run, monkey aborted"。`am start` 直起 Activity，可靠。
-4. 清数据做干净态验证：**先 `android_install_app` 再 `pm clear`**（反过来 `pm clear` 可能 "Failed"，因旧安装态失效）。
-   - `pm clear` 直接调有时返回非零退出码但实际成功；包一层看退出码：`adb shell "pm clear com.github.chsiching.worddrill; echo done=$?"`，`done=0` 即成功。
-   - connectedAndroidTest 跑完会卸载 app，下次手验前先 `adb shell pm list packages | grep word` 确认还在，不在就重新 `android_install_app`。
+1. Run `android_preflight` to confirm the environment.
+2. Build: `JAVA_HOME=C:/jdk17 ./gradlew :app:assembleDebug`.
+3. Install with `android_install_app`; launch with `adb shell am start -n com.github.chsiching.worddrill/.MainActivity`.
+   - Both `android_launch_app` and `android_build_and_run` go through monkey, which fails with "No activities found to run, monkey aborted" under manual Hilt (no Gradle plugin). `am start` launches the Activity directly and works reliably.
+4. To verify a clean state, clear data. Run `android_install_app` first, then `pm clear`. The reverse order can fail with "Failed" because the previous install state is gone.
+   - `pm clear` sometimes returns a non-zero exit code while actually succeeding. Wrap it and check the code: `adb shell "pm clear com.github.chsiching.worddrill; echo done=$?"`. `done=0` means success.
+   - connectedAndroidTest uninstalls the app when it finishes. Before the next manual verification, check the app still exists with `adb shell pm list packages | grep word` and reinstall via `android_install_app` if needed.
 
-## 像素级验证（#9 起用）
+## Pixel-level verification (used since #9)
 
-`android_screenshot` 是肉眼真相，但要断言"深色主题生效"这种**颜色变化**，肉眼不够客观。**用 adb 抓 PNG + node_repl + pngjs 读像素 RGB**：
+`android_screenshot` is the ground truth for eyes, but asserting a color change such as "dark theme took effect" needs objective data. Capture a PNG with adb, then read pixel RGB values through node_repl with pngjs.
 
-1. 抓屏：`adb exec-out screencap -p > /tmp/x.png`（MCP 的 `android_screenshot` 返回的是 MCP 内部路径，raw adb 更可控）。
-2. 读像素：node_repl 里 `const { PNG } = await import('pngjs'); const png = PNG.sync.read(fs.readFileSync(path)); const [r,g,b] = px(x,y)`。
-3. pngjs 已装在 `C:/Users/Administrator/AppData/Local/Temp/node_modules`，node_repl 先 `js_add_node_module_dir` 加该目录。
-4. **采样点选纯背景区**（避开文字/icon）。深色主题内容区背景 ≈ `[18,19,24]`，浅色 ≈ `[250,248,255]`，对比即可断言主题切换生效。
-5. ⚠️ `analyze_image` MCP 只支持远程 URL，本地截图用不了；像素法是替代。
-6. ⚠️ `js_reset` 后 `js_add_node_module_dir` 的路径会丢，需重新加（`true`=新增，`false`=已存在，都正常）。
-7. ⚠️ **node_repl 的 `import()` 写错会污染整个 kernel**：若 `import('pkg')` 的 catch 返回 `null`（如 `await import('/dev/null').catch(()=>({PNG:null}))` 这种占位写法），`PNG` 绑定变成 `null`，后续 `PNG.sync.read(...)` 全报 `Cannot read properties of null`。而 `const PNG` 不能重复声明，**只能 `js_reset` 全部重来**（丢失所有绑定，包括 fs、`js_add_node_module_dir` 路径都要重加）。应对：import 直接写对（`const { PNG } = await import('pngjs')`），别用 `/dev/null` 之类占位兜底；若绑定已坏，直接 `js_reset` 重来，别试图覆盖。
+1. Capture: `adb exec-out screencap -p > /tmp/x.png`. The MCP's `android_screenshot` returns an internal MCP path; raw adb is more controllable.
+2. Read pixels in node_repl: `const { PNG } = await import('pngjs'); const png = PNG.sync.read(fs.readFileSync(path)); const [r,g,b] = px(x,y)`.
+3. pngjs is installed at `C:/Users/Administrator/AppData/Local/Temp/node_modules`. In node_repl, add that directory first with `js_add_node_module_dir`.
+4. Sample pure background areas, away from text and icons. The dark-theme content background is about `[18,19,24]`, light about `[250,248,255]`. Comparing the two asserts theme switching.
+5. The `analyze_image` MCP only accepts remote URLs, so local screenshots cannot use it. The pixel method replaces it.
+6. After `js_reset`, the path added by `js_add_node_module_dir` is lost. Add it again. Both `true` (added) and `false` (already present) returns are normal.
+7. A wrong `import()` in node_repl poisons the whole kernel. If the catch of `import('pkg')` returns null, for example `await import('/dev/null').catch(()=>({PNG:null}))`, the `PNG` binding becomes null and every later `PNG.sync.read(...)` throws "Cannot read properties of null". `const PNG` cannot be redeclared, so the only way out is `js_reset`, which loses all bindings including fs and the module path. Prevention: write the import correctly the first time, `const { PNG } = await import('pngjs')`, with no placeholder fallbacks. If a binding is already broken, run `js_reset` and start over instead of trying to overwrite it.
 
+## Verifying UI
 
-## 验证 UI
+- `android_screenshot` shows the truth; `android_ui_describe` returns the element tree with coordinates; `android_ui_resolve` finds a specific element.
+- `android_ui_describe` sometimes returns a stale snapshot, for example still showing a dialog that already closed. When in doubt, trust `android_screenshot`.
+- For documentation or behavior questions, check the official Android docs via context7, such as Compose Testing APIs and UIAutomator. The android-emulator MCP itself has no public docs, so do not guess operations.
 
-- `android_screenshot` 看真相；`android_ui_describe` 拿元素树坐标；`android_ui_resolve` 查具体元素。
-- **`android_ui_describe` 有时返回滞后快照**（对话框已关它还显示开）。拿不准时以 `android_screenshot` 为准。
-- 文档/行为问题用 **context7 查 Android 官方文档**（如 Compose Testing APIs、UIAutomator）。android-emulator MCP 本身无公开文档，别乱猜操作。
+## IME cannot type into Compose TextField
 
-## IME 无法输入 Compose TextField
+Neither `android_ui_type_text` nor `adb shell input text` can enter text into a Compose `TextField` or `OutlinedTextField`. The backends are adb-input and UIAutomator, which inject KeyEvents. Compose goes through the IME channel, and the two are incompatible. context7 on Compose Testing APIs confirms the right path is `performSemanticsAction`, which the MCP does not expose.
 
-`android_ui_type_text`、`adb shell input text` 都**无法**往 Compose `TextField` / `OutlinedTextField` 输入文字。后端是 adb-input / UIAutomator，注入 KeyEvent；Compose 走 IME 通道，两者不兼容（context7 查 Compose Testing APIs 确认：正确路径是 `performSemanticsAction`，MCP 不暴露语义层）。
+Workarounds, given that MCP cannot automate the input flow:
 
-**应对**（输入流无法 MCP 自动化）：
-1. 可测逻辑抽**纯函数 JVM 单测**（如 `validateBookName`）。
-2. DAO 写入路径用 `WordDrillDatabaseTest`（内存 Room）覆盖。
-3. 端到端落库用 **adb 直接验证**（配合下条 `wal_checkpoint`）。
-4. UI 渲染用 MCP screenshot / describe 验证可见性，别指望驱动 TextField 输入。
+1. Extract testable logic into pure functions covered by JVM unit tests, such as `validateBookName`.
+2. Cover DAO write paths with `WordDrillDatabaseTest` using in-memory Room.
+3. Verify end-to-end persistence directly with adb, together with the `wal_checkpoint` trick below.
+4. Verify UI rendering with MCP screenshot and describe. Do not expect to drive TextField input.
 
-## 查 Room 数据库
+## Reading the Room database
 
-查刚写入的库可能因 WAL 返回空。**先 checkpoint 再查**：
+A freshly written database can read empty because of WAL. Checkpoint first, then query:
 
 ```
 adb shell "run-as com.github.chsiching.worddrill sqlite3 databases/worddrill.db 'PRAGMA wal_checkpoint(TRUNCATE); SELECT ...;'"
 ```
 
-查 DataStore（看 `current_book_id` 的 varint 值）：
+Reading DataStore, to see the varint value of `current_book_id`:
 
 ```
 adb shell "run-as com.github.chsiching.worddrill sh -c 'cat files/datastore/worddrill.preferences.preferences_pb | od -An -tx1'"
 ```
 
-## 测试
+## Tests
 
-- `createComposeRule` / `createAndroidComposeRule` 有 v2 deprecation 警告，**别迁移**。保持 v1（与既有测试一致），warning 无害。v2 用 StandardTestDispatcher，行为不同，要重写同步逻辑。
-- 带写副作用的 Flow `collect` 务必 `distinctUntilChanged`，否则重复 emit 重复写库（`HorizontalPager` 的 `settledPage`、列表刷新回调都会对同一值重复 emit）。
-- **断言用 `Truth.assertThat`，别用 `kotlin.assert`**：Kotlin 的 `assert` 在 JVM 上靠 `-ea` flag，JUnit4 默认不设，所以 `assert(x)` 永远通过（no-op），测了等于没测。repo 约定是 `com.google.common.truth.Truth.assertThat`（见 `WordDrillDatabaseTest` / `BookNameValidationTest`）。
-- **`onNodeWithText` 默认做子串匹配**（错误信息原文 "contains '...'"）。`onNodeWithText("统计")` 会同时命中"统计数据""今日统计"等，报 "found N nodes"。要么用更长更精确的文案，要么 `onNodeWithText("统计", substring = false)`。
-- **`performTextInput` 是追加，不是替换**：对已有值的 TextField 调 `performTextInput("X")` 会把 "苹果" 变成 "苹果X"。要整段替换用 `performTextReplacement("X")`。
-- `IconButton` 的点击入口在测试里要用 `onNodeWithContentDescription(...)`（匹配 `contentDescription`），不是 `onNodeWithText`（后者匹配显示文本，IconButton 通常只有 icon 没文本）。
-- **`= runBlocking { }` 表达式体的测试方法若最后一条语句返回非 Unit，JUnit4 报 `InvalidTestClassError: Method should be void`**。典型陷阱：`fun foo() = runBlocking { ... onNodeWithText(x).assertIsDisplayed() }` —— `assertIsDisplayed()` 返回 `SemanticsNodeInteraction`，`runBlocking` 推断方法返回类型非 Unit，JUnit4 拒绝。改用**块体** `fun foo() { runBlocking { ... }; ... }`，或保证表达式体最后一条返回 Unit（`assertThat(...).isEqualTo()` 返回 Unit，安全）。
-- **`someStateFlow.first()` 拿到的是 `initialValue`，不是解析后的值**。`stateIn(WhileSubscribed, initialValue = X)` 首次订阅先发 `X` 再异步解析上游；`.first()` 立即返回首条 = `X`。要等解析后的值，用带条件的 `.first { predicate }`（如 `.first { it.bookName.isNotEmpty() }`），或用 Turbine 收集多帧。
-- **in-memory Room + 异步 Flow query 的 connectedAndroidTest 偶发 "connection pool has been closed"**（#9 重跑时撞到 #8 的 `progress_followsNewCurrentBook_afterSwitch`）。原因：`tearDown` 的 `db.close()` 在某测试的异步 query 还在跑时执行。**重跑即过，不是回归**。应对：测试里 `runBlocking` 同步等 query 完成再 close，或接受偶发重跑。
-- **测试断言版本号会硬编码 `onNodeWithText("版本 0.1.0")`**：bump `versionName` 时同步改测试。曾尝试前缀 `onNodeWithText("版本 ")` 避免 bump 碎裂，但 Compose substring 匹配在 "版本 "（带尾空格）上失败，回退硬编码。
-- **`onNodeWithText("X")` 在弹窗里 X 同时出现在标题和正文时风险**（substring=true 默认同时命中两者）。`AlertDialog` 的 title 语义节点处理特殊，实测可能只命中正文（第一版通过），但 code-review 会抓。稳妥：正文用 `substring=false` 精确匹配。
-- **ViewModel 里的用户可见文案也要走 `R.string`**（#10 code-review 抓）。VM 不是 Composable 不能直接 `stringResource`，但若把中文/英文写死在 VM（如 `error("无法打开文件")`、`State("导出完成")`），文案会在 UI 展示 → 违反"用户可见文案走 R.string"约定。**正确模式：sealed status 携带 `@StringRes Int`**，VM 只传资源 id（`Done(R.string.me_export_done)` / `Failed(R.string.me_export_failed, e.message)`），Composable 用 `stringResource(status.messageRes)` 解析。附带好处：同一 sealed 类型用不同 id 区分导出/导入完成，避免"导入后显示导出完成"的正确性泄漏。
-- **SAF（Storage Access Framework）文件选择可用 MCP 驱动端到端验证**（#10）。Compose 用 `rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json"))` / `OpenDocument()`，点确认后系统弹 DocumentsUI（包名 `com.google.android.documentsui`，不在 app 内）。MCP `android_ui_describe` 能拿到 SAVE 按钮（`android:id/button1`）、文件名输入框、CardView 列表项的坐标，`android_ui_tap` 点文件 → 回调 Uri 给 VM → 写库。**整库导出验证用 `adb exec-out "cat /sdcard/Download/worddrill-backup.json"`** 读真实 JSON 确认内容（像素法不适用于文件内容）。
+- `createComposeRule` / `createAndroidComposeRule` carry v2 deprecation warnings. Do not migrate. Stay on v1, matching the existing tests; the warnings are harmless. v2 uses StandardTestDispatcher, behaves differently, and would force a rewrite of the synchronization logic.
+- Any Flow `collect` with write side effects must use `distinctUntilChanged`, or repeated emits write the same value to the database repeatedly. `HorizontalPager`'s `settledPage` and list-refresh callbacks both emit the same value more than once.
+- Assert with `Truth.assertThat`, not `kotlin.assert`. Kotlin's `assert` on the JVM needs the `-ea` flag, which JUnit4 does not set by default, so `assert(x)` always passes and tests nothing. The repo convention is `com.google.common.truth.Truth.assertThat`; see `WordDrillDatabaseTest` and `BookNameValidationTest`.
+- `onNodeWithText` does substring matching by default; the error message literally says "contains '...'". `onNodeWithText("统计")` also matches "统计数据" or "今日统计" and then fails with "found N nodes". Use a longer, more precise string, or pass `onNodeWithText("统计", substring = false)`.
+- `performTextInput` appends, it does not replace. Calling `performTextInput("X")` on a TextField holding "苹果" produces "苹果X". To replace the whole value, use `performTextReplacement("X")`.
+- In tests, target an `IconButton` click through `onNodeWithContentDescription(...)`, which matches `contentDescription`, not `onNodeWithText`, which matches displayed text. An IconButton usually has only an icon and no text.
+- A test method written as `= runBlocking { }` whose last statement returns non-Unit makes JUnit4 reject the class with `InvalidTestClassError: Method should be void`. The classic trap is `fun foo() = runBlocking { ... onNodeWithText(x).assertIsDisplayed() }`. `assertIsDisplayed()` returns `SemanticsNodeInteraction`, `runBlocking` infers a non-Unit return type, and JUnit4 refuses. Use a block body, `fun foo() { runBlocking { ... }; ... }`, or make the expression body end in a Unit call. `assertThat(...).isEqualTo()` returns Unit and is safe.
+- `someStateFlow.first()` returns the `initialValue`, not the resolved value. A `stateIn(WhileSubscribed, initialValue = X)` flow emits `X` first and resolves the upstream asynchronously afterwards, so `.first()` returns immediately with that first emission. To wait for the resolved value, use a conditional `.first { predicate }` such as `.first { it.bookName.isNotEmpty() }`, or collect several frames with Turbine.
+- In-memory Room plus an asynchronous Flow query in connectedAndroidTest occasionally throws "connection pool has been closed". Hit while rerunning #9, on #8's `progress_followsNewCurrentBook_afterSwitch`. The cause is `tearDown`'s `db.close()` running while another test's async query is still in flight. A rerun passes, so it is not a regression. Response: inside the test, `runBlocking` until the query finishes before close, or accept the occasional rerun.
+- Tests that assert the version number hardcode `onNodeWithText("版本 0.1.0")`. When bumping `versionName`, update the test too. A prefix match `onNodeWithText("版本 ")` was tried to survive bumps, but Compose substring matching failed on "版本 " with its trailing space, so the hardcode stayed.
+- `onNodeWithText("X")` is risky inside a dialog where X appears in both the title and the body, since substring matching is on by default and hits both. `AlertDialog`'s title semantics node is special; in practice only the body matched and the first version passed, but code review flags the pattern. The safe form is an exact match on the body with `substring = false`.
+- User-visible text living in a ViewModel must also go through `R.string` (caught by code review on #10). A VM is not a Composable and cannot call `stringResource`, but hardcoding Chinese or English inside the VM, such as `error("无法打开文件")` or `State("导出完成")`, puts that text on screen, which violates the convention that user-visible text goes through R.string. The correct pattern is a sealed status carrying a `@StringRes Int`. The VM passes only the resource id, as in `Done(R.string.me_export_done)` or `Failed(R.string.me_export_failed, e.message)`, and the Composable resolves it with `stringResource(status.messageRes)`. A bonus: the same sealed type with different ids separates export completion from import completion, avoiding the correctness leak where an import shows "export finished".
+- SAF file picking, Storage Access Framework, can be driven end to end with MCP (#10). Compose uses `rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json"))` or `OpenDocument()`. After confirming, the system opens DocumentsUI, package `com.google.android.documentsui`, which lives outside the app. MCP `android_ui_describe` reaches the SAVE button (`android:id/button1`), the filename input, and the CardView list items, so `android_ui_tap` can tap a file, hand the Uri to the VM, and write the database. To verify a full export, read the real JSON with `adb exec-out "cat /sdcard/Download/worddrill-backup.json"`. The pixel method does not apply to file contents.
 
+## Code conventions
 
-## 代码层约定
+Cross-file pitfalls repeatedly caught by code review on the Standards axis, which cannot live in a single code comment.
 
-跨文件、无法在单处注释承载的反复踩坑（code-review Standards 轴抓出来的）。
-
-- **所有用户可见文案走 `stringResource(R.string.*)`，别硬编码中文字面量**（含含变量的拼接，用格式资源 `%1$s` / `%1$d`）。repo 所有 Composable（`DrillScreen` / `LibraryScreen` / `WordListScreen` / `MeScreen`）都走 `stringResource`；本地拼接字符串（如 `"$bookName：$x / $y"`）看似省事，实则在 i18n、文案一致性检查、code-review 上反复翻车。含变量用格式资源：`<string name="me_progress_line">%1$s：%2$d / %3$d（%4$d%%）</string>` + `stringResource(R.string.me_progress_line, bookName, x, y, percent)`。
-- **别给 Composable/函数加"便于测试/预览"的投机参数**（AGENTS.md §2 Simplicity First）。#9 给 `WordDrillTheme` 加了 `systemDarkTheme: Boolean = isSystemInDarkTheme()` 参数，KDoc 写"便于测试/预览"，但**无任何测试或 `@Preview` 用到它**，code-review 抓为 Speculative Generality 删掉。测试要注入就显式传真实依赖（如 ViewModel），别在生产 Composable 签名上开投机口子。
-- **导入覆盖（整库清空重插）要用 Room `@Transaction`，且清表顺序先子后父**（#10）。`sense`/`book_word` 有 CASCADE 外键挂 `word`/`book`，`swipe_log` 无外键（保留孤立日志用于累计统计）。清表先 `deleteAllSenses`/`deleteAllLinks`/`deleteAll(swipe_log)` 再 `deleteAll(book)`/`deleteAll(word)`；重插反之。`BackupService.import` 用 `db.withTransaction { ... }` 包住，失败回滚不留半导入态。**按原始主键恢复**（`@Insert(onConflict=REPLACE)` 带原 id）保证跨表引用与孤立日志完整。
+- All user-visible text goes through `stringResource(R.string.*)`. Never hardcode Chinese literals, including concatenation with variables; use format resources with `%1$s` and `%1$d`. Every Composable in the repo, `DrillScreen`, `LibraryScreen`, `WordListScreen`, `MeScreen`, uses `stringResource`. Local concatenation such as `"$bookName：$x / $y"` looks cheaper but keeps breaking i18n, copy consistency checks, and code review. With variables, use a format resource: `<string name="me_progress_line">%1$s：%2$d / %3$d（%4$d%%）</string>` plus `stringResource(R.string.me_progress_line, bookName, x, y, percent)`.
+- Do not add speculative parameters to Composables or functions "for tests or previews" (AGENTS.md §2 Simplicity First). On #9, `WordDrillTheme` gained a `systemDarkTheme: Boolean = isSystemInDarkTheme()` parameter whose KDoc said it existed for tests and previews, but no test or `@Preview` ever used it. Code review flagged it as Speculative Generality and it was deleted. When a test needs an injection, pass real dependencies explicitly, such as the ViewModel. Do not open speculative holes in production Composable signatures.
+- Import overwrite, meaning clearing the whole database and reinserting, must run inside a Room `@Transaction`, and must clear child tables before parents (#10). `sense` and `book_word` carry CASCADE foreign keys into `word` and `book`; `swipe_log` has no foreign key, so orphan logs stay for cumulative stats. Clear `deleteAllSenses`, `deleteAllLinks`, `deleteAll(swipe_log)` first, then `deleteAll(book)` and `deleteAll(word)`; reinsert in the reverse order. `BackupService.import` wraps everything in `db.withTransaction { ... }`, so a failure rolls back without leaving a half-imported state. Restore original primary keys, `@Insert(onConflict=REPLACE)` carrying the original ids, to keep cross-table references and orphan logs intact.

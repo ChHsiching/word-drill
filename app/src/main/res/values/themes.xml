@@ -1,5 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Ticket #24 — system SplashScreen theme.
+    <!-- Ticket #24 system SplashScreen theme.
          Colors are fully controlled by Compose WordDrillTheme; this theme only sets
          transparent system bars (edge-to-edge) and a transparent window background
          to avoid white flashes.
@@ -13,12 +13,12 @@
         <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 
-    <!-- Ticket #24 — splash screen theme (forced by the system on API 31+).
+    <!-- Ticket #24 splash screen theme, forced by the system on API 31+.
          parent must be Theme.SplashScreen and postSplashScreenTheme must point at the real theme.
-         windowSplashScreenBackground = the app's main background color (seamless handoff);
-         windowSplashScreenAnimatedIcon = a transparent drawable (same color as the background,
-         so no system logo is visible) — the custom Compose launch animation is the only
-         animation the user sees, from the first frame.
+         windowSplashScreenBackground matches the app's main background color for a seamless handoff.
+         windowSplashScreenAnimatedIcon is a transparent drawable of the same color, so no system
+         logo is visible. The custom Compose launch animation is the only animation the user
+         sees, from the first frame.
          android:windowBackground is also set to that color, preventing the compat library
          parent's default gradient from leaking through. -->
     <style name="Theme.WordDrill.Splash" parent="Theme.SplashScreen">
