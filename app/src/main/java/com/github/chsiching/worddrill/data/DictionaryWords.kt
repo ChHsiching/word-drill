@@ -1,19 +1,20 @@
 package com.github.chsiching.worddrill.data
 
 /**
- * Ticket #19：内置词典的内存模型（与 assets/dictionary.json 结构对应）。
- * 纯数据类，无 Android 依赖，便于 JVM 单测构造。
+ * Ticket #19: in-memory model of the built-in dictionary (matches the assets/dictionary.json
+ * structure).
+ * Pure data class with no Android dependency, easy to construct in JVM unit tests.
  *
- * JSON 结构（与 tools/gen_dictionary_json.py 输出一致）：
+ * JSON structure (matches the tools/gen_dictionary_json.py output):
  * {
  *   "source": "ECDICT (MIT License, ...)",
  *   "words": [
- *     { "word": "apple", "phonetic": "/ˈæpl/", "pos": "n.", "meaning": "苹果" },
+ *     { "word": "apple", "phonetic": "/ˈæpl/", "pos": "n.", "meaning": "apple" },
  *     { "word": "apple", "phonetic": "/ˈæpl/", "pos": "v.", "meaning": "..." }
  *   ]
  * }
  *
- * 同一 word 的多个词性 = 多条 entries（与 word/sense 模型同形）。
+ * Multiple parts of speech for the same word = multiple entries (same shape as the word/sense model).
  */
 data class DictionaryWords(
     val source: String,

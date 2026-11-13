@@ -3,30 +3,32 @@ package com.github.chsiching.worddrill.data.wordimport
 import java.io.InputStream
 
 /**
- * Ticket #21：txt / csv 表格解析（纯函数）。
+ * Ticket #21: txt / csv table parser (pure function).
  *
- * 列结构（issue #21，所有格式统一）：
- * - col 0：序号（忽略）
- * - col 1：单词
- * - col 2：音标（可空）
- * - col 3：词性+释义（可空）
+ * Column layout (issue #21, identical for all formats):
+ * - col 0: index (ignored)
+ * - col 1: word
+ * - col 2: phonetic (nullable)
+ * - col 3: pos+meaning (nullable)
  *
- * 两种模式：
- * - [delimiter] = `,`：CSV 模式，支持双引号包裹的 field（释义内部含 `,`）
- * - [delimiter] = null：TXT 模式，按 tab 或 2+ 连续空格切列（兼容从 PDF/Word 复制的对齐表）
+ * Two modes:
+ * - [delimiter] = `,`: CSV mode, supports double-quoted fields (meaning containing `,`)
+ * - [delimiter] = null: TXT mode, splits columns on tabs or 2+ consecutive spaces
+ *   (compatible with aligned tables copied from PDF/Word)
  *
- * 不做的事：
- * - 不解析 POS（[PosMeaningParser] 负责，[FileWordImporter] 在词典未命中时调用）
- * - 不识别表头（issue 没要求；如需排除表头，调用方在导入后手动判断）
+ * What it does not do:
+ * - No POS parsing ([PosMeaningParser] owns that; [FileWordImporter] calls it on a dictionary miss)
+ * - No header detection (not required by the issue; if headers must be excluded, the caller
+ *   filters them manually after import)
  *
- * 解析后字段统一 trim，空字段 → null（[ImportRow] 字段语义对齐）。
- * 行内 word 列（col 1）为空的行直接跳过（无法构成词条）。
+ * Parsed fields are trimmed, empty fields -> null (matching [ImportRow] field semantics).
+ * Rows with an empty word column (col 1) are skipped outright (they cannot form a word entry).
  */
 object TextTableParser {
 
     /**
-     * @param input 文本输入流（UTF-8 解码）
-     * @param delimiter `,` → CSV 模式；`null` → TXT 自动识别（tab / 2+ 空格）
+     * @param input Text input stream (decoded as UTF-8)
+     * @param delimiter `,` -> CSV mode; `null` -> TXT auto-detection (tab / 2+ spaces)
      */
     fun parse(input: InputStream, delimiter: Char?): List<ImportRow> {
         val text = input.bufferedReader(Charsets.UTF_8).readText()
@@ -34,13 +36,13 @@ object TextTableParser {
 
         val rows = mutableListOf<ImportRow>()
         for (rawLine in text.lines()) {
-            // 跳过空行（含只有 \r 的 CRLF 残留）
+            // Skip blank lines (including CRLF leftovers that are only \r)
             if (rawLine.isBlank()) continue
 
             val cols = if (delimiter != null) {
                 splitCsvLine(rawLine, delimiter)
             } else {
-                // TXT 模式：tab / 2+ 空格切列，与 PdfTableParser 共用 [ImportRowMapper.splitLine]
+                // TXT mode: split on tab / 2+ spaces, sharing [ImportRowMapper.splitLine] with PdfTableParser
                 ImportRowMapper.splitLine(rawLine)
             }
             val row = ImportRowMapper.toRow(cols) ?: continue
@@ -50,10 +52,10 @@ object TextTableParser {
     }
 
     /**
-     * CSV 行切分：支持双引号包裹的 field。
+     * CSV line splitting: supports double-quoted fields.
      *
-     * 简易状态机：quote 开关交替，遇到分隔符（在非 quote 内）切一段。
-     * 引号内的分隔符不切；引号本身被剥离。
+     * Simple state machine: the quote flag toggles; a delimiter (outside a quote) ends a field.
+     * Delimiters inside quotes do not split; the quotes themselves are stripped.
      */
     private fun splitCsvLine(line: String, delimiter: Char): List<String> {
         val cols = mutableListOf<String>()
@@ -65,7 +67,7 @@ object TextTableParser {
             when {
                 c == '"' -> {
                     if (inQuote && i + 1 < line.length && line[i + 1] == '"') {
-                        // CSV 转义：两个连续引号 → 一个字面引号
+                        // CSV escaping: two consecutive quotes -> one literal quote
                         current.append('"')
                         i += 2
                         continue

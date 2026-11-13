@@ -6,34 +6,41 @@ import java.io.InputStream
 import java.util.zip.ZipInputStream
 
 /**
- * Ticket #21：xlsx 解析（手写 OOXML，零生产依赖）。
+ * Ticket #21: xlsx parsing (hand-written OOXML, zero production dependencies).
  *
- * issue #21 原指定 Fastexcel (cn.idev.excel:fastexcel:1.3.0)，但它本质是 Apache POI 5.4.1
- * 的封装。POI 5.x 在 Android 上有已知问题（`javax.xml.stream` 不存在，需 stax stub + ProGuard
- * 规则），且会让 APK +10MB。词书导入只需读 4 列文本，POI 的复杂特性（公式、合并单元格、图表）
- * 用不上。改用：ZIP 解包 + [XmlPullParser]（Android 框架自带，无新依赖）。
+ * issue #21 originally specified Fastexcel (cn.idev.excel:fastexcel:1.3.0), but it is
+ * essentially a wrapper around Apache POI 5.4.1. POI 5.x has known problems on Android
+ * (`javax.xml.stream` is missing, needs stax stubs + ProGuard rules) and adds ~10MB to the
+ * APK. Book import only needs to read 4 columns of text; POI's advanced features (formulas,
+ * merged cells, charts) are useless here. Instead: ZIP unpacking + [XmlPullParser] (shipped
+ * with the Android framework, no new dependency).
  *
- * 流程：
- * 1. [ZipInputStream] 解 .xlsx，找 `xl/sharedStrings.xml` + `xl/worksheets/sheet1.xml`。
- *    只读第一个 sheet（多 sheet 文件其余忽略；issue 没要求多 sheet）。
- * 2. sharedStrings：解 `<si><t>...</t></si>` 序列 → `List<String>`（按出现顺序索引）。
- * 3. sheet1：解 `<row>` 内的 `<c r="B1" t="s"><v>0</v></c>`，按 `r="A1"` 的字母列定位，
- *    `t="s"` 的值是 sharedStrings 索引（`<v>` 里数字），`t="inlineStr"` 的值是 `<is><t>` 文本，
- *    无 `t` / `t="n"` 的值是数字字符串。
- * 4. 每行按 col A/B/C/D 映射到 [ImportRow]：A=序号忽略 / B=word / C=phonetic / D=posMeaning。
- *    B 列空 → 整行跳过。
+ * Flow:
+ * 1. [ZipInputStream] unpacks the .xlsx, looking for `xl/sharedStrings.xml` +
+ *    `xl/worksheets/sheet1.xml`. Only the first sheet is read (other sheets in multi-sheet
+ *    files are ignored; the issue does not require multi-sheet support).
+ * 2. sharedStrings: parse the `<si><t>...</t></si>` sequence -> `List<String>` (indexed by
+ *    order of appearance).
+ * 3. sheet1: parse `<c r="B1" t="s"><v>0</v></c>` inside `<row>`, locating cells by the letter
+ *    column of `r="A1"`; a `t="s"` value is a sharedStrings index (the number inside `<v>`),
+ *    a `t="inlineStr"` value is the `<is><t>` text, and no `t` / `t="n"` means the value is a
+ *    numeric string.
+ * 4. Each row maps cols A/B/C/D to [ImportRow]: A=index ignored / B=word / C=phonetic /
+ *    D=posMeaning. Empty column B -> the whole row is skipped.
  *
- * 不支持（issue 没要求）：公式 `<f>` / 合并单元格 / 多 sheet 合并 / `.xls`（旧格式）。
+ * Not supported (not required by the issue): formulas `<f>` / merged cells / multi-sheet
+ * merging / `.xls` (legacy format).
  *
- * 设计要点：用 [XmlPullParser] 而非 DOM（流式解析，省内存；大 xlsx 不会一次性载入）。
+ * Design note: [XmlPullParser] instead of DOM (streaming parse, low memory; a large xlsx is
+ * never loaded all at once).
  */
 object XlsxParser {
 
     private const val NS_SHEET = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 
-    /** 列字母（A/B/C/D...）→ 0 起列号。"A"=0, "B"=1, ... "AA"=26 */
+    /** Column letters (A/B/C/D...) -> 0-based column index. "A"=0, "B"=1, ... "AA"=26 */
     private fun colIndexFromRef(ref: String): Int {
-        // ref 如 "B12"：前缀字母是列，后缀数字是行
+        // ref like "B12": the letter prefix is the column, the numeric suffix is the row
         val letters = ref.takeWhile { it.isLetter() }
         var idx = 0
         for (c in letters) idx = idx * 26 + (c.uppercaseChar() - 'A' + 1)
@@ -55,7 +62,7 @@ object XlsxParser {
                     name == "xl/worksheets/sheet1.xml" -> {
                         sheet1Xml = zip.readBytes().toString(Charsets.UTF_8)
                     }
-                    // 其他 entries 忽略
+                    // Other entries are ignored
                 }
                 zip.closeEntry()
                 entry = zip.nextEntry
@@ -66,7 +73,7 @@ object XlsxParser {
         return parseWorksheet(xml, sharedStrings)
     }
 
-    /** 解 sharedStrings.xml → 字符串列表（按 <si> 顺序）。 */
+    /** Parse sharedStrings.xml -> string list (in <si> order). */
     private fun readSharedStrings(input: InputStream): List<String> {
         val parser = newParser(input)
         val result = mutableListOf<String>()
@@ -81,8 +88,9 @@ object XlsxParser {
     }
 
     /**
-     * 读 <si>...</si> 内的文本。<si> 可包含单个 <t> 或多个 <t>（rich text，每个 <r><t>）。
-     * 这里把所有 <t> 的文本拼起来，简化处理。
+     * Read the text inside <si>...</si>. An <si> can contain a single <t> or multiple <t>
+     * elements (rich text, one per <r><t>).
+     * Simplified handling: concatenate the text of all <t> elements.
      */
     private fun readTextInsideSi(parser: XmlPullParser): String {
         val sb = StringBuilder()
@@ -98,7 +106,7 @@ object XlsxParser {
         return sb.toString()
     }
 
-    /** 解 sheet1.xml，每 <row> → 一个 ImportRow（word 列空则跳过）。 */
+    /** Parse sheet1.xml, each <row> -> one ImportRow (skipped if the word column is empty). */
     private fun parseWorksheet(xml: String, sharedStrings: List<String>): List<ImportRow> {
         val parser = newParser(xml.byteInputStream(Charsets.UTF_8))
         val rows = mutableListOf<ImportRow>()
@@ -114,7 +122,7 @@ object XlsxParser {
         return rows
     }
 
-    /** 读 <row> 内的所有 <c> → Map<colIndex, value>。value 已解析（sharedStrings 解引用 / inlineStr）。 */
+    /** Read all <c> inside a <row> -> Map<colIndex, value>. Values are already resolved (sharedStrings dereference / inlineStr). */
     private fun readCellsInRow(parser: XmlPullParser, sharedStrings: List<String>): Map<Int, String> {
         val cells = mutableMapOf<Int, String>()
         val startDepth = parser.depth
@@ -134,11 +142,11 @@ object XlsxParser {
     }
 
     /**
-     * 读 <c> 元素的值。
-     * - t="s"：<v> 里是 sharedStrings 的索引
-     * - t="inlineStr"：<is><t>...</t></is> 直接是文本
-     * - t="n" 或无：<v> 里是数字字符串（保留原样）
-     * - 无 <v> 也无 <is>：返回 null（空 cell）
+     * Read the value of a <c> element.
+     * - t="s": <v> holds a sharedStrings index
+     * - t="inlineStr": <is><t>...</t></is> is the text directly
+     * - t="n" or absent: <v> holds a numeric string (kept as-is)
+     * - Neither <v> nor <is>: returns null (empty cell)
      */
     private fun readCellValue(
         parser: XmlPullParser,
@@ -154,7 +162,7 @@ object XlsxParser {
                     "v" -> {
                         val raw = parser.nextText()
                         value = if (type == "s") {
-                            // sharedStrings 解引用
+                            // sharedStrings dereference
                             val idx = raw.toIntOrNull() ?: return null
                             sharedStringsView().getOrNull(idx)
                         } else {
@@ -162,7 +170,7 @@ object XlsxParser {
                         }
                     }
                     "is" -> {
-                        // inlineStr：<is><t>text</t></is>
+                        // inlineStr: <is><t>text</t></is>
                         value = readInlineString(parser)
                     }
                 }
@@ -173,7 +181,7 @@ object XlsxParser {
         return value
     }
 
-    /** 读 <is> 内的 <t>...</t> 文本。 */
+    /** Read the <t>...</t> text inside <is>. */
     private fun readInlineString(parser: XmlPullParser): String {
         val sb = StringBuilder()
         val startDepth = parser.depth
@@ -188,8 +196,8 @@ object XlsxParser {
         return sb.toString()
     }
 
-    /** Map<colIndex, value> → ImportRow。col 1=word / col 2=phonetic / col 3=posMeaning。
-     *  cells 里的 value 已在 [readCellValue] 时按 cell type 解引用过 sharedStrings。 */
+    /** Map<colIndex, value> -> ImportRow. col 1=word / col 2=phonetic / col 3=posMeaning.
+     *  Values in cells were already dereferenced against sharedStrings by cell type in [readCellValue]. */
     private fun buildRow(cells: Map<Int, String>): ImportRow? {
         val word = cells[1]?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         val phonetic = cells[2]?.trim()?.takeIf { it.isNotEmpty() }

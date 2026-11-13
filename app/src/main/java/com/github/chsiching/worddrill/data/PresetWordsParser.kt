@@ -3,10 +3,11 @@ package com.github.chsiching.worddrill.data
 import org.json.JSONObject
 
 /**
- * 解析 assets/words.json 文本为 [PresetWords]。
- * 用 Android 自带的 org.json（无新增依赖）。
+ * Parse assets/words.json text into [PresetWords].
+ * Uses Android's built-in org.json (no new dependency).
  *
- * 解析逻辑独立成纯函数，便于在 JVM 单测里喂入小段 JSON 字符串验证。
+ * The parsing logic is a standalone pure function, easy to verify in JVM unit tests by feeding
+ * in small JSON strings.
  */
 object PresetWordsParser {
 
@@ -36,11 +37,13 @@ object PresetWordsParser {
                         add(
                             PresetWords.Word(
                                 text = w.getString("text"),
-                                // Ticket #14：phonetic 可空。
-                                // ⚠️ 必须 w.isNull 先挡 JSON null：Android 自带 org.json 的 optString(key, "")
-                                // 在 key 存在且值为 JSON null 时会返回字符串 "null"（而非 fallback ""),
-                                // 直接 optString 会让 phonetic = "null" 落库（实机验证踩到）。
-                                // 同样的坑也出现在 DatabaseJsonSerializer 反序列化路径，处理方式一致。
+                                // Ticket #14: phonetic is nullable.
+                                // Warning: JSON null must be guarded with w.isNull first: Android's
+                                // bundled org.json optString(key, "") returns the string "null" (not the
+                                // fallback "") when the key exists with a JSON null value, so calling
+                                // optString directly would persist phonetic = "null" (hit and verified on
+                                // a real device). The same trap exists in DatabaseJsonSerializer's
+                                // deserialization path, handled the same way.
                                 phonetic = if (w.isNull("phonetic")) {
                                     null
                                 } else {

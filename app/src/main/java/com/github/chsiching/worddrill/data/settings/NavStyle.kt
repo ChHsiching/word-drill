@@ -1,20 +1,20 @@
 package com.github.chsiching.worddrill.data.settings
 
 /**
- * 底部导航栏风格（Ticket #16）：浮动胶囊 / 全宽底部栏。
+ * Bottom navigation bar style (Ticket #16): floating pill / full-width bottom bar.
  *
- * 与 [ThemeMode] 一样：持久化存 [name]，读回用 [fromStorageName] 安全解码，
- * 未知值回退到默认 [PILL]，避免损坏数据抛异常。
+ * Same as [ThemeMode]: persisted as [name], decoded safely on read with [fromStorageName];
+ * unknown values fall back to the default [PILL], avoiding exceptions on corrupted data.
  */
 enum class NavStyle {
-    /** 居中悬浮胶囊：圆角 100px，毛玻璃半透明，黑色滑动指示器，选中项文字反白。 */
+    /** Centered floating pill: 100px corner radius, frosted-glass translucency, black sliding indicator, selected item text inverted to white. */
     PILL,
 
-    /** 全宽贴底栏：无圆角，选中项用文字亮度高亮（无黑块）。 */
+    /** Full-width bottom-anchored bar: no corner radius, selected item highlighted by text brightness (no black block). */
     BAR;
 
     companion object {
-        /** 从 DataStore 读回的字符串安全解码。null 或无法识别 → [PILL]。 */
+        /** Safely decodes a string read back from DataStore. null or unrecognized -> [PILL]. */
         fun fromStorageName(name: String?): NavStyle =
             name?.let { runCatching { valueOf(it) }.getOrNull() } ?: PILL
     }

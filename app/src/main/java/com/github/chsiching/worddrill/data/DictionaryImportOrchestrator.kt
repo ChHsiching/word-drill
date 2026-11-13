@@ -10,16 +10,20 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Ticket #19：内置词典首启导入编排。幂等检查 → 读 assets → 解析 → 写 Room → 置标记。
+ * Ticket #19: built-in dictionary first-launch import orchestration. Idempotency check ->
+ * read assets -> parse -> write Room -> set the flag.
  *
- * 与 [PresetImportOrchestrator] 同模式。触发方（Application.onCreate）调用
- * [ensureDictionaryImported] 即可，已导入会立即返回。导入在 [Dispatchers.IO] 上执行。
+ * Same pattern as [PresetImportOrchestrator]. The trigger (Application.onCreate) just calls
+ * [ensureDictionaryImported]; if already imported, it returns immediately. The import runs on
+ * [Dispatchers.IO].
  *
- * 与预置词库导入独立标记：词典失败不影响用户已有词书（dictionary 只读参考数据）。
+ * Uses a flag independent from the preset library import: a dictionary failure does not affect
+ * the user's existing books (the dictionary is read-only reference data).
  *
- * Ticket #23：用版本号 [DICTIONARY_VERSION] 取代"已导入即不再导"语义。每次发布
- * 修复过 dictionary.json 的版本就 +1；老用户升级后存储版本 < 期望版本 → 清表重导，
- * 解决 INSERT IGNORE 无法覆盖旧行的问题。
+ * Ticket #23: the version number [DICTIONARY_VERSION] replaces the "imported once, never
+ * again" semantics. Incremented for every release that fixes dictionary.json; after upgrading,
+ * a stored version < the expected version -> clear the table and re-import, solving the
+ * problem that INSERT IGNORE cannot overwrite old rows.
  */
 @Singleton
 class DictionaryImportOrchestrator @Inject constructor(
@@ -27,41 +31,46 @@ class DictionaryImportOrchestrator @Inject constructor(
     private val settings: SettingsRepository,
     private val importer: DictionaryImporter,
 ) {
-    /** assets 中内置词典文件名。 */
+    /** Built-in dictionary file name in assets. */
     private val assetFile = "dictionary.json"
 
     /**
-     * 内置词典数据版本。每次发布修复过 [assetFile] 内容的版本就 +1：
-     * - v1：Ticket #19 首发（ECDICT top 10 万词，parse_translation 续接策略）。
-     * - v2：Ticket #23 修复（POS_PREFIXES 补 adj./interj.；无 POS 行不再续接）。
-     * orchestrator 把它写入 DataStore，启动时比对，落后则清表重导。
+     * Built-in dictionary data version. Incremented for every release that fixes [assetFile]:
+     * - v1: Ticket #19 initial release (ECDICT top 100k words, parse_translation continuation strategy).
+     * - v2: Ticket #23 fix (POS_PREFIXES gained adj./interj.; rows without a POS no longer continue).
+     * The orchestrator writes it to DataStore and compares it on startup; when stale, clear the
+     * table and re-import.
      */
     val version: Long = DICTIONARY_VERSION
 
     /**
-     * 若内置词典尚未导入或落后于 [DICTIONARY_VERSION]，则完成导入并置标记；已对齐则跳过。
+     * If the built-in dictionary has not been imported, or is behind [DICTIONARY_VERSION],
+     * finish the import and set the flag; skip when already up to date.
      *
-     * 幂等说明：预期由单一调用方（Application.onCreate）触发一次。DataStore 版本标记
-     * 保证后续启动不再重导；落后版本时先 [DictionaryImporter.clear] 再 insert，覆盖旧行。
+     * Idempotency note: expected to be triggered once by a single caller (Application.onCreate).
+     * The DataStore version flag guarantees later launches do not re-import; when the version is
+     * behind, [DictionaryImporter.clear] runs before the insert, overwriting old rows.
      *
-     * clearFirst 判定：stored == 0 且 旧布尔 [SettingsRepository.dictionaryImported] 为 true
-     * → 从 #19 老版本升级，dictionary 表有旧行，必须 clear；stored > 0 → 跨版本升级，
-     * 同样 clear；仅首启（stored == 0 且布尔为 false）不需要 clear（表本就空）。
+     * clearFirst decision: stored == 0 and the old boolean [SettingsRepository.dictionaryImported]
+     * is true -> upgrading from the old #19 version, the dictionary table holds old rows, must
+     * clear; stored > 0 -> cross-version upgrade, also clear; only a true first launch
+     * (stored == 0 and the boolean false) needs no clear (the table is already empty).
      */
     suspend fun ensureDictionaryImported() = withContext(Dispatchers.IO) {
         val stored = settings.dictionaryVersion.first()
         if (stored >= DICTIONARY_VERSION) return@withContext
         val json = context.assets.open(assetFile).use { it.readBytes().toString(Charsets.UTF_8) }
         val data = DictionaryWordsParser.parse(json)
-        // stored==0 时仍可能已有旧数据（#19 老布尔标记过 true 但版本字段未写入）；
-        // 用旧布尔判定是否需要先清表，否则 INSERT IGNORE 无法覆盖污染行。
+        // With stored==0 there may still be old data (#19's old boolean flag was true but the
+        // version field was never written); use the old boolean to decide whether to clear the
+        // table first, otherwise INSERT IGNORE cannot overwrite polluted rows.
         val hadOldData = stored > 0L || settings.dictionaryImported.first()
         importer.importDictionary(data, clearFirst = hadOldData)
         settings.markDictionaryVersion(DICTIONARY_VERSION)
     }
 
     companion object {
-        /** 当前内置词典数据版本。见 [version] 的递增说明。 */
+        /** Current built-in dictionary data version. See [version] for the increment rules. */
         const val DICTIONARY_VERSION: Long = 2L
     }
 }

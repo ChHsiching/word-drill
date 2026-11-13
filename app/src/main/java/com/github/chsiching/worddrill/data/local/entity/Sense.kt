@@ -6,10 +6,10 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * 词义：一个单词的某一种词性下的中文释义。
- * 同一拼写不同词性 = 同一 word 下的不同 sense（一张卡 = 一个 word 的全部 sense）。
+ * Sense: the Chinese definition of a word under one part of speech.
+ * Same spelling with different parts of speech = different senses under the same word (one card = all senses of one word).
  *
- * (wordId, pos) 唯一：同一单词同一词性只允许一条释义。
+ * (wordId, pos) unique: only one definition is allowed per word per part of speech.
  */
 @Entity(
     tableName = "sense",
@@ -26,8 +26,8 @@ import androidx.room.PrimaryKey
 data class Sense(
     @PrimaryKey(autoGenerate = true) val senseId: Long = 0,
     val wordId: Long,
-    /** 词性，如 "n."、"v."、"adj." */
+    /** Part of speech, e.g. "n.", "v.", "adj." */
     val pos: String,
-    /** 中文释义 */
+    /** Chinese definition */
     val meaning: String,
 )

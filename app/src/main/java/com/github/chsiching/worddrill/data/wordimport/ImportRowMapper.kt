@@ -1,18 +1,19 @@
 package com.github.chsiching.worddrill.data.wordimport
 
 /**
- * Ticket #21：列 → [ImportRow] 通用映射。
+ * Ticket #21: shared columns-to-[ImportRow] mapping.
  *
- * [TextTableParser]（TXT 模式）和 [PdfTableParser] 都按同一规则切列 + 映射 [ImportRow]，
- * 提取到这里避免两处实现漂移（issue #21 列结构对所有格式统一）。
+ * Both [TextTableParser] (TXT mode) and [PdfTableParser] split columns and map to [ImportRow]
+ * by the same rules, extracted here so the two implementations cannot drift apart
+ * (issue #21's column layout is identical for all formats).
  *
- * 列结构（issue #21）：col0=序号忽略 / col1=word / col2=phonetic / col3=posMeaning。
+ * Column layout (issue #21): col0=index ignored / col1=word / col2=phonetic / col3=posMeaning.
  */
 internal object ImportRowMapper {
 
     private val COLUMN_SEPARATOR = Regex("\\t+| {2,}")
 
-    /** 按行首尾 trim 后，按 tab 或 2+ 连续空格切列。 */
+    /** Trims the line, then splits columns on tabs or 2+ consecutive spaces. */
     fun splitLine(line: String): List<String> {
         val trimmed = line.trim()
         if (trimmed.isEmpty()) return emptyList()
@@ -20,9 +21,9 @@ internal object ImportRowMapper {
     }
 
     /**
-     * 列数组 → [ImportRow]。col1=word / col2=phonetic / col3=posMeaning。
-     * - 列数 < 2 或 col1（word）空 → 返回 null
-     * - 音标 / 释义列 trim 后空 → null
+     * Column array -> [ImportRow]. col1=word / col2=phonetic / col3=posMeaning.
+     * - Fewer than 2 columns, or col1 (word) empty -> returns null
+     * - Phonetic / meaning columns empty after trim -> null
      */
     fun toRow(cols: List<String>): ImportRow? {
         if (cols.size < 2) return null

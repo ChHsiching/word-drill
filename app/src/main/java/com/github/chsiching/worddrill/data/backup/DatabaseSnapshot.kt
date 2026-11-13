@@ -7,16 +7,20 @@ import com.github.chsiching.worddrill.data.local.entity.SwipeLog
 import com.github.chsiching.worddrill.data.local.entity.Word
 
 /**
- * 整库快照（导出/导入的内存模型）。
+ * Whole-database snapshot (in-memory model for export/import).
  *
- * 导入策略为**覆盖**（Ticket #10 默认）：按原始主键恢复，整库清空再批量重插。
- * 这样跨表的外键引用关系（book_word / sense → word，swipe_log.bookId → book）完整保留，
- * 尤其是孤立的 swipe_log（其 bookId/wordId 可能引用已删除的词书/词条，仍需保留用于累计统计）。
+ * Import strategy is **overwrite** (Ticket #10 default): restore by original primary keys,
+ * clear the whole database, then batch re-insert. This way cross-table foreign key references
+ * (book_word / sense → word, swipe_log.bookId → book) are fully preserved, especially orphaned
+ * swipe_log rows (their bookId/wordId may reference deleted books/words, but must still be kept
+ * for cumulative statistics).
  *
- * 字段对齐 Room 表，无 Android 依赖，便于在 JVM 单测里构造并验证 JSON 往返。
+ * Fields align with Room tables; no Android dependencies, making it easy to construct and
+ * verify JSON round-trips in JVM unit tests.
  *
- * @param version JSON schema 版本号；当前为 1。向后兼容：缺省时默认 1。
- * @param nickname 可选昵称标签。导出文件的用户可见标识，非全局设置；空白视为 null（不写入）。
+ * @param version JSON schema version number; currently 1. Backward compatible: defaults to 1 when absent.
+ * @param nickname Optional nickname label. User-visible identifier of the exported file, not a
+ *   global setting; blank is treated as null (not written).
  */
 data class DatabaseSnapshot(
     val version: Int = 1,

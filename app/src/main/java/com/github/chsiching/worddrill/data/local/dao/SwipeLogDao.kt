@@ -13,17 +13,17 @@ interface SwipeLogDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(log: SwipeLog): Long
 
-    /** 累计刷卡数：全表事件计数。 */
+    /** Cumulative swipe count: total event count across the table. */
     @Query("SELECT COUNT(*) FROM swipe_log")
     suspend fun totalCount(): Int
 
-    /** 今日刷卡数：timestamp >= 一日起始 epoch 毫秒的事件计数。 */
+    /** Today's swipe count: events with timestamp >= the day-start epoch millis. */
     @Query("SELECT COUNT(*) FROM swipe_log WHERE timestamp >= :dayStartMillis")
     suspend fun countSince(dayStartMillis: Long): Int
 
     /**
-     * 某词书已刷词数：该词书内被刷卡过的不同 wordId 数。
-     * 用于"当前词书进度 = 已刷 X / 总 Y"。X = 本方法，Y = BookDao.countWordsInBook。
+     * Words swiped in a book: count of distinct wordIds swiped within that book.
+     * Used for "current book progress = swiped X / total Y". X = this method, Y = BookDao.countWordsInBook.
      */
     @Query(
         """
@@ -33,17 +33,17 @@ interface SwipeLogDao {
     )
     suspend fun distinctWordCountForBook(bookId: Long): Int
 
-    // ---- Ticket #8: 响应式版本（「我的」Tab 统计随刷卡实时刷新）----
+    // ---- Ticket #8: reactive versions ("Mine" tab stats refresh live on each swipe) ----
 
-    /** 累计刷卡数（响应式）：swipe_log 任意写操作后自动重发。 */
+    /** Cumulative swipe count (reactive): re-emitted automatically after any write to swipe_log. */
     @Query("SELECT COUNT(*) FROM swipe_log")
     fun observeTotalCount(): Flow<Int>
 
-    /** 今日刷卡数（响应式）：传入今日 0 点毫秒。 */
+    /** Today's swipe count (reactive): pass today's midnight epoch millis. */
     @Query("SELECT COUNT(*) FROM swipe_log WHERE timestamp >= :dayStartMillis")
     fun observeCountSince(dayStartMillis: Long): Flow<Int>
 
-    /** 某词书已刷词数（响应式）。 */
+    /** Words swiped in a book (reactive). */
     @Query(
         """
         SELECT COUNT(DISTINCT wordId) FROM swipe_log
@@ -52,17 +52,17 @@ interface SwipeLogDao {
     )
     fun observeDistinctWordCountForBook(bookId: Long): Flow<Int>
 
-    // ---- Ticket #10：整库导出/导入 ----
+    // ---- Ticket #10: full-database export/import ----
 
-    /** 全量读所有刷卡日志（导出快照用；含引用已删词书/词条的孤立日志）。 */
+    /** Read all swipe logs (for the export snapshot; includes orphan logs referencing deleted books/entries). */
     @Query("SELECT * FROM swipe_log")
     suspend fun getAll(): List<SwipeLog>
 
-    /** 清空刷卡日志表（导入覆盖前清理）。 */
+    /** Clear the swipe log table (cleanup before an import overwrites). */
     @Query("DELETE FROM swipe_log")
     suspend fun deleteAll()
 
-    /** 批量插入刷卡日志（带原始 logId，导入覆盖恢复用）。 */
+    /** Batch-insert swipe logs (with original logIds, to restore an import overwrite). */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(logs: List<SwipeLog>)
 }

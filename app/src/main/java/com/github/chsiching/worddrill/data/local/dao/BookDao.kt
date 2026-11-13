@@ -9,14 +9,15 @@ import com.github.chsiching.worddrill.data.local.entity.BookWord
 import kotlinx.coroutines.flow.Flow
 
 /**
- * 词书 + 词条数（Ticket #16：词库列表副标题需要展示词条数）。
- * JOIN + GROUP BY 一次查出所有词书的词条数，避免 N 次查询。
+ * Book + word count (Ticket #16: the book list subtitle needs to show the word count).
+ * JOIN + GROUP BY fetches counts for all books in one query, avoiding N queries.
  *
- * Ticket #20：wordCount 只计 `skipped = 0` 的未跳过词条 —— 词书列表副标题的「X 词」
- * 反映用户实际会刷到的词数。跳过（隐藏不删）后副标题数字相应减少。
+ * Ticket #20: wordCount only counts entries with `skipped = 0`. The "X words" in the book list
+ * subtitle reflects the number of words the user will actually swipe. After skipping (hidden, not deleted), the subtitle number drops accordingly.
  *
- * Ticket #22：wordCount 还排除 `deleted = 1` 的软删词条 —— 删除后副标题数字相应减少，
- * 与 [WordDao.getWordsWithSensesByBook] / [observeWordsWithSensesByBook] 的过滤保持一致。
+ * Ticket #22: wordCount also excludes soft-deleted entries with `deleted = 1`, so the subtitle
+ * number drops after deletion, consistent with the filters in
+ * [WordDao.getWordsWithSensesByBook] / [observeWordsWithSensesByBook].
  */
 data class BookWithCount(
     val bookId: Long,
@@ -26,8 +27,8 @@ data class BookWithCount(
 )
 
 /**
- * 回收站条目（Ticket #22）：deleted=1 的 (bookId, wordId) 关联 + 关联的词书名/词文本。
- * 用于回收站列表展示「wordText（从 bookName 移除）」。
+ * Recycle bin entry (Ticket #22): a (bookId, wordId) association with deleted=1 plus the
+ * associated book name / word text. Used by the recycle bin list to show "wordText (removed from bookName)".
  */
 data class DeletedEntry(
     val bookId: Long,
@@ -39,25 +40,25 @@ data class DeletedEntry(
 @Dao
 interface BookDao {
 
-    // ---- 词书 CRUD ----
+    // ---- Book CRUD ----
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(book: Book): Long
 
     /**
-     * 所有可见词书（Ticket #22：过滤 deleted=1 的软删词书）。
-     * 排序：预置在前、name 升序。
+     * All visible books (Ticket #22: filters out soft-deleted books with deleted=1).
+     * Ordering: presets first, then name ascending.
      */
     @Query("SELECT * FROM book WHERE deleted = 0 ORDER BY isPreset DESC, CASE WHEN name = '复习' THEN 1 ELSE 0 END, name ASC")
     fun observeAll(): Flow<List<Book>>
 
     /**
-     * 词书 + 词条数（Ticket #16）。LEFT JOIN 保证空词书（0 词）也列出。
-     * 排序与 [observeAll] 一致：预置在前、name 升序。
+     * Books + word counts (Ticket #16). LEFT JOIN so empty books (0 words) are still listed.
+     * Ordering matches [observeAll]: presets first, then name ascending.
      *
-     * Ticket #20：只计 `bw.skipped = 0` 的未跳过词 —— 跳过的词不算进副标题词数。
-     * Ticket #22：还排除 `bw.deleted = 1` 的软删词 —— 删除后副标题词数相应减少。
-     *            且过滤 `b.deleted = 0` —— 软删的词书本身不进词库列表。
+     * Ticket #20: only counts words with `bw.skipped = 0`, so skipped words are not counted in the subtitle.
+     * Ticket #22: also excludes soft-deleted words with `bw.deleted = 1`, so the subtitle count drops after deletion.
+     *            Also filters `b.deleted = 0`, so soft-deleted books themselves stay out of the book list.
      */
     @Query(
         """
@@ -75,29 +76,32 @@ interface BookDao {
     @Query("SELECT * FROM book WHERE bookId = :bookId")
     suspend fun getById(bookId: Long): Book?
 
-    /** 按名字查词书。导入幂等用：重名预置词书复用既有行，不新建重复行。 */
+    /** Look up a book by name. Used for idempotent imports: a preset book with the same name reuses the existing row instead of creating a duplicate. */
     @Query("SELECT * FROM book WHERE name = :name LIMIT 1")
     suspend fun getByName(name: String): Book?
 
     /**
-     * 重命名词书。返回受影响行数：自定义词书返回 1，预置词书被 WHERE isPreset = 0 拒绝（返回 0）。
-     * 与 [deleteCustom] 同模式：预置词书在 DAO 层兜底只读，UI 入口也隐藏。
+     * Rename a book. Returns the number of affected rows: 1 for a custom book, 0 for a preset
+     * book rejected by WHERE isPreset = 0.
+     * Same pattern as [deleteCustom]: preset books are read-only as a DAO-level fallback, and the UI entry is hidden too.
      */
     @Query("UPDATE book SET name = :name WHERE bookId = :bookId AND isPreset = 0")
     suspend fun rename(bookId: Long, name: String): Int
 
     /**
-     * 软删除词书（Ticket #22）：标记 deleted=1，词书进回收站，可恢复。
-     * 返回受影响行数：自定义词书返回 1，预置词书被 WHERE isPreset = 0 拒绝（返回 0）。
-     * 与 [rename] 同模式：预置词书在 DAO 层兜底只读，UI 入口也隐藏。
+     * Soft-delete a book (Ticket #22): marks deleted=1, the book goes to the recycle bin and can be restored.
+     * Returns the number of affected rows: 1 for a custom book, 0 for a preset book rejected by
+     * WHERE isPreset = 0.
+     * Same pattern as [rename]: preset books are read-only as a DAO-level fallback, and the UI entry is hidden too.
      *
-     * 软删不真删 book 行，也不动其下 book_word 关联（含各自 deleted/skipped 状态保留）。
-     * 恢复走 [restoreBook]（deleted 置 0），永久删除走 [purgeBook]（真 DELETE + CASCADE）。
+     * Soft delete does not really delete the book row, nor touch its book_word associations
+     * (their individual deleted/skipped states are preserved).
+     * Restore goes through [restoreBook] (sets deleted to 0), permanent deletion through [purgeBook] (real DELETE + CASCADE).
      */
     @Query("UPDATE book SET deleted = 1 WHERE bookId = :bookId AND isPreset = 0")
     suspend fun deleteCustom(bookId: Long): Int
 
-    // ---- 词书-词条 关联 ----
+    // ---- Book-to-word-entry associations ----
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun linkBookWord(bookWord: BookWord): Long
@@ -106,8 +110,9 @@ interface BookDao {
     suspend fun unlinkBookWord(bookId: Long, wordId: Long)
 
     /**
-     * 词书内未跳过、未删除的词条数（Ticket #20 + #22）。
-     * 「我的」Tab 进度统计用：已刷 distinct / 总 Y，Y 应只含未跳过 + 未删除的词。
+     * Count of non-skipped, non-deleted word entries in a book (Ticket #20 + #22).
+     * Used by the "Mine" tab progress stat: swiped distinct / total Y, where Y should only
+     * include non-skipped + non-deleted words.
      */
     @Query("SELECT COUNT(*) FROM book_word WHERE bookId = :bookId AND skipped = 0 AND deleted = 0")
     suspend fun countWordsInBook(bookId: Long): Int
@@ -115,56 +120,61 @@ interface BookDao {
     @Query("SELECT COUNT(*) FROM book_word WHERE bookId = :bookId AND skipped = 0 AND deleted = 0")
     fun observeWordCountInBook(bookId: Long): Flow<Int>
 
-    // ---- Ticket #20：跳过标记（词书级独立）----
+    // ---- Ticket #20: skip flag (independent per book) ----
 
     /**
-     * 设置某条 (bookId, wordId) 关联的跳过标记。词书级：只改这一条关联，
-     * 不影响同词在其他词书的关联行（CET-4 跳过不动 CET-6）。
+     * Set the skip flag on one (bookId, wordId) association. Book-level: only this one
+     * association changes; association rows for the same word in other books are unaffected
+     * (skipping in CET-4 does not touch CET-6).
      *
-     * @param skipped true=跳过（隐藏，skipped=1）；false=恢复（skipped=0，重新进刷卡列表）
+     * @param skipped true=skip (hidden, skipped=1); false=restore (skipped=0, back on the card list)
      */
     @Query("UPDATE book_word SET skipped = :skipped WHERE bookId = :bookId AND wordId = :wordId")
     suspend fun setSkipped(bookId: Long, wordId: Long, skipped: Boolean)
 
-    /** 查某条关联当前的 skipped 状态。无此关联（已 unlink）返回 null。 */
+    /** Current skipped state of one association. Returns null if the association no longer exists (already unlinked). */
     @Query("SELECT skipped FROM book_word WHERE bookId = :bookId AND wordId = :wordId LIMIT 1")
     suspend fun getSkipped(bookId: Long, wordId: Long): Boolean?
 
     /**
-     * 把该词在**所有词书**的 skipped 标记全置 0（恢复）。
+     * Reset the skipped flag to 0 (restore) for this word in **all books**.
      *
-     * 恢复语义（issue #1）：一个词可能在 CET-4 和 CET-6 都被跳过，恢复时一次性全清，
-     * 词回到所有原词书可刷。与 [setSkipped]（词书级，只改一条）互补：setSkipped 用于
-     * 跳过（单本），unskipWordEverywhere 用于恢复（全局）。
+     * Restore semantics (issue #1): a word may be skipped in both CET-4 and CET-6; restoring
+     * clears all of them at once, and the word becomes swipeable again in all its original books.
+     * Complements [setSkipped] (book-level, changes one row): setSkipped is for skipping
+     * (single book), unskipWordEverywhere is for restoring (global).
      */
     @Query("UPDATE book_word SET skipped = 0 WHERE wordId = :wordId")
     suspend fun unskipWordEverywhere(wordId: Long)
 
-    // ---- Ticket #22：软删除（词书级独立，进回收站）----
+    // ---- Ticket #22: soft delete (independent per book, goes to recycle bin) ----
 
     /**
-     * 设置某条 (bookId, wordId) 关联的软删标记。词书级：只改这一条关联，
-     * 不影响同词在其他词书的关联行（CET-4 删只动 CET-4）。
+     * Set the soft-delete flag on one (bookId, wordId) association. Book-level: only this one
+     * association changes; association rows for the same word in other books are unaffected
+     * (deleting in CET-4 only touches CET-4).
      *
-     * 与 [setSkipped] 平行但语义不同：
-     * - skipped=true = 跳过（自动进复习词书，刷卡片列表过滤）
-     * - deleted=true = 软删（进回收站，列表/统计过滤；可恢复或永久删除）
+     * Parallel to [setSkipped] but with different semantics:
+     * - skipped=true = skip (automatically goes into the review book, filtered from the card list)
+     * - deleted=true = soft delete (goes to the recycle bin, filtered from lists/stats; recoverable or permanently deletable)
      *
-     * @param deleted true=软删（隐藏，deleted=1，进回收站）；false=恢复（deleted=0，回词书列表）
+     * @param deleted true=soft delete (hidden, deleted=1, goes to the recycle bin); false=restore (deleted=0, back on the book list)
      */
     @Query("UPDATE book_word SET deleted = :deleted WHERE bookId = :bookId AND wordId = :wordId")
     suspend fun setDeleted(bookId: Long, wordId: Long, deleted: Boolean)
 
-    /** 查某条关联当前的 deleted 状态。无此关联（已 unlink）返回 null。 */
+    /** Current deleted state of one association. Returns null if the association no longer exists (already unlinked). */
     @Query("SELECT deleted FROM book_word WHERE bookId = :bookId AND wordId = :wordId LIMIT 1")
     suspend fun getDeleted(bookId: Long, wordId: Long): Boolean?
 
     /**
-     * 回收站列表（响应式）：所有 deleted=1 的关联 + 关联的词书名/词文本。
+     * Recycle bin list (reactive): all associations with deleted=1 plus the associated book
+     * name / word text.
      *
-     * INNER JOIN book/word：词书或词若被真删（CASCADE），关联行也跟着没了，
-     * 不会出现「关联在但词书/词找不到」的孤儿条目。回收站永远只显示可恢复的完整条目。
-     * 排序按 bookId 分组、词文本升序，便于用户在回收站里找。
+     * INNER JOIN book/word: if a book or word is really deleted (CASCADE), the association row
+     * is gone with it, so there are no orphan entries where the association exists but the
+     * book/word cannot be found. The recycle bin only ever shows complete, recoverable entries.
+     * Ordered grouped by bookId, then word text ascending, so entries are easy to find.
      */
     @Query(
         """
@@ -180,59 +190,64 @@ interface BookDao {
     fun observeDeletedEntries(): Flow<List<DeletedEntry>>
 
     /**
-     * 永久删除（真 DELETE）：清掉这条 (bookId, wordId) 关联。
+     * Permanent delete (real DELETE): removes this (bookId, wordId) association.
      *
-     * `deleted = 1` 兜底：只允许从回收站永久删除，避免误用此方法删未软删的关联。
-     * CASCADE 不触发（关联行被删，不会级联到 book/word —— word 本身永远在全局词池保留）。
-     * 与 [unlinkBookWord] 区别：unlinkBookWord 是「从词书移除」（直接删关联，无回收站），
-     * purgeDeleted 是「从回收站永久删除」（仅对已软删的关联生效）。
+     * `deleted = 1` guard: only allows permanent deletion from the recycle bin, preventing
+     * misuse of this method on associations that were not soft-deleted.
+     * CASCADE is not triggered (the association row is deleted, nothing cascades to book/word;
+     * the word itself always stays in the global word pool).
+     * Difference from [unlinkBookWord]: unlinkBookWord means "remove from book" (deletes the
+     * association directly, no recycle bin), purgeDeleted means "permanently delete from the
+     * recycle bin" (only works on already soft-deleted associations).
      */
     @Query("DELETE FROM book_word WHERE bookId = :bookId AND wordId = :wordId AND deleted = 1")
     suspend fun purgeDeleted(bookId: Long, wordId: Long)
 
-    // ---- Ticket #22：词书级软删除恢复 / 永久删除 ----
+    // ---- Ticket #22: book-level soft-delete restore / permanent delete ----
 
-    /** 恢复词书：deleted 置 0，词书回到词库列表。其下 book_word 关联状态原样保留。 */
+    /** Restore a book: sets deleted to 0, the book returns to the book list. Its book_word association states are preserved as they were. */
     @Query("UPDATE book SET deleted = 0 WHERE bookId = :bookId")
     suspend fun restoreBook(bookId: Long)
 
     /**
-     * 回收站里的已软删词书（响应式）。只列自定义词书（预置词书 isPreset=0 兜底不会被软删，
-     * 这里 WHERE deleted=1 已隐含 isPreset=0，但显式写更清晰）。
+     * Soft-deleted books in the recycle bin (reactive). Lists only custom books (preset books
+     * cannot be soft-deleted thanks to the isPreset=0 guard; here WHERE deleted=1 already implies
+     * isPreset=0, but writing it explicitly would be clearer).
      */
     @Query("SELECT * FROM book WHERE deleted = 1 ORDER BY name ASC")
     fun observeDeletedBooks(): Flow<List<Book>>
 
     /**
-     * 永久删除词书（真 DELETE）：CASCADE 清掉其下所有 book_word 关联。
-     * 与 [deleteCustom]（软删）区别：这是不可逆的真删。`deleted = 1` 兜底只允许从回收站永久删。
+     * Permanently delete a book (real DELETE): CASCADE removes all its book_word associations.
+     * Difference from [deleteCustom] (soft delete): this is an irreversible real delete.
+     * The `deleted = 1` guard only allows permanent deletion from the recycle bin.
      */
     @Query("DELETE FROM book WHERE bookId = :bookId AND deleted = 1")
     suspend fun purgeBook(bookId: Long)
 
-    // ---- Ticket #10：整库导出/导入 ----
+    // ---- Ticket #10: full-database export/import ----
 
-    /** 全量读所有词书（导出快照用）。 */
+    /** Read all books (for the export snapshot). */
     @Query("SELECT * FROM book")
     suspend fun getAll(): List<Book>
 
-    /** 全量读所有词书-词条关联（导出快照用）。 */
+    /** Read all book-word associations (for the export snapshot). */
     @Query("SELECT * FROM book_word")
     suspend fun getAllLinks(): List<BookWord>
 
-    /** 清空词书表（导入覆盖前清理）。 */
+    /** Clear the book table (cleanup before an import overwrites). */
     @Query("DELETE FROM book")
     suspend fun deleteAll()
 
-    /** 清空词书-词条关联表（导入覆盖前清理）。 */
+    /** Clear the book-word association table (cleanup before an import overwrites). */
     @Query("DELETE FROM book_word")
     suspend fun deleteAllLinks()
 
-    /** 批量插入词书（带原始 bookId，导入覆盖恢复用）。 */
+    /** Batch-insert books (with original bookIds, to restore an import overwrite). */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(books: List<Book>)
 
-    /** 批量建立词书-词条关联（导入恢复用）。 */
+    /** Batch-create book-word associations (to restore an import). */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun linkAll(links: List<BookWord>)
 }

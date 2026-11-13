@@ -9,20 +9,25 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 整库导出/导入（Ticket #10）。
+ * Whole-database export/import (Ticket #10).
  *
- * 导出：读 5 张表全量 → [DatabaseSnapshot]（交由 [DatabaseJsonSerializer] 序列化）。
- * 导入：[DatabaseSnapshot] → 在一个 Room 事务里清空 5 张表后按原始主键批量重插。
+ * Export: read all 5 tables in full → [DatabaseSnapshot] (handed to [DatabaseJsonSerializer]
+ * for serialization). Import: [DatabaseSnapshot] → in one Room transaction, clear the 5 tables
+ * then batch re-insert by original primary keys.
  *
- * 导入策略为**覆盖**（Ticket #10 默认）：整库清空再重插。按原始主键恢复保证跨表外键
- * 引用关系完整，尤其是孤立的 swipe_log（bookId/wordId 可能引用已删除的词书/词条，
- * 因 swipe_log 无外键约束，重插后保留 → 累计统计不可丢，规格 AC）。
+ * Import strategy is **overwrite** (Ticket #10 default): clear the whole database and re-insert.
+ * Restoring by original primary keys keeps cross-table foreign key references intact, especially
+ * orphaned swipe_log rows (bookId/wordId may reference deleted books/words; because swipe_log
+ * has no foreign key constraint they are preserved after re-insert → cumulative statistics
+ * must not be lost, spec AC).
  *
- * 外键顺序：sense / book_word 有 CASCADE 外键 → 清理先删子表再删父表；
- * 插入先父表再子表。swipe_log 无外键，可任意顺序。
+ * Foreign key ordering: sense / book_word have CASCADE foreign keys → when clearing, delete
+ * child tables before parent tables; when inserting, parent tables before child tables.
+ * swipe_log has no foreign keys, so any order works.
  *
- * 序列化/反序列化是纯函数（[DatabaseJsonSerializer]），有独立 JVM 单测覆盖；
- * 本类只负责"表 ↔ 快照"映射与事务编排，在 instrumented 测试里用内存 Room 验证往返。
+ * Serialization/deserialization are pure functions ([DatabaseJsonSerializer]) with independent
+ * JVM unit test coverage; this class only handles the "tables ↔ snapshot" mapping and
+ * transaction orchestration, verified with in-memory Room round-trips in instrumented tests.
  */
 @Singleton
 class BackupService @Inject constructor(
@@ -31,7 +36,7 @@ class BackupService @Inject constructor(
     private val wordDao: WordDao,
     private val swipeLogDao: SwipeLogDao,
 ) {
-    /** 读整库为快照。nickname 可为 null（导出时不写标签）。 */
+    /** Reads the whole database into a snapshot. nickname may be null (no label written on export). */
     suspend fun export(nickname: String?): DatabaseSnapshot = db.withTransaction {
         DatabaseSnapshot(
             version = DatabaseJsonSerializer.CURRENT_VERSION,
@@ -44,16 +49,17 @@ class BackupService @Inject constructor(
         )
     }
 
-    /** 整库覆盖恢复。在一个事务里清空 5 张表后按原始主键重插，失败回滚不留半导入状态。 */
+    /** Whole-database overwrite restore. Clears the 5 tables and re-inserts by original primary
+     *  keys in one transaction; on failure it rolls back, leaving no half-imported state. */
     suspend fun import(snapshot: DatabaseSnapshot) = db.withTransaction {
-        // 清空：先子表（sense/book_word/swipe_log）再父表（book/word）
+        // Clear: child tables (sense/book_word/swipe_log) first, then parent tables (book/word)
         wordDao.deleteAllSenses()
         bookDao.deleteAllLinks()
         swipeLogDao.deleteAll()
         bookDao.deleteAll()
         wordDao.deleteAll()
 
-        // 重插：先父表（book/word）再子表（sense/book_word/swipe_log）
+        // Re-insert: parent tables (book/word) first, then child tables (sense/book_word/swipe_log)
         bookDao.insertAll(snapshot.books)
         wordDao.insertAll(snapshot.words)
         wordDao.insertAllSenses(snapshot.senses)

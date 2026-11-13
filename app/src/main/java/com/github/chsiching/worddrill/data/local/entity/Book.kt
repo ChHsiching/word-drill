@@ -5,18 +5,20 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * 词书。预置词书（CET-4/CET-6/考研）的 isPreset=true，只读（不可重命名/删除）。
- * 自定义词书 isPreset=false，可重命名/删除。
+ * Word book. Preset books (CET-4/CET-6/kaoyan) have isPreset=true and are read-only (cannot be renamed/deleted).
+ * Custom books have isPreset=false and can be renamed/deleted.
  *
- * Ticket #22：[deleted] 标记本词书被「删除」（隐藏 + 进回收站，可恢复）。
- * 软删 = deleted=1，词书列表/统计过滤；恢复 = deleted=0。与 [BookWord.deleted]
- * 平行但粒度不同：BookWord.deleted 是「某词书的某词条关联」被删，Book.deleted 是
- * 「整个词书」被删。词书恢复时其下所有 book_word 关联（含各自 deleted 状态）保留原样。
+ * Ticket #22: [deleted] marks this book as "deleted" (hidden + moved to the recycle bin, recoverable).
+ * Soft delete = deleted=1, filtered out of book lists/stats; restore = deleted=0. Parallel to
+ * [BookWord.deleted] but at a different granularity: BookWord.deleted means the association between
+ * one book and one word entry is deleted, while Book.deleted means the whole book is deleted.
+ * When a book is restored, all its book_word associations (including their individual deleted states) stay as they were.
  *
- * `@ColumnInfo(defaultValue = "0")` 必须显式声明 —— Room codegen 不会把 Kotlin 默认值
- * 翻译成 SQL DEFAULT 子句，而 [com.github.chsiching.worddrill.data.local.WordDrillDatabase.MIGRATION_4_5]
- * 的 ALTER TABLE 带了 `DEFAULT 0`。两边都写 0，Room 启动时的 schema 校验
- * （比 `TableInfo.Column.defaultVal`）才不会抛 IllegalStateException。
+ * `@ColumnInfo(defaultValue = "0")` must be declared explicitly. Room codegen does not translate the Kotlin
+ * default value into a SQL DEFAULT clause, while the ALTER TABLE in
+ * [com.github.chsiching.worddrill.data.local.WordDrillDatabase.MIGRATION_4_5]
+ * includes `DEFAULT 0`. With 0 written on both sides, Room's startup schema validation
+ * (which compares `TableInfo.Column.defaultVal`) will not throw IllegalStateException.
  */
 @Entity(tableName = "book")
 data class Book(

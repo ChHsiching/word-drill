@@ -7,35 +7,37 @@ import androidx.room.Query
 import com.github.chsiching.worddrill.data.local.entity.DictionaryEntry
 
 /**
- * Ticket #19：内置词典 DAO。只读查询 + 首启批量写入，不提供单条增删改
- * （dictionary 表是只读参考数据）。
+ * Ticket #19: Built-in dictionary DAO. Read-only queries + first-launch batch insert; no
+ * single-row insert/update/delete (the dictionary table is read-only reference data).
  *
- * 用法：加词 / 文件导入时调 [findByWord] 按拼写查词性 + 释义 + 音标。
+ * Usage: when adding words or importing files, call [findByWord] to look up
+ * pos + meaning + phonetic by spelling.
  */
 @Dao
 interface DictionaryDao {
 
     /**
-     * 按拼写查词典条目（一个词的多个词性 = 多行）。
-     * 大小写敏感：ECDICT 的 word 列存原形（小写为主），调用方传原形即可。
-     * 调用方需要大小写不敏感时自行 lower 后再查。
+     * Look up dictionary entries by spelling (multiple parts of speech for one word = multiple rows).
+     * Case-sensitive: ECDICT's word column stores the base form (mostly lowercase), callers pass the base form.
+     * Callers that need case-insensitive matching should lowercase first, then query.
      */
     @Query("SELECT * FROM dictionary WHERE word = :word")
     suspend fun findByWord(word: String): List<DictionaryEntry>
 
-    /** 首启批量写入（IGNORE 兜底 (word, pos) 唯一索引，重复导入不报错）。 */
+    /** First-launch batch insert (IGNORE plus the (word, pos) unique index, so duplicate imports do not error). */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(entries: List<DictionaryEntry>)
 
     /**
-     * Ticket #23：清空 dictionary 表。orchestrator 在检测到 dictionary.json 内容有修复
-     * （[com.github.chsiching.worddrill.data.DictionaryImportOrchestrator.DICTIONARY_VERSION]
-     * 升级）时调用，保证旧污染行被清除后再重新填充——单靠 INSERT IGNORE 无法覆盖旧行。
+     * Ticket #23: Clear the dictionary table. The orchestrator calls this when it detects the
+     * dictionary.json content has been fixed
+     * ([com.github.chsiching.worddrill.data.DictionaryImportOrchestrator.DICTIONARY_VERSION]
+     * upgraded), so old polluted rows are removed before refilling. INSERT IGNORE alone cannot overwrite old rows.
      */
     @Query("DELETE FROM dictionary")
     suspend fun clear()
 
-    /** 测试 / 诊断用：返回总条目数。 */
+    /** For tests / diagnostics: returns the total entry count. */
     @Query("SELECT COUNT(*) FROM dictionary")
     suspend fun count(): Int
 }

@@ -8,17 +8,22 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Ticket #19：内置词典导入。把一份 [DictionaryWords] 写入 Room 的只读 dictionary 表。
+ * Ticket #19: built-in dictionary import. Writes a [DictionaryWords] into Room's read-only
+ * dictionary table.
  *
- * 设计要点：
- * - dictionary 表 (word, pos) 唯一索引兜底重复：[DictionaryDao.insertAll] 用 IGNORE，
- *   同 (word, pos) 已存在则跳过。重复调用安全（幂等）。
- * - 整个导入在一个 Room 事务里（[androidx.room.withTransaction]）：原子且读到自洽快照。
- * - 批量写入，避免 11 万条逐行 insert。当前一次性 insertAll——若数据规模继续增长可改分批，
- *   现 11 万条单事务在中等手机上首次导入约数秒，可接受。
+ * Design points:
+ * - The dictionary table's (word, pos) unique index guards against duplicates:
+ *   [DictionaryDao.insertAll] uses IGNORE, so an existing (word, pos) is skipped.
+ *   Safe to call repeatedly (idempotent).
+ * - The whole import runs in one Room transaction ([androidx.room.withTransaction]): atomic
+ *   and reading a self-consistent snapshot.
+ * - Batch writes, avoiding 110k row-by-row inserts. Currently one bulk insertAll; if the data
+ *   grows further it can be chunked. As is, 110k rows in a single transaction takes a few
+ *   seconds on a mid-range phone for the first import, which is acceptable.
  *
- * 该类只负责"写库"，不负责读 assets / 解析 JSON，便于在 JVM 单测里喂入内存版 Room
- * 和构造好的 [DictionaryWords] 验证导入正确性与幂等性。
+ * This class only "writes the database"; it does not read assets / parse JSON, so JVM unit
+ * tests can feed an in-memory Room and a constructed [DictionaryWords] to verify import
+ * correctness and idempotency.
  */
 @Singleton
 class DictionaryImporter @Inject constructor(
@@ -26,11 +31,13 @@ class DictionaryImporter @Inject constructor(
     private val dictionaryDao: DictionaryDao,
 ) {
     /**
-     * 把 [data] 写入数据库。返回写入的条目数（含 (word,pos) 唯一索引去重后实际新增）。
+     * Write [data] into the database. Returns the number of entries written (the actual new
+     * rows after (word,pos) unique-index dedupe).
      *
-     * 参数 [clearFirst]：Ticket #23 新增。为 true 时先清空 dictionary 表再写，
-     * 用于版本升级重导场景（INSERT IGNORE 无法覆盖旧行，必须先 clear）。
-     * 默认 false 兼容旧调用方（首启空表导入）。
+     * Parameter [clearFirst]: added in Ticket #23. When true, clears the dictionary table
+     * before writing, for the version-upgrade re-import scenario (INSERT IGNORE cannot
+     * overwrite old rows, so a clear must come first).
+     * Defaults to false for older callers (first-launch import into an empty table).
      */
     suspend fun importDictionary(data: DictionaryWords, clearFirst: Boolean = false): Int = db.withTransaction {
         if (clearFirst) {

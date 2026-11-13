@@ -14,15 +14,15 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 应用级 DataStore（单例）。文件名 worddrill.preferences。 */
+/** App-level DataStore (singleton). File name worddrill.preferences. */
 private val Context.appDataStore: DataStore<Preferences> by preferencesDataStore(name = "worddrill.preferences")
 
 /**
- * 应用级设置与状态标记。
- * - 预置词库是否已首次导入（Ticket #4 首启幂等导入）
- * - 当前选中的词书 book_id（Ticket #5 「刷」Tab 记住上次刷的词书）
- * - 主题偏好（Ticket #9 深色/浅色/跟随系统，重启保持）
- * - UI 设置（Ticket #16）：隐藏音标 / 导航栏风格 / 简约导航
+ * App-level settings and state flags.
+ * - Whether preset books have been imported once (Ticket #4, idempotent first-launch import)
+ * - The currently selected book's book_id (Ticket #5, the "Drill" tab remembers the last book)
+ * - Theme preference (Ticket #9, dark/light/follow-system, persists across restarts)
+ * - UI settings (Ticket #16): hide phonetics / nav bar style / compact nav
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -31,9 +31,11 @@ class SettingsRepository @Inject constructor(
     private val presetImportedKey = booleanPreferencesKey("preset_imported")
     private val dictionaryImportedKey = booleanPreferencesKey("dictionary_imported")
     /**
-     * Ticket #23：内置词典的导入版本（整数）。当前每发布一次修复过 dictionary.json 的版本就 +1，
-     * orchestrator 比对存储版本 < 期望版本时清表重导，保证老用户在 app 升级后能拿到新数据。
-     * 取代了纯布尔 [dictionaryImportedKey] 的"已导入即不再导"语义。
+     * Ticket #23: imported version of the built-in dictionary (integer). Currently incremented
+     * each time a release ships a fixed dictionary.json; the orchestrator compares the stored
+     * version < the expected version, clears the table and re-imports, so existing users get the
+     * new data after upgrading the app.
+     * Replaces the plain boolean [dictionaryImportedKey] "imported once, never again" semantics.
      */
     private val dictionaryVersionKey = longPreferencesKey("dictionary_version")
     private val reviewBookCreatedKey = booleanPreferencesKey("review_book_created")
@@ -43,33 +45,37 @@ class SettingsRepository @Inject constructor(
     private val navStyleKey = stringPreferencesKey("nav_style")
     private val compactNavKey = booleanPreferencesKey("compact_nav")
 
-    /** 预置词库是否已导入完成。未读过时默认 false。 */
+    /** Whether the preset books have finished importing. Defaults to false when never read. */
     val presetImported: Flow<Boolean> = context.appDataStore.data.map { it[presetImportedKey] ?: false }
 
-    /** 标记预置词库导入完成。导入流程成功后调用一次，后续启动跳过导入。 */
+    /** Mark the preset book import as done. Called once after a successful import; later launches skip importing. */
     suspend fun markPresetImported() {
         context.appDataStore.edit { it[presetImportedKey] = true }
     }
 
-    // ---- Ticket #19：内置词典首启导入幂等标记 ----
+    // ---- Ticket #19: idempotent first-launch import flag for the built-in dictionary ----
 
     /**
-     * 内置词典（ECDICT）是否曾经成功导入过。Ticket #19 的原始幂等标记，
-     * Ticket #23 引入版本号后只作为"表里可能已有数据"的信号，供 [com.github.chsiching.worddrill.data.DictionaryImportOrchestrator]
-     * 判断是否需要先 [com.github.chsiching.worddrill.data.local.dao.DictionaryDao.clear] 再 insert。
+     * Whether the built-in dictionary (ECDICT) has ever been imported successfully. The original
+     * idempotency flag from Ticket #19; after Ticket #23 introduced the version number it only
+     * signals "the table may already hold data", used by
+     * [com.github.chsiching.worddrill.data.DictionaryImportOrchestrator]
+     * to decide whether to run [com.github.chsiching.worddrill.data.local.dao.DictionaryDao.clear] before inserting.
      */
     val dictionaryImported: Flow<Boolean> =
         context.appDataStore.data.map { it[dictionaryImportedKey] ?: false }
 
     /**
-     * Ticket #23：内置词典当前已导入的版本号。未读过时默认 0（视为"从未导入"）。
-     * orchestrator 用它与 [com.github.chsiching.worddrill.data.DictionaryImportOrchestrator.DICTIONARY_VERSION]
-     * 比对：小于期望版本 → 清表重导。
+     * Ticket #23: currently imported version of the built-in dictionary. Defaults to 0 when
+     * never read (treated as "never imported").
+     * The orchestrator compares it against
+     * [com.github.chsiching.worddrill.data.DictionaryImportOrchestrator.DICTIONARY_VERSION]:
+     * smaller than the expected version -> clear the table and re-import.
      */
     val dictionaryVersion: Flow<Long> =
         context.appDataStore.data.map { it[dictionaryVersionKey] ?: 0L }
 
-    /** 标记当前已导入到 [version]。重导完成后调用。同时把旧布尔标记置 true（兼容诊断）。 */
+    /** Mark the current import as being at [version]. Called after a re-import finishes. Also sets the old boolean flag to true (for diagnostic compatibility). */
     suspend fun markDictionaryVersion(version: Long) {
         context.appDataStore.edit {
             it[dictionaryVersionKey] = version
@@ -77,55 +83,56 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    // ---- Ticket #20：预置复习词书首启创建幂等标记 ----
+    // ---- Ticket #20: idempotent first-launch creation flag for the preset review book ----
 
-    /** 预置「复习」词书是否已创建。未读过时默认 false。 */
+    /** Whether the preset "Review" book has been created. Defaults to false when never read. */
     val reviewBookCreated: Flow<Boolean> =
         context.appDataStore.data.map { it[reviewBookCreatedKey] ?: false }
 
-    /** 标记复习词书已创建。首次创建后调用一次，后续启动跳过。 */
+    /** Mark the review book as created. Called once after first creation; later launches skip it. */
     suspend fun markReviewBookCreated() {
         context.appDataStore.edit { it[reviewBookCreatedKey] = true }
     }
 
     /**
-     * 清除复习词书创建标记（置 false）。供测试隔离用：内存 Room 库每次新建为空，
-     * 配合清标记让 [com.github.chsiching.worddrill.data.ReviewBookInitializer] 从干净起点执行。
+     * Clear the review book creation flag (set to false). For test isolation: an in-memory Room
+     * database starts empty each time, and clearing the flag lets
+     * [com.github.chsiching.worddrill.data.ReviewBookInitializer] run from a clean starting point.
      */
     suspend fun clearReviewBookCreated() {
         context.appDataStore.edit { it[reviewBookCreatedKey] = false }
     }
 
-    /** 当前选中的词书 id。未设置过时为 null（首次启动，调用方应默认选第一本）。 */
+    /** Currently selected book id. null when never set (first launch; callers should default to the first book). */
     val currentBookId: Flow<Long?> = context.appDataStore.data.map { it[currentBookIdKey] }
 
-    /** 记住当前词书，下次打开 App 直接刷该词书。 */
+    /** Remember the current book, so the next app launch drills that book directly. */
     suspend fun setCurrentBookId(id: Long) {
         context.appDataStore.edit { it[currentBookIdKey] = id }
     }
 
     /**
-     * 用户主题偏好（Ticket #9）。未设置过时默认 [ThemeMode.SYSTEM]。
-     * 损坏/未知值通过 [ThemeMode.fromStorageName] 安全回退，不抛异常。
+     * User theme preference (Ticket #9). Defaults to [ThemeMode.SYSTEM] when never set.
+     * Corrupted/unknown values fall back safely via [ThemeMode.fromStorageName], no exception thrown.
      */
     val themePreference: Flow<ThemeMode> =
         context.appDataStore.data.map { ThemeMode.fromStorageName(it[themeKey]) }
 
-    /** 写入主题偏好，重启后保持。 */
+    /** Write the theme preference; persists across restarts. */
     suspend fun setTheme(mode: ThemeMode) {
         context.appDataStore.edit { it[themeKey] = mode.name }
     }
 
-    // ---- Ticket #16：UI 设置（隐藏音标 / 导航栏风格 / 简约导航）----
+    // ---- Ticket #16: UI settings (hide phonetics / nav bar style / compact nav) ----
 
-    /** 是否隐藏刷卡页音标。未设置过时默认 false。 */
+    /** Whether to hide phonetics on the drill page. Defaults to false when never set. */
     val hidePhonetic: Flow<Boolean> = context.appDataStore.data.map { it[hidePhoneticKey] ?: false }
 
     suspend fun setHidePhonetic(value: Boolean) {
         context.appDataStore.edit { it[hidePhoneticKey] = value }
     }
 
-    /** 导航栏风格。未设置过或损坏值默认 [NavStyle.PILL]。 */
+    /** Nav bar style. Defaults to [NavStyle.PILL] when never set or the value is corrupted. */
     val navStyle: Flow<NavStyle> =
         context.appDataStore.data.map { NavStyle.fromStorageName(it[navStyleKey]) }
 
@@ -133,7 +140,7 @@ class SettingsRepository @Inject constructor(
         context.appDataStore.edit { it[navStyleKey] = style.name }
     }
 
-    /** 是否启用简约导航（仅图标、无文字标签）。未设置过时默认 false。 */
+    /** Whether compact nav is enabled (icons only, no text labels). Defaults to false when never set. */
     val compactNav: Flow<Boolean> = context.appDataStore.data.map { it[compactNavKey] ?: false }
 
     suspend fun setCompactNav(value: Boolean) {

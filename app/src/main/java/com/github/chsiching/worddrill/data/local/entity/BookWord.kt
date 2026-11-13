@@ -6,24 +6,25 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 
 /**
- * 词书-词条 关联表（多对多）。
- * 复合主键 (bookId, wordId)：同一词书内同一词条不重复。
- * 词书或词条删除时级联清理关联。
+ * Book-to-word-entry association table (many-to-many).
+ * Composite primary key (bookId, wordId): the same word entry cannot repeat within the same book.
+ * Associations are cleaned up by cascade when a book or word entry is deleted.
  *
- * Ticket #20：[skipped] 标记本词书内此词被「跳过」（隐藏不删）。
- * 词书级独立：CET-4 跳过只置 CET-4 这条关联的 skipped=1，不影响 CET-6 同词的关联行。
- * 跳过可恢复：[com.github.chsiching.worddrill.data.local.dao.BookDao.setSkipped] 置回 0 即恢复。
+ * Ticket #20: [skipped] marks this word as "skipped" within this book (hidden, not deleted).
+ * Independent per book: skipping in CET-4 only sets skipped=1 on the CET-4 association row and does not affect the CET-6 association row for the same word.
+ * Skipping is recoverable: [com.github.chsiching.worddrill.data.local.dao.BookDao.setSkipped] sets it back to 0 to restore.
  *
- * Ticket #22：[deleted] 标记本词书内此词被「删除」（隐藏 + 进回收站，可恢复）。
- * 与 [skipped] 平行：词书级独立（CET-4 删只动 CET-4 这条关联），deleted=0 恢复。
- * 区别：skipped 是「跳过复习」语义（自动进复习词书），deleted 是「误删恢复」语义（进回收站）。
- * 软删 = 只标 deleted=1，不真删关联行，词本身永远在全局 word 池。
+ * Ticket #22: [deleted] marks this word as "deleted" within this book (hidden + moved to the recycle bin, recoverable).
+ * Parallel to [skipped]: independent per book (deleting in CET-4 only touches the CET-4 association), deleted=0 restores.
+ * Difference: skipped means "skip review" (automatically goes into the review book), deleted means "recover from accidental deletion" (goes to the recycle bin).
+ * Soft delete = only mark deleted=1, do not actually delete the association row; the word itself always stays in the global word pool.
  *
- * `@ColumnInfo(defaultValue = "0")` 必须显式声明 —— Room codegen 不会把 Kotlin 默认值
- * （`= false`）翻译成 SQL DEFAULT 子句，而 [com.github.chsiching.worddrill.data.local.WordDrillDatabase.MIGRATION_3_4]
+ * `@ColumnInfo(defaultValue = "0")` must be declared explicitly. Room codegen does not translate the Kotlin
+ * default value (`= false`) into a SQL DEFAULT clause, while the ALTER TABLE in
+ * [com.github.chsiching.worddrill.data.local.WordDrillDatabase.MIGRATION_3_4]
  * / [com.github.chsiching.worddrill.data.local.WordDrillDatabase.MIGRATION_4_5]
- * 的 ALTER TABLE 带了 `DEFAULT 0`。两边都写 0，Room 启动时的 schema 校验
- * （比 `TableInfo.Column.defaultVal`）才不会抛 IllegalStateException。
+ * includes `DEFAULT 0`. With 0 written on both sides, Room's startup schema validation
+ * (which compares `TableInfo.Column.defaultVal`) will not throw IllegalStateException.
  */
 @Entity(
     tableName = "book_word",

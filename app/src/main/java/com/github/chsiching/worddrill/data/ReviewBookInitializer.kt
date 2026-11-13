@@ -8,26 +8,29 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Ticket #20：预置「复习」词书的幂等创建。
+ * Ticket #20: idempotent creation of the preset "Review" book.
  *
- * 跳过的词会汇入这本词书（[com.github.chsiching.worddrill.ui.drill.DrillViewModel.skipWord]
- * 把当前 book_word.skipped 置 1 + 把该 word 挂到复习词书）。复习词书与 CET-4/CET-6 一样
- * 是预置词书（isPreset=true，不可重命名/删除），但默认空，由用户跳过行为填充。
+ * Skipped words flow into this book ([com.github.chsiching.worddrill.ui.drill.DrillViewModel.skipWord]
+ * sets the current book_word.skipped to 1 + attaches the word to the review book). Like CET-4/CET-6,
+ * the review book is a preset book (isPreset=true, cannot be renamed/deleted), but it starts empty
+ * and is filled by the user's skip behavior.
  *
- * 幂等：DataStore 标记 `review_book_created` 保证只建一次；BookDao.getByName 兜底，
- * 即便标记缺失（重装/清缓存）也不会建出两本同名词书。与 [PresetImportOrchestrator]
- * 同模式：标记检查 + 数据层去重双保险。
+ * Idempotency: the DataStore flag `review_book_created` guarantees it is created only once;
+ * BookDao.getByName acts as a fallback, so even if the flag is missing (reinstall/cache cleared)
+ * two books with the same name will not be created. Same pattern as [PresetImportOrchestrator]:
+ * flag check + data-layer deduplication as double insurance.
  */
 @Singleton
 class ReviewBookInitializer @Inject constructor(
     private val bookDao: BookDao,
     private val settings: SettingsRepository,
 ) {
-    /** 「复习」词书名。预置词书不可重命名，name 稳定可作幂等键。 */
-    // 与 CET-4 / CET-6 / 考研 来自 assets 数据一致：词书名是数据值，不走 R.string。
+    /** Name of the "Review" book. Preset books cannot be renamed, so name is stable as an idempotency key. */
+    // Consistent with CET-4 / CET-6 / kaoyan coming from assets data: book names are data values,
+    // not R.string resources.
     private val reviewBookName = "复习"
 
-    /** 若复习词书尚未创建，则建一本空的预置词书；已建则跳过。 */
+    /** Creates an empty preset book if the review book does not exist yet; skips if already created. */
     suspend fun ensureReviewBookCreated() {
         if (settings.reviewBookCreated.first()) return
         if (bookDao.getByName(reviewBookName) == null) {

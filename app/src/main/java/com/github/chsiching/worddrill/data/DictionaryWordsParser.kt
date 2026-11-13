@@ -3,11 +3,11 @@ package com.github.chsiching.worddrill.data
 import org.json.JSONObject
 
 /**
- * Ticket #19：解析 assets/dictionary.json 文本为 [DictionaryWords]。
- * 用 Android 自带的 org.json（无新增依赖）。
+ * Ticket #19: parse assets/dictionary.json text into [DictionaryWords].
+ * Uses Android's built-in org.json (no new dependency).
  *
- * 解析逻辑独立成纯函数，便于在 JVM 单测里喂入小段 JSON 字符串验证
- * （与 [PresetWordsParser] 同模式）。
+ * The parsing logic is a standalone pure function, easy to verify in JVM unit tests by feeding
+ * in small JSON strings (same pattern as [PresetWordsParser]).
  */
 object DictionaryWordsParser {
 
@@ -18,8 +18,9 @@ object DictionaryWordsParser {
         val words = buildList {
             for (i in 0 until wordsJson.length()) {
                 val w = wordsJson.getJSONObject(i)
-                // phonetic 可空，且必须 w.isNull 先挡 JSON null（与 PresetWordsParser 同坑：
-                // org.json.optString(key, "") 在 JSON null 时返回 "null" 字符串）。
+                // phonetic is nullable, and JSON null must be guarded with w.isNull first (same
+                // trap as PresetWordsParser: org.json.optString(key, "") returns the string "null"
+                // on a JSON null).
                 val phonetic = if (w.isNull("phonetic")) {
                     null
                 } else {

@@ -5,28 +5,35 @@ import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.io.InputStream
 
 /**
- * Ticket #21：PDF 表格解析（PdfBox-Android）。
+ * Ticket #21: PDF table parsing (PdfBox-Android).
  *
- * issue #21 原指定 tabula-java (technology.tabula:tabula:1.0.5)，但它依赖 PDFBox 2.0.24
- * （用 `java.awt.*` / `javax.imageio.*`，Android 不存在），项目自 2021 无更新。
- * 改用 `com.tom-roush:pdfbox-android:2.0.27.0`（PDFBox 2.0.27 的 Android 移植，去掉 AWT）。
+ * issue #21 originally specified tabula-java (technology.tabula:tabula:1.0.5), but it depends
+ * on PDFBox 2.0.24 (which uses `java.awt.*` / `javax.imageio.*`, absent on Android) and the
+ * project has had no updates since 2021.
+ * Switched to `com.tom-roush:pdfbox-android:2.0.27.0` (an Android port of PDFBox 2.0.27 with
+ * AWT removed).
  *
- * 简化策略（不做完整表格识别算法，原因见 [XlsxParser] 同款论证 —— issue 没要求复杂特性）：
- * 1. `PDFTextStripper` 提取文本，按行 split（默认输出已按 y 排序）。
- * 2. 每行按 tab 或 2+ 连续空格切列（与 [TextTableParser] 的 TXT 模式相同）。
- * 3. **水印过滤**：单行字符数 > [MAX_LINE_LENGTH] 的视为水印/页脚（如全页扫描背景文字、
- *    网站盗版 PDF 的整页广告水印）跳过。这是启发式 —— 词书 PDF 的正常表格行字符数远低于此阈值。
- * 4. 列结构同其他格式：col0=序号 / col1=word / col2=phonetic / col3=posMeaning。
+ * Simplified strategy (no full table-recognition algorithm, for the same reasoning as in
+ * [XlsxParser]: the issue does not require advanced features):
+ * 1. `PDFTextStripper` extracts the text, split by line (default output is already sorted by y).
+ * 2. Each line is split into columns on tabs or 2+ consecutive spaces (same as [TextTableParser]'s TXT mode).
+ * 3. **Watermark filter**: a line longer than [MAX_LINE_LENGTH] chars is treated as a
+ *    watermark/footer (e.g. full-page scanned background text, or the full-page ad watermark of
+ *    pirated PDFs) and skipped. This is a heuristic: normal table rows in book PDFs are far
+ *    below this threshold.
+ * 4. Column layout matches the other formats: col0=index / col1=word / col2=phonetic / col3=posMeaning.
  *
- * 不支持（issue 没要求）：扫描版 PDF（图片型，需 OCR）/ 复杂跨页表格合并 / 多栏排版。
+ * Not supported (not required by the issue): scanned PDFs (image-based, needs OCR) / complex
+ * cross-page table merging / multi-column layouts.
  *
- * ⚠️ 本解析器依赖 Android 运行时（PdfBox-Android 的 native 库需 `PDFBoxResourceLoader.init(context)`
- *    在 Application 初始化），因此 **JVM 单测不可用**。覆盖路径：[FileWordImporterTest]
- *    （androidTest）放一个小测试 PDF 端到端验证。
+ * Warning: this parser depends on the Android runtime (PdfBox-Android's native library needs
+ * `PDFBoxResourceLoader.init(context)` in Application), so it is **not usable in JVM unit
+ * tests**. Coverage path: [FileWordImporterTest] (androidTest) with a small test PDF for
+ * end-to-end verification.
  */
 object PdfTableParser {
 
-    /** 单行字符数上限，超过视为水印/页脚/扫描背景，跳过。 */
+    /** Max characters per line; longer lines are treated as watermark/footer/scan background and skipped. */
     private const val MAX_LINE_LENGTH = 200
 
     fun parse(input: InputStream): List<ImportRow> {
@@ -40,7 +47,7 @@ object PdfTableParser {
         val rows = mutableListOf<ImportRow>()
         for (rawLine in text.lines()) {
             if (rawLine.isBlank()) continue
-            // 水印过滤：超长行视为水印跳过
+            // Watermark filter: overlong lines are treated as watermarks and skipped
             if (rawLine.length > MAX_LINE_LENGTH) continue
 
             val cols = splitLine(rawLine)
@@ -50,8 +57,9 @@ object PdfTableParser {
         return rows
     }
 
-    /** 与 [TextTableParser] 的 TXT 模式相同：tab 或 2+ 连续空格切列 + 同样的列→ImportRow 映射。
-     *  共用 [ImportRowMapper] 避免两处实现漂移（issue #21 同款列结构）。 */
+    /** Same as [TextTableParser]'s TXT mode: split on tab or 2+ consecutive spaces + the same
+     *  columns-to-ImportRow mapping. Shares [ImportRowMapper] so the two implementations cannot
+     *  drift apart (issue #21's shared column layout). */
     private fun splitLine(line: String): List<String> = ImportRowMapper.splitLine(line)
 
     private fun toRow(cols: List<String>): ImportRow? = ImportRowMapper.toRow(cols)

@@ -35,10 +35,10 @@ abstract class WordDrillDatabase : RoomDatabase() {
 
     companion object {
         /**
-         * Ticket #14：v1 → v2 给 word 表加 phonetic 列（IPA 音标，可空）。
-         * ALTER TABLE ADD COLUMN 在 SQLite 上保留旧数据，新列默认 NULL。
-         * Room 自动生成的 fallbackToDestructiveMigration 会丢用户词书，禁用；
-         * 这里走显式 migration，老用户升级后既有词条/词书/刷卡记录全部保留。
+         * Ticket #14: v1 -> v2 adds the phonetic column (IPA, nullable) to the word table.
+         * ALTER TABLE ADD COLUMN preserves old data on SQLite; the new column defaults to NULL.
+         * Room's auto-generated fallbackToDestructiveMigration would lose user books, so it is disabled;
+         * this explicit migration keeps all existing word entries/books/swipe records for upgrading users.
          */
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -47,16 +47,18 @@ abstract class WordDrillDatabase : RoomDatabase() {
         }
 
         /**
-         * Ticket #19：v2 → v3 新增 dictionary 表（只读 ECDICT 词典）。
+         * Ticket #19: v2 -> v3 adds the dictionary table (read-only ECDICT dictionary).
          *
-         * 表 schema 与 [DictionaryEntry] 实体对应：(word, pos) 唯一索引兜底重复导入。
-         * 老用户升级后 dictionary 为空，首启由 [com.github.chsiching.worddrill.data.DictionaryImportOrchestrator]
-         * 从 assets/dictionary.json 导入；不破坏既有 word/sense/book 数据。
+         * The table schema matches the [DictionaryEntry] entity: the (word, pos) unique index
+         * guards against duplicate imports.
+         * After upgrading, dictionary is empty; on first launch
+         * [com.github.chsiching.worddrill.data.DictionaryImportOrchestrator]
+         * imports it from assets/dictionary.json without touching existing word/sense/book data.
          *
-         * 注意：CREATE TABLE 语句必须与 Room codegen 生成的 schema 完全一致（含
-         * `PRIMARY KEY AUTOINCREMENT NOT NULL` 列约束 + 反引号 quoting），
-         * 否则 Room 在启动时做 schema 校验会抛 IllegalStateException。_codegen
-         * 形态从实机 sqlite_master 抓取确认过。
+         * Note: the CREATE TABLE statement must exactly match the schema Room codegen generates
+         * (including the `PRIMARY KEY AUTOINCREMENT NOT NULL` column constraint + backtick quoting),
+         * otherwise Room's startup schema validation throws IllegalStateException. The codegen
+         * form was captured from sqlite_master on a real device to confirm it.
          */
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -78,14 +80,16 @@ abstract class WordDrillDatabase : RoomDatabase() {
         }
 
         /**
-         * Ticket #20：v3 → v4 给 book_word 表加 skipped 列（跳过标记，词书级独立）。
+         * Ticket #20: v3 -> v4 adds the skipped column (skip flag, independent per book) to book_word.
          *
-         * ALTER TABLE ADD COLUMN 在 SQLite 上保留旧关联行，新列默认 0（未跳过）。
-         * Room Boolean 映射 INTEGER（0/1），migration 显式写 INTEGER NOT NULL DEFAULT 0
-         * 与 Room codegen 的列定义一致（否则 schema 校验会抛 IllegalStateException）。
+         * ALTER TABLE ADD COLUMN preserves old association rows on SQLite; the new column defaults
+         * to 0 (not skipped). Room maps Boolean to INTEGER (0/1); the migration explicitly writes
+         * INTEGER NOT NULL DEFAULT 0 to match Room codegen's column definition (otherwise schema
+         * validation throws IllegalStateException).
          *
-         * 跳过语义：[BookWord.skipped]。词书级独立 = 每条 (bookId, wordId) 关联单独标记，
-         * CET-4 跳过不影响 CET-6 同词的关联。老数据全部 skipped=0（未跳过），行为不变。
+         * Skip semantics: [BookWord.skipped]. Independent per book = each (bookId, wordId)
+         * association is flagged separately; skipping in CET-4 does not affect the CET-6 association
+         * for the same word. All existing rows get skipped=0 (not skipped), so behavior is unchanged.
          */
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -96,20 +100,24 @@ abstract class WordDrillDatabase : RoomDatabase() {
         }
 
         /**
-         * Ticket #22：v4 → v5 给 book_word 和 book 表加 deleted 列（软删除标记）。
+         * Ticket #22: v4 -> v5 adds the deleted column (soft-delete flag) to book_word and book.
          *
-         * - book_word.deleted：词书级独立（每条 (bookId, wordId) 关联单独标记），
-         *   CET-4 删 apple 不影响 CET-6 同词关联。与 [MIGRATION_3_4]（加 skipped）同模式。
-         * - book.deleted：整本词书的软删标记。删除自定义词书 = deleted=1（隐藏 + 进回收站），
-         *   恢复 = deleted=0。与 [BookWord.deleted] 平行但粒度不同。
+         * - book_word.deleted: independent per book (each (bookId, wordId) association is flagged
+         *   separately); deleting apple in CET-4 does not affect the CET-6 association for the same
+         *   word. Same pattern as [MIGRATION_3_4] (which added skipped).
+         * - book.deleted: soft-delete flag for a whole book. Deleting a custom book = deleted=1
+         *   (hidden + moved to the recycle bin), restore = deleted=0. Parallel to
+         *   [BookWord.deleted] but at a different granularity.
          *
-         * 与 [MIGRATION_3_4]（加 skipped）完全同模式：ALTER TABLE ADD COLUMN 在 SQLite
-         * 上保留旧数据，新列默认 0（未删）。Room Boolean 映射 INTEGER（0/1），
-         * migration 显式写 INTEGER NOT NULL DEFAULT 0 与 Room codegen 的列定义一致
-         * （否则 schema 校验会抛 IllegalStateException）。
+         * Exactly the same pattern as [MIGRATION_3_4] (which added skipped): ALTER TABLE ADD COLUMN
+         * preserves old data on SQLite; the new column defaults to 0 (not deleted). Room maps
+         * Boolean to INTEGER (0/1); the migration explicitly writes INTEGER NOT NULL DEFAULT 0 to
+         * match Room codegen's column definition (otherwise schema validation throws
+         * IllegalStateException).
          *
-         * 老数据全部 deleted=0（未删），行为不变。软删的词/词书进回收站，可恢复（deleted 改回 0）；
-         * 永久删除走真 DELETE（带 deleted=1 兜底）。
+         * All existing rows get deleted=0 (not deleted), so behavior is unchanged. Soft-deleted
+         * words/books go to the recycle bin and can be restored (set deleted back to 0);
+         * permanent deletion is a real DELETE (guarded by deleted=1).
          */
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {

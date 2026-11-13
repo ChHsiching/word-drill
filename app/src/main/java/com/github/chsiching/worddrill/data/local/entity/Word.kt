@@ -5,13 +5,13 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * 全局词条池：一个单词在词池中只存一份，多个词书通过 book_word 引用共享。
- * word 表只存拼写；词性/释义挂在 sense 表上。
+ * Global word entry pool: each word is stored only once, shared by multiple books through book_word references.
+ * The word table stores only the spelling; pos/meaning live on the sense table.
  *
- * 按"拼写"去重：text 有唯一索引，保证同一拼写全局只有一行。
+ * Deduplicated by "spelling": text has a unique index, guaranteeing one row per spelling globally.
  *
- * Ticket #14：phonetic 存 IPA 音标（如 "/əˈbændən/"），可为空（词典缺音标或用户手输词）。
- * 由 v2 migration 以 ALTER TABLE ADD COLUMN 引入，老用户升级后此列为 NULL。
+ * Ticket #14: phonetic stores the IPA transcription (e.g. "/əˈbændən/"), nullable (dictionary missing the phonetic or user-entered word).
+ * Introduced by the v2 migration via ALTER TABLE ADD COLUMN; NULL for existing users after upgrade.
  */
 @Entity(
     tableName = "word",

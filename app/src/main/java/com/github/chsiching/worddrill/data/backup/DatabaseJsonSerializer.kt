@@ -9,39 +9,42 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * [DatabaseSnapshot] 的 JSON 序列化/反序列化（副接缝）。
+ * JSON serialization/deserialization for [DatabaseSnapshot] (secondary seam).
  *
- * 与 [com.github.chsiching.worddrill.data.PresetWordsParser] 同样用 Android 自带的 org.json，
- * 无新增依赖。两个函数都是纯函数（输入数据 → 输出字符串 / 输入字符串 → 输出数据），
- * 不依赖 Android 文件系统，便于在 JVM 单测里喂入数据与字符串验证往返。
+ * Like [com.github.chsiching.worddrill.data.PresetWordsParser], uses Android's built-in org.json,
+ * with no new dependencies. Both functions are pure (input data → output string /
+ * input string → output data) and do not depend on the Android file system, making it easy to
+ * feed data and strings in JVM unit tests and verify round-trips.
  *
- * JSON 结构：
+ * JSON structure:
  * ```
  * {
  *   "version": 1,
- *   "nickname": "可选昵称",            // 空白/省略视为无昵称
+ *   "nickname": "optional nickname",    // blank/omitted means no nickname
  *   "books":   [ { "bookId":1, "name":"CET-4", "isPreset":true } ],
  *   "words":   [ { "wordId":10, "text":"apple", "phonetic":"/ˈæpl/" } ],
- *   "senses":  [ { "senseId":100, "wordId":10, "pos":"n.", "meaning":"书" } ],
+ *   "senses":  [ { "senseId":100, "wordId":10, "pos":"n.", "meaning":"book" } ],
  *   "bookWords":[ { "bookId":1, "wordId":10, "skipped":false } ],
  *   "swipeLogs":[ { "logId":1000, "bookId":2, "wordId":10, "timestamp":1700000000000 } ]
  * }
  * ```
  *
- * 反序列化对缺省字段做安全回退：version 缺省为 1，nickname 缺省/空白为 null；
- * word.phonetic 缺省/空白为 null（兼容 Ticket #14 之前的导出文件）；
- * 但 books/words/senses/bookWords/swipeLogs 数组缺省时抛 [org.json.JSONException]
- *（与 [com.github.chsiching.worddrill.data.PresetWordsParser] 的策略一致：缺关键字段视为损坏文件）。
+ * Deserialization applies safe fallbacks for absent fields: version defaults to 1,
+ * nickname defaults to null when absent/blank; word.phonetic defaults to null when
+ * absent/blank (compatible with export files from before Ticket #14); but if the
+ * books/words/senses/bookWords/swipeLogs arrays are absent, an [org.json.JSONException]
+ * is thrown (same strategy as [com.github.chsiching.worddrill.data.PresetWordsParser]:
+ * missing key fields are treated as a corrupted file).
  */
 object DatabaseJsonSerializer {
 
-    /** 当前 schema 版本号，导出时写入。 */
+    /** Current schema version number, written on export. */
     const val CURRENT_VERSION = 1
 
     fun serialize(snapshot: DatabaseSnapshot): String {
         val root = JSONObject()
         root.put("version", snapshot.version)
-        // 空白昵称不写入（导出文件里不留空标签）
+        // Blank nicknames are not written (no empty labels left in the exported file)
         val nick = snapshot.nickname?.trim()
         if (!nick.isNullOrEmpty()) root.put("nickname", nick)
 
@@ -51,8 +54,10 @@ object DatabaseJsonSerializer {
                     put("bookId", b.bookId)
                     put("name", b.name)
                     put("isPreset", b.isPreset)
-                    // Ticket #22：软删标记写入导出（true = 已软删，重导回保留回收站状态）。
-                    // 与 bookWord.skipped/deleted 同策略：字段齐全写，反序列化无须猜测缺省。
+                    // Ticket #22: soft-delete flag is written to the export (true = soft-deleted,
+                    // re-importing keeps the recycle bin state).
+                    // Same strategy as bookWord.skipped/deleted: always write the field so
+                    // deserialization never has to guess the default.
                     put("deleted", b.deleted)
                 })
             }
@@ -62,8 +67,9 @@ object DatabaseJsonSerializer {
                 put(JSONObject().apply {
                     put("wordId", w.wordId)
                     put("text", w.text)
-                    // Ticket #14：phonetic 为空不写入（与 nickname 同策略：导出文件不留空标签，
-                    // 反序列化时 optString 默认 "" → null）。
+                    // Ticket #14: empty phonetic is not written (same strategy as nickname:
+                    // no empty labels in the exported file; on deserialization
+                    // optString defaults to "" → null).
                     if (!w.phonetic.isNullOrBlank()) put("phonetic", w.phonetic)
                 })
             }
@@ -83,11 +89,15 @@ object DatabaseJsonSerializer {
                 put(JSONObject().apply {
                     put("bookId", bw.bookId)
                     put("wordId", bw.wordId)
-                    // Ticket #20：跳过标记写入导出（true = 已跳过，重导回不丢跳过状态）。
-                    // 默认 false 的行也写，保持字段齐全，反序列化无须猜测缺省。
+                    // Ticket #20: skip flag is written to the export (true = skipped,
+                    // re-importing does not lose the skipped state).
+                    // Rows with the default false are also written to keep fields complete,
+                    // so deserialization never has to guess the default.
                     put("skipped", bw.skipped)
-                    // Ticket #22：软删标记写入导出（true = 已软删，重导回保留回收站状态）。
-                    // 与 skipped 同策略：字段齐全写，反序列化无须猜测缺省。
+                    // Ticket #22: soft-delete flag is written to the export (true = soft-deleted,
+                    // re-importing keeps the recycle bin state).
+                    // Same strategy as skipped: always write the field so deserialization
+                    // never has to guess the default.
                     put("deleted", bw.deleted)
                 })
             }
@@ -108,11 +118,12 @@ object DatabaseJsonSerializer {
     fun deserialize(json: String): DatabaseSnapshot {
         val root = JSONObject(json)
         val version = if (root.has("version")) root.getInt("version") else 1
-        // 空白昵称视为无昵称
+        // Blank nickname is treated as no nickname
         val nickname = root.optString("nickname").trim().ifEmpty { null }
 
         val books = root.getJSONArray("books").toList { b ->
-            // Ticket #22：deleted 可空，兼容 #22 之前的导出文件（缺省 → false，未软删）。
+            // Ticket #22: deleted is nullable, compatible with export files from before #22
+            // (absent → false, not soft-deleted).
             Book(
                 bookId = b.getLong("bookId"),
                 name = b.getString("name"),
@@ -121,9 +132,10 @@ object DatabaseJsonSerializer {
             )
         }
         val words = root.getJSONArray("words").toList { w ->
-            // Ticket #14：phonetic 可空。
-            // ⚠️ w.isNull 先挡 JSON null（见 PresetWordsParser 同款坑的说明）：
-            // Android org.json 的 optString 在值为 JSON null 时返回字符串 "null"。
+            // Ticket #14: phonetic is nullable.
+            // ⚠️ w.isNull first guards against JSON null (see the note about the same pitfall
+            // in PresetWordsParser): Android org.json's optString returns the string "null"
+            // when the value is JSON null.
             Word(
                 wordId = w.getLong("wordId"),
                 text = w.getString("text"),
@@ -140,8 +152,10 @@ object DatabaseJsonSerializer {
             )
         }
         val bookWords = root.getJSONArray("bookWords").toList { bw ->
-            // Ticket #20：skipped 可空，兼容 #20 之前的导出文件（缺省 → false，未跳过）。
-            // Ticket #22：deleted 可空，兼容 #22 之前的导出文件（缺省 → false，未软删）。
+            // Ticket #20: skipped is nullable, compatible with export files from before #20
+            // (absent → false, not skipped).
+            // Ticket #22: deleted is nullable, compatible with export files from before #22
+            // (absent → false, not soft-deleted).
             BookWord(
                 bookId = bw.getLong("bookId"),
                 wordId = bw.getLong("wordId"),
@@ -168,7 +182,7 @@ object DatabaseJsonSerializer {
         )
     }
 
-    /** 把 JSONArray 映射成 List<T>，块里拿到的是已解包的 JSONObject。 */
+    /** Maps a JSONArray to List<T>; the block receives an already-unwrapped JSONObject. */
     private inline fun <T> JSONArray.toList(block: (JSONObject) -> T): List<T> =
         buildList {
             for (i in 0 until length()) add(block(getJSONObject(i)))
