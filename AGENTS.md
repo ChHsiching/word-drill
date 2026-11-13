@@ -4,6 +4,18 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
+## 0. Repo Language Policy
+
+All dev-facing artifacts are written in **English**: documentation, code comments, git commit messages, and GitHub issues.
+
+Exceptions that stay Chinese:
+
+- App-internal user-facing text (`res/values/strings.xml` values, and test string literals that assert them)
+- Product-facing marketing copy: `README.md` and the website (`docs/index.html`)
+- Human-agent conversation
+
+Never rewrite existing git history; the policy governs new content only.
+
 ## 1. Think Before Coding
 
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
@@ -80,4 +92,4 @@ Single-context layout: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `do
 
 ### Android emulator MCP
 
-用 `android-emulator` MCP 辅助开发时的工具层坑（IME 输入、数据库查询、构建/验证路径）。See `docs/agents/android-mcp-notes.md`.
+Tool-layer pitfalls when developing with the `android-emulator` MCP (IME input, database queries, build/verify paths). See `docs/agents/android-mcp-notes.md`.
