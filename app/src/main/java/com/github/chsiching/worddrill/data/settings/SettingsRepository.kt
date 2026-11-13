@@ -31,10 +31,10 @@ class SettingsRepository @Inject constructor(
     private val presetImportedKey = booleanPreferencesKey("preset_imported")
     private val dictionaryImportedKey = booleanPreferencesKey("dictionary_imported")
     /**
-     * Ticket #23: imported version of the built-in dictionary (integer). Currently incremented
-     * each time a release ships a fixed dictionary.json; the orchestrator compares the stored
-     * version < the expected version, clears the table and re-imports, so existing users get the
-     * new data after upgrading the app.
+     * Ticket #23: imported version of the built-in dictionary (integer). Increment it each time
+     * a release ships a fixed dictionary.json. The orchestrator compares the stored version
+     * against the expected version, clears the table and re-imports when it is behind, so
+     * existing users get the new data after upgrading the app.
      * Replaces the plain boolean [dictionaryImportedKey] "imported once, never again" semantics.
      */
     private val dictionaryVersionKey = longPreferencesKey("dictionary_version")
@@ -69,8 +69,9 @@ class SettingsRepository @Inject constructor(
      * Ticket #23: currently imported version of the built-in dictionary. Defaults to 0 when
      * never read (treated as "never imported").
      * The orchestrator compares it against
-     * [com.github.chsiching.worddrill.data.DictionaryImportOrchestrator.DICTIONARY_VERSION]:
-     * smaller than the expected version -> clear the table and re-import.
+     * [com.github.chsiching.worddrill.data.DictionaryImportOrchestrator.DICTIONARY_VERSION].
+     * When the stored version is smaller than the expected version, the orchestrator clears the
+     * table and re-imports.
      */
     val dictionaryVersion: Flow<Long> =
         context.appDataStore.data.map { it[dictionaryVersionKey] ?: 0L }
@@ -95,8 +96,8 @@ class SettingsRepository @Inject constructor(
     }
 
     /**
-     * Clear the review book creation flag (set to false). For test isolation: an in-memory Room
-     * database starts empty each time, and clearing the flag lets
+     * Clear the review book creation flag (set to false). This exists for test isolation. An
+     * in-memory Room database starts empty each time, and clearing the flag lets
      * [com.github.chsiching.worddrill.data.ReviewBookInitializer] run from a clean starting point.
      */
     suspend fun clearReviewBookCreated() {

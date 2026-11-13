@@ -116,7 +116,7 @@ val LightColors = lightColorScheme(
     outline = SeparatorStrongLight,
     outlineVariant = SeparatorLight,
     scrim = Color.Black,
-    // Surface container hierarchy — pure grayscale to override M3 default tonal palette.
+    // Surface container hierarchy, pure grayscale to override M3 default tonal palette.
     // NavigationBar / Surface(tonalElevation>0) read surfaceContainer; without these they
     // fall back to a default M3 tint (purple-ish), breaking the monochrome spec.
     surfaceBright = SurfaceLight,
@@ -157,7 +157,7 @@ val DarkColors = darkColorScheme(
     outline = SeparatorStrongDark,
     outlineVariant = SeparatorDark,
     scrim = Color.Black,
-    // Surface container hierarchy — pure grayscale to override M3 default tonal palette.
+    // Surface container hierarchy, pure grayscale to override M3 default tonal palette.
     surfaceBright = SurfaceElevatedDark,
     surfaceDim = BgDark,
     surfaceContainer = SurfaceDark,

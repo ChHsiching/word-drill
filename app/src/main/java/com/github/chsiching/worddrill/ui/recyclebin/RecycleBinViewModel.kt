@@ -18,12 +18,12 @@ import javax.inject.Inject
  * restore and permanent delete.
  *
  * Two kinds of items:
- * - **Books** ([books]): a whole book soft-deleted ([Book.deleted]=1). Restore = the whole
- *   book returns to the list; permanent delete = a real DELETE of the book (CASCADE clears
+ * - **Books** ([books]): a whole book soft-deleted ([Book.deleted]=1). Restore returns the whole
+ *   book to the list; permanent delete is a real DELETE of the book (CASCADE clears
  *   its book_word links).
  * - **Word links** ([entries]): a word link of some book soft-deleted
  *   ([com.github.chsiching.worddrill.data.local.entity.BookWord.deleted]=1).
- *   Restore = the word returns to its original book; permanent delete = a real DELETE of
+ *   Restore returns the word to its original book; permanent delete is a real DELETE of
  *   that link row.
  *
  * Permanently deleting a book CASCADEs away all its links (including soft-deleted ones),

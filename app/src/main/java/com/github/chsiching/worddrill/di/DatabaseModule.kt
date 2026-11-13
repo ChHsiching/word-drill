@@ -34,10 +34,10 @@ object DatabaseModule {
         )
             // Register migrations explicitly: fallbackToDestructiveMigration would lose user
             // books/swipe records, so it is disabled.
-            // - v1→v2 (Ticket #14): add phonetic column to word table
-            // - v2→v3 (Ticket #19): add dictionary table (read-only ECDICT dictionary)
-            // - v3→v4 (Ticket #20): add skipped column to book_word table (skip flag, per-book independent)
-            // - v4→v5 (Ticket #22): add deleted column to book_word table (soft-delete flag,
+            // - v1 to v2 (Ticket #14): add phonetic column to word table
+            // - v2 to v3 (Ticket #19): add dictionary table (read-only ECDICT dictionary)
+            // - v3 to v4 (Ticket #20): add skipped column to book_word table (skip flag, per-book independent)
+            // - v4 to v5 (Ticket #22): add deleted column to book_word table (soft-delete flag,
             //   per-book independent, goes to recycle bin)
             .addMigrations(
                 WordDrillDatabase.MIGRATION_1_2,

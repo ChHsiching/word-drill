@@ -19,8 +19,8 @@ enum class ImportFormat {
         /**
          * Detect the format from the file extension. An unknown extension throws
          * [UnsupportedFileTypeException], which the caller catches and shows in the UI layer with
-         * [com.github.chsiching.worddrill.R.string.library_import_failed]
-         * + a file-type message. No user-visible Chinese is hardcoded in the data layer
+             * [com.github.chsiching.worddrill.R.string.library_import_failed]
+             * and a file-type message. No user-visible Chinese is hardcoded in the data layer
          * (project convention: user-visible text goes through R.string).
          */
         fun byExtension(filename: String): ImportFormat {

@@ -20,8 +20,8 @@ import javax.inject.Singleton
  * - [Sense]'s (wordId, pos) is unique. Data preparation already guarantees one meaning per pos
  *   per word, so insertSense is called directly (IGNORE as a fallback so an accidental
  *   duplicate cannot fail the whole import).
- * - The whole import runs in one Room transaction ([androidx.room.withTransaction]): atomic
- *   and reading a self-consistent snapshot.
+ * - The whole import runs in one Room transaction ([androidx.room.withTransaction]), so it is
+ *   atomic and readers see a self-consistent snapshot.
  *
  * This class only "writes the database"; it does not read assets / parse JSON, so JVM unit
  * tests can feed an in-memory Room and a constructed [PresetWords] to verify import

@@ -137,8 +137,8 @@ fun AnimatedSplashOverlay(
 
         // Phase 5: staggered fade-out (stagger, not a pipeline).
         // Order: line1, line2, line3, back card, front card. Each element starts **without
-        // waiting for the previous one to finish**, with a 100ms start interval (compact,
-        // not sluggish); each fade-out is a spring (critically damped, same as fly-in).
+        // waiting for the previous one to finish**, with a 100ms start interval; each
+        // fade-out is a spring (critically damped, same as fly-in).
         // Several elements sit mid fade-out at different progresses, giving a layered look.
         val fadeOutOrder = listOf(
             Element.LINE1, Element.LINE2, Element.LINE3,

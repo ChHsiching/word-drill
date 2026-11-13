@@ -3,7 +3,7 @@ package com.github.chsiching.worddrill.data.wordimport
 /**
  * Ticket #21: pos abbreviation + Chinese meaning parser (pure function).
  *
- * Column 4 text (e.g. `"a.flat; plain n.apartment; plane"` in real data) -> `List<Pair<pos, meaning>>`.
+ * Parses column 4 text (e.g. `"a.flat; plain n.apartment; plane"` in real data) into `List<Pair<pos, meaning>>`.
  *
  * Fixed abbreviation list (verbatim from issue #21): each abbreviation ends with a half-width `.`:
  *   n. v. vt. vi. aux.v. adj. a. adv. ad. prep. conj. pron. art. num. int. interj. abbr.
@@ -17,7 +17,7 @@ package com.github.chsiching.worddrill.data.wordimport
  * 3. Text before the first anchor (if any): when non-empty after trim it is treated as a bare
  *    meaning with no abbreviation and assigned the default `n.` (conservative choice; the issue
  *    does not specify, and this avoids losing the word's meaning).
- * 4. Abbreviation with no meaning (e.g. a bare `"n."`) -> skipped.
+ * 4. An abbreviation with no meaning (e.g. a bare `"n."`) is skipped.
  *
  * Note: abbreviations inside a meaning are still recognized (e.g. "n.watch etc. and so on" is
  * not split, because `etc.` is not in the list). The fixed abbreviation list is what guarantees
@@ -40,7 +40,7 @@ object PosMeaningParser {
      */
     private val SORTED_ABBREVIATIONS: List<String> = ABBREVIATIONS.sortedByDescending { it.length }
 
-    /** Escapes regex metacharacters (`.` -> `\.`). The abbreviations only contain `.`, so escaping is safe. */
+    /** Escapes regex metacharacters (`.` becomes `\.`). The abbreviations only contain `.`, so escaping is safe. */
     private val ABBREV_PATTERN: Regex = Regex(
         SORTED_ABBREVIATIONS.joinToString("|") { Regex.escape(it) }
     )
@@ -56,13 +56,13 @@ object PosMeaningParser {
 
         val matches = ABBREV_PATTERN.findAll(trimmed).toList()
         if (matches.isEmpty()) {
-            // No abbreviation in the whole segment -> default n.
+            // No abbreviation in the whole segment, so it defaults to n.
             return listOf("n." to trimmed)
         }
 
         val result = mutableListOf<Pair<String, String>>()
 
-        // Text before the first anchor (non-empty after trim) -> default n.
+        // Text before the first anchor (non-empty after trim) also defaults to n.
         val leading = trimmed.substring(0, matches.first().range.first).trim()
         if (leading.isNotEmpty()) {
             result.add("n." to leading)

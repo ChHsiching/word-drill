@@ -38,9 +38,9 @@ object PresetWordsParser {
                             PresetWords.Word(
                                 text = w.getString("text"),
                                 // Ticket #14: phonetic is nullable.
-                                // Warning: JSON null must be guarded with w.isNull first: Android's
-                                // bundled org.json optString(key, "") returns the string "null" (not the
-                                // fallback "") when the key exists with a JSON null value, so calling
+                                // Warning: guard JSON null with w.isNull first, because Android's
+                                // bundled org.json optString(key, "") returns the string "null" when
+                                // the key exists with a JSON null value, so calling
                                 // optString directly would persist phonetic = "null" (hit and verified on
                                 // a real device). The same trap exists in DatabaseJsonSerializer's
                                 // deserialization path, handled the same way.

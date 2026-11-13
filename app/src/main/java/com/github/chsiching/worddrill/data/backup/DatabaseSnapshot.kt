@@ -11,7 +11,7 @@ import com.github.chsiching.worddrill.data.local.entity.Word
  *
  * Import strategy is **overwrite** (Ticket #10 default): restore by original primary keys,
  * clear the whole database, then batch re-insert. This way cross-table foreign key references
- * (book_word / sense → word, swipe_log.bookId → book) are fully preserved, especially orphaned
+ * (book_word / sense reference word, swipe_log.bookId references book) are fully preserved, especially orphaned
  * swipe_log rows (their bookId/wordId may reference deleted books/words, but must still be kept
  * for cumulative statistics).
  *

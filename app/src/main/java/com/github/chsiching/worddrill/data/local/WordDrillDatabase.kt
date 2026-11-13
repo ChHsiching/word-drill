@@ -35,7 +35,7 @@ abstract class WordDrillDatabase : RoomDatabase() {
 
     companion object {
         /**
-         * Ticket #14: v1 -> v2 adds the phonetic column (IPA, nullable) to the word table.
+         * Ticket #14: v1 to v2 adds the phonetic column (IPA, nullable) to the word table.
          * ALTER TABLE ADD COLUMN preserves old data on SQLite; the new column defaults to NULL.
          * Room's auto-generated fallbackToDestructiveMigration would lose user books, so it is disabled;
          * this explicit migration keeps all existing word entries/books/swipe records for upgrading users.
@@ -47,7 +47,7 @@ abstract class WordDrillDatabase : RoomDatabase() {
         }
 
         /**
-         * Ticket #19: v2 -> v3 adds the dictionary table (read-only ECDICT dictionary).
+         * Ticket #19: v2 to v3 adds the dictionary table (read-only ECDICT dictionary).
          *
          * The table schema matches the [DictionaryEntry] entity: the (word, pos) unique index
          * guards against duplicate imports.
@@ -57,8 +57,8 @@ abstract class WordDrillDatabase : RoomDatabase() {
          *
          * Note: the CREATE TABLE statement must exactly match the schema Room codegen generates
          * (including the `PRIMARY KEY AUTOINCREMENT NOT NULL` column constraint + backtick quoting),
-         * otherwise Room's startup schema validation throws IllegalStateException. The codegen
-         * form was captured from sqlite_master on a real device to confirm it.
+         * otherwise Room's startup schema validation throws IllegalStateException. We captured
+         * the codegen form from sqlite_master on a real device to confirm the match.
          */
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -80,14 +80,14 @@ abstract class WordDrillDatabase : RoomDatabase() {
         }
 
         /**
-         * Ticket #20: v3 -> v4 adds the skipped column (skip flag, independent per book) to book_word.
+         * Ticket #20: v3 to v4 adds the skipped column (skip flag, independent per book) to book_word.
          *
          * ALTER TABLE ADD COLUMN preserves old association rows on SQLite; the new column defaults
          * to 0 (not skipped). Room maps Boolean to INTEGER (0/1); the migration explicitly writes
          * INTEGER NOT NULL DEFAULT 0 to match Room codegen's column definition (otherwise schema
          * validation throws IllegalStateException).
          *
-         * Skip semantics: [BookWord.skipped]. Independent per book = each (bookId, wordId)
+         * Skip semantics: [BookWord.skipped]. Independent per book means each (bookId, wordId)
          * association is flagged separately; skipping in CET-4 does not affect the CET-6 association
          * for the same word. All existing rows get skipped=0 (not skipped), so behavior is unchanged.
          */
@@ -100,14 +100,14 @@ abstract class WordDrillDatabase : RoomDatabase() {
         }
 
         /**
-         * Ticket #22: v4 -> v5 adds the deleted column (soft-delete flag) to book_word and book.
+         * Ticket #22: v4 to v5 adds the deleted column (soft-delete flag) to book_word and book.
          *
          * - book_word.deleted: independent per book (each (bookId, wordId) association is flagged
          *   separately); deleting apple in CET-4 does not affect the CET-6 association for the same
          *   word. Same pattern as [MIGRATION_3_4] (which added skipped).
-         * - book.deleted: soft-delete flag for a whole book. Deleting a custom book = deleted=1
-         *   (hidden + moved to the recycle bin), restore = deleted=0. Parallel to
-         *   [BookWord.deleted] but at a different granularity.
+         * - book.deleted: soft-delete flag for a whole book. Deleting a custom book sets
+         *   deleted=1 (hidden and moved to the recycle bin); restore sets it back to 0. Parallel
+         *   to [BookWord.deleted] but at a different granularity.
          *
          * Exactly the same pattern as [MIGRATION_3_4] (which added skipped): ALTER TABLE ADD COLUMN
          * preserves old data on SQLite; the new column defaults to 0 (not deleted). Room maps

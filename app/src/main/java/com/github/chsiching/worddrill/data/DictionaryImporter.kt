@@ -15,8 +15,8 @@ import javax.inject.Singleton
  * - The dictionary table's (word, pos) unique index guards against duplicates:
  *   [DictionaryDao.insertAll] uses IGNORE, so an existing (word, pos) is skipped.
  *   Safe to call repeatedly (idempotent).
- * - The whole import runs in one Room transaction ([androidx.room.withTransaction]): atomic
- *   and reading a self-consistent snapshot.
+ * - The whole import runs in one Room transaction ([androidx.room.withTransaction]), so it is
+ *   atomic and readers see a self-consistent snapshot.
  * - Batch writes, avoiding 110k row-by-row inserts. Currently one bulk insertAll; if the data
  *   grows further it can be chunked. As is, 110k rows in a single transaction takes a few
  *   seconds on a mid-range phone for the first import, which is acceptable.

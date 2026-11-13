@@ -409,8 +409,8 @@ private fun NavStyleRow(current: NavStyle, onClick: () -> Unit) {
 /**
  * Top-right theme-switch icon (review feedback 5).
  *
- * Tap: compute locally "currently dark? target = the opposite", pass it to
- * [LocalThemeRevealTrigger] to fire the circular reveal; also write DataStore
+ * Tap: compute the target locally (if currently dark, switch to light, and vice versa), pass
+ * it to [LocalThemeRevealTrigger] to fire the circular reveal, and write DataStore
  * (cycleTheme) to persist.
  */
 /**

@@ -7,7 +7,8 @@ import androidx.room.PrimaryKey
 
 /**
  * Sense: the Chinese definition of a word under one part of speech.
- * Same spelling with different parts of speech = different senses under the same word (one card = all senses of one word).
+ * The same spelling with different parts of speech means different senses under the same word
+ * (one card shows all senses of one word).
  *
  * (wordId, pos) unique: only one definition is allowed per word per part of speech.
  */

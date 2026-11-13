@@ -24,19 +24,19 @@ class FileNotOpenableException(val uri: String) : Exception("file not openable: 
  * Ticket #21: file-to-book import orchestrator (@Singleton).
  *
  * Flow (issue #21):
- * 1. User picks a file (SAF, Uri passed in by the ViewModel) + enters a new book name -> call [import]
- * 2. Detect the format from the Uri suffix ([ImportFormat.byExtension]) -> route to the matching parser
+ * 1. The user picks a file (SAF; the ViewModel passes the Uri) and enters a new book name, then calls [import]
+ * 2. Detect the format from the Uri suffix ([ImportFormat.byExtension]), then route to the matching parser
  * 3. Parse into an [ImportRow] list
  * 4. Process word by word:
- *    - **Dictionary lookup first** (issue #21 word processing step 1): hit -> use the dictionary's pos+meaning+phonetic
- *    - **No dictionary entry** -> use the file's col3 phonetic + col4 pos/meaning ([PosMeaningParser]
+ *    - **Dictionary lookup first** (issue #21 word processing step 1): on a hit, use the dictionary's pos, meaning, and phonetic
+ *    - **No dictionary entry** means the file's col3 phonetic and col4 pos/meaning are used ([PosMeaningParser]
  *      parses col4; the issue uses 1-based column numbers: col1=index / col2=word / col3=phonetic / col4=pos+meaning)
- *    - **col3+4 also empty** -> skip, counted as "incomplete data" ([ImportSummary.skipped])
+ *    - **col3+4 also empty** means the row is skipped, counted as "incomplete data" ([ImportSummary.skipped])
  * 5. Silent dedupe: word table `text` unique index (IGNORE fallback) + sense `(wordId,pos)` unique
  *    index + book_word `(bookId,wordId)` composite primary key. Duplicate words across files /
  *    books automatically reuse the same word row; the issue explicitly says "dedupe without prompting".
- * 6. Write the word pool + book_word associations in one Room transaction
- *    ([androidx.room.withTransaction]) -> atomic; a failure rolls back, leaving no half-imported state.
+ * 6. Write the word pool and book_word associations in one Room transaction
+ *    ([androidx.room.withTransaction]), so it is atomic; a failure rolls back, leaving no half-imported state.
  * 7. Return [ImportSummary] (success X / skipped Y).
  *
  * Same pattern as [com.github.chsiching.worddrill.data.PresetImporter]: upsert word (reuse or
@@ -96,11 +96,11 @@ class FileWordImporter @Inject constructor(
                         success++
                         continue
                     }
-                    // 2) No dictionary entry -> use the file's col3 (phonetic) + col4 (pos/meaning, needs POS parsing)
+                    // 2) No dictionary entry: use the file's col3 (phonetic) and col4 (pos/meaning, needs POS parsing)
                     val phonetic = row.phonetic?.takeIf { it.isNotBlank() }
                     val senses = PosMeaningParser.parse(row.posMeaning ?: "")
                     if (phonetic == null && senses.isEmpty()) {
-                        // 3) All empty -> skip, counted as "incomplete data"
+                        // 3) All empty: skip, counted as incomplete data
                         skipped++
                         continue
                     }

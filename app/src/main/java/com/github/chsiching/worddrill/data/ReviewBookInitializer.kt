@@ -18,7 +18,7 @@ import javax.inject.Singleton
  * Idempotency: the DataStore flag `review_book_created` guarantees it is created only once;
  * BookDao.getByName acts as a fallback, so even if the flag is missing (reinstall/cache cleared)
  * two books with the same name will not be created. Same pattern as [PresetImportOrchestrator]:
- * flag check + data-layer deduplication as double insurance.
+ * the flag check comes first, and data-layer deduplication is the second guard.
  */
 @Singleton
 class ReviewBookInitializer @Inject constructor(

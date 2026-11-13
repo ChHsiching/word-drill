@@ -27,7 +27,7 @@ import javax.inject.Inject
  * Dialog states of the "Library" tab: none / create / rename / delete confirm / import
  * from file / import done.
  *
- * - [Import]: pick a file + enter a book name, then submit (working=true means the
+ * - [Import]: pick a file and enter a book name, then submit (working=true means the
  *   database write is in progress)
  * - [ImportDone]: import finished (carrying [ImportSummary]); the Composable shows it and
  *   then dismisses
@@ -71,7 +71,7 @@ data class LibraryUiState(
  *   pitfall C)
  * - Delete: double confirmation then [BookDao.deleteCustom] (presets are guarded by the
  *   SQL isPreset=0 condition)
- * - File import (#21): SAF picks a Uri + book name entry, then [FileWordImporter.import],
+ * - File import (#21): SAF picks a Uri and book name entry, then [FileWordImporter.import],
  *   then ImportDone
  */
 @HiltViewModel
@@ -170,13 +170,13 @@ class LibraryViewModel @Inject constructor(
 
     fun openImportDialog() { _dialog.value = LibraryDialog.Import() }
 
-    /** SAF callback: after the user picks a file, the Composable passes in the Uri + filename (read from Cursor DISPLAY_NAME). */
+    /** SAF callback: after the user picks a file, the Composable passes in the Uri and filename (read from Cursor DISPLAY_NAME). */
     fun onFileSelected(uri: Uri, filename: String) {
         val d = _dialog.value as? LibraryDialog.Import ?: return
         _dialog.value = d.copy(uri = uri, filename = filename, failureMessage = null, failureDetail = null)
     }
 
-    /** Submits import: runs [FileWordImporter.import] only after validation (name + a file must be picked). */
+    /** Submits import: runs [FileWordImporter.import] only after validation (a name and a file must be picked). */
     fun submitImport() {
         val d = _dialog.value as? LibraryDialog.Import ?: return
         if (d.error != null) return

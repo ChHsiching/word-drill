@@ -54,8 +54,8 @@ interface WordDao {
     /**
      * Ticket #7: reactive word entry query by book (with sense lists).
      * The book list page subscribes; re-emitted automatically after inserts/deletes/updates.
-     * Ticket #20: filters `bw.skipped = 0`, the word list page only shows non-skipped words.
-     * Ticket #22: filters `bw.deleted = 0`, the word list page only shows non-soft-deleted words.
+     * Ticket #20: filters `bw.skipped = 0` so the word list page only shows non-skipped words.
+     * Ticket #22: filters `bw.deleted = 0` so the word list page only shows non-soft-deleted words.
      * @Transaction keeps the @Relation two-step query reading a consistent snapshot.
      */
     @Transaction

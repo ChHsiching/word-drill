@@ -21,14 +21,14 @@ import java.io.InputStream
  * - No header detection (not required by the issue; if headers must be excluded, the caller
  *   filters them manually after import)
  *
- * Parsed fields are trimmed, empty fields -> null (matching [ImportRow] field semantics).
+ * Parsed fields are trimmed, and empty fields become null (matching [ImportRow] field semantics).
  * Rows with an empty word column (col 1) are skipped outright (they cannot form a word entry).
  */
 object TextTableParser {
 
     /**
      * @param input Text input stream (decoded as UTF-8)
-     * @param delimiter `,` -> CSV mode; `null` -> TXT auto-detection (tab / 2+ spaces)
+     * @param delimiter `,` means CSV mode; `null` means TXT auto-detection (tab / 2+ spaces)
      */
     fun parse(input: InputStream, delimiter: Char?): List<ImportRow> {
         val text = input.bufferedReader(Charsets.UTF_8).readText()
@@ -67,7 +67,7 @@ object TextTableParser {
             when {
                 c == '"' -> {
                     if (inQuote && i + 1 < line.length && line[i + 1] == '"') {
-                        // CSV escaping: two consecutive quotes -> one literal quote
+                        // CSV escaping: two consecutive quotes become one literal quote
                         current.append('"')
                         i += 2
                         continue

@@ -8,8 +8,8 @@ import androidx.room.PrimaryKey
  * Word book. Preset books (CET-4/CET-6/kaoyan) have isPreset=true and are read-only (cannot be renamed/deleted).
  * Custom books have isPreset=false and can be renamed/deleted.
  *
- * Ticket #22: [deleted] marks this book as "deleted" (hidden + moved to the recycle bin, recoverable).
- * Soft delete = deleted=1, filtered out of book lists/stats; restore = deleted=0. Parallel to
+ * Ticket #22: [deleted] marks this book as "deleted" (hidden and moved to the recycle bin, recoverable).
+ * Soft delete sets deleted=1, which filters the book out of lists and stats; restore sets it back to 0. Parallel to
  * [BookWord.deleted] but at a different granularity: BookWord.deleted means the association between
  * one book and one word entry is deleted, while Book.deleted means the whole book is deleted.
  * When a book is restored, all its book_word associations (including their individual deleted states) stay as they were.

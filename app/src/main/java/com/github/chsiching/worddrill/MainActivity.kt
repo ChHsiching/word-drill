@@ -41,7 +41,7 @@ class MainActivity : Hilt_MainActivity() {
         //
         // setKeepOnScreenCondition: during cold start, Compose first-frame composition + the WordDrillRoot subtree
         // (Hilt/Room/NavHost) initialization takes ~1-2s; during that period the system splash keeps showing a solid background color,
-        // avoiding a jarring blank gap of "splash disappears -> overlay blank -> animation only then starts".
+        // avoiding a jarring blank gap between the splash disappearing and the animation starting.
         // Once the animation's first frame is drawn (animReady set to true), the system splash hands off to the overlay.
         val animReady = AtomicBoolean(false)
         val splashScreen = installSplashScreen()
@@ -56,7 +56,7 @@ class MainActivity : Hilt_MainActivity() {
         setContent {
             val themeMode by themeState.collectAsStateWithLifecycle()
             // renderedTheme tracks themeMode (the two sync up after DataStore's async refresh).
-            // During the reveal animation: DataStore write completes -> themeMode changes -> renderedTheme follows -> the underlying layer switches.
+            // During the reveal animation the DataStore write completes, themeMode changes, renderedTheme follows, and the underlying layer switches.
             // The snapshot overlay covers the old theme, and the animation reveals the new theme underneath.
             var renderedTheme by remember { mutableStateOf(themeMode) }
 

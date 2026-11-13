@@ -12,9 +12,10 @@ import org.json.JSONObject
  * JSON serialization/deserialization for [DatabaseSnapshot] (secondary seam).
  *
  * Like [com.github.chsiching.worddrill.data.PresetWordsParser], uses Android's built-in org.json,
- * with no new dependencies. Both functions are pure (input data → output string /
- * input string → output data) and do not depend on the Android file system, making it easy to
- * feed data and strings in JVM unit tests and verify round-trips.
+ * with no new dependencies. Both functions are pure (serialize takes a snapshot and returns
+ * a JSON string; deserialize takes a JSON string and returns a snapshot) and do not depend on
+ * the Android file system, making it easy to feed data and strings in JVM unit tests and
+ * verify round-trips.
  *
  * JSON structure:
  * ```
@@ -69,7 +70,7 @@ object DatabaseJsonSerializer {
                     put("text", w.text)
                     // Ticket #14: empty phonetic is not written (same strategy as nickname:
                     // no empty labels in the exported file; on deserialization
-                    // optString defaults to "" → null).
+                    // optString defaults to "", which becomes null).
                     if (!w.phonetic.isNullOrBlank()) put("phonetic", w.phonetic)
                 })
             }
@@ -123,7 +124,7 @@ object DatabaseJsonSerializer {
 
         val books = root.getJSONArray("books").toList { b ->
             // Ticket #22: deleted is nullable, compatible with export files from before #22
-            // (absent → false, not soft-deleted).
+            // (absent means false, not soft-deleted).
             Book(
                 bookId = b.getLong("bookId"),
                 name = b.getString("name"),
@@ -133,7 +134,7 @@ object DatabaseJsonSerializer {
         }
         val words = root.getJSONArray("words").toList { w ->
             // Ticket #14: phonetic is nullable.
-            // ⚠️ w.isNull first guards against JSON null (see the note about the same pitfall
+            // Warning: w.isNull first guards against JSON null (see the note about the same pitfall
             // in PresetWordsParser): Android org.json's optString returns the string "null"
             // when the value is JSON null.
             Word(
@@ -153,9 +154,9 @@ object DatabaseJsonSerializer {
         }
         val bookWords = root.getJSONArray("bookWords").toList { bw ->
             // Ticket #20: skipped is nullable, compatible with export files from before #20
-            // (absent → false, not skipped).
+            // (absent means false, not skipped).
             // Ticket #22: deleted is nullable, compatible with export files from before #22
-            // (absent → false, not soft-deleted).
+            // (absent means false, not soft-deleted).
             BookWord(
                 bookId = bw.getLong("bookId"),
                 wordId = bw.getLong("wordId"),

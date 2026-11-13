@@ -11,14 +11,14 @@ import com.github.chsiching.worddrill.data.local.entity.DictionaryEntry
  * single-row insert/update/delete (the dictionary table is read-only reference data).
  *
  * Usage: when adding words or importing files, call [findByWord] to look up
- * pos + meaning + phonetic by spelling.
+ * pos, meaning, and phonetic by spelling.
  */
 @Dao
 interface DictionaryDao {
 
     /**
-     * Look up dictionary entries by spelling (multiple parts of speech for one word = multiple rows).
-     * Case-sensitive: ECDICT's word column stores the base form (mostly lowercase), callers pass the base form.
+     * Look up dictionary entries by spelling (a word with multiple parts of speech has multiple rows).
+     * Case-sensitive: ECDICT's word column stores the base form (mostly lowercase), so callers pass the base form.
      * Callers that need case-insensitive matching should lowercase first, then query.
      */
     @Query("SELECT * FROM dictionary WHERE word = :word")

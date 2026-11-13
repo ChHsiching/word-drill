@@ -14,7 +14,7 @@ enum class NavStyle {
     BAR;
 
     companion object {
-        /** Safely decodes a string read back from DataStore. null or unrecognized -> [PILL]. */
+        /** Safely decodes a string read back from DataStore. null or unrecognized falls back to [PILL]. */
         fun fromStorageName(name: String?): NavStyle =
             name?.let { runCatching { valueOf(it) }.getOrNull() } ?: PILL
     }

@@ -90,7 +90,7 @@ data class WordListUiState(
  * - Add: reuse the global word pool ([WordDao.findIdByText]), write the sense, then
  *   linkBookWord; the whole step is one transaction.
  * - **Ticket #9**: after [onTextInput], a debounced [DictionaryDao] lookup auto-fills pos
- *   + meaning on a hit (autoFilled=true flag; the user can still edit afterwards).
+ *   and meaning on a hit (autoFilled=true flag; the user can still edit afterwards).
  * - Edit: [WordDao.updateSense].
  * - Delete (Ticket #22): [BookDao.setDeleted] soft-deletes book_word.deleted=1
  *   (book-level: only this book's link changes; deleting apple in CET-4 does not affect
@@ -211,7 +211,7 @@ class WordListViewModel @Inject constructor(
         }
     }
 
-    /** Submits add: after validation, one transaction writes word (reuse/create) + sense + linkBookWord. */
+    /** Submits add: after validation, one transaction writes word (reuse/create), sense, and linkBookWord. */
     fun submitAdd() {
         val d = _dialog.value as? WordListDialog.Add ?: return
         if (d.error != null) return // validateAddWordInput already checks after trim

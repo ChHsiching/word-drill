@@ -151,7 +151,7 @@ internal fun DrillPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
             // Review feedback 3: locking does not disable card swiping. Locking only hides
-            // the nav bar + skip button (see BottomNavOverlay.hidden in WordDrillRoot and
+            // the nav bar and skip button (see BottomNavOverlay.hidden in WordDrillRoot and
             // the AnimatedVisibility in DrillTopBar); the user can still swipe through
             // cards while locked.
         ) { pageIndex ->
@@ -175,7 +175,7 @@ internal fun DrillPager(
  * the counter is absolutely centered by the overlay Text.
  *
  * The locked state hides skip (AnimatedVisibility fade); the lock button gets an inverted
- * background + LockOpen icon.
+ * background and LockOpen icon.
  */
 @Composable
 private fun DrillTopBar(
@@ -190,7 +190,7 @@ private fun DrillTopBar(
 ) {
     // issue #1: the review book button label is "Restore", regular books "Skip". onAction
     // inside DrillPager already dispatches to onRestore/onSkip by isReviewBook; this spot
-    // only handles the no-arg closure + label switch.
+    // only handles the no-arg closure and label switch.
     val actionLabel = if (isReviewBook) R.string.drill_restore else R.string.drill_skip
     Box(
         modifier = Modifier
@@ -257,8 +257,8 @@ private fun DrillTopBar(
 }
 
 /**
- * Lock button: transparent + tertiary icon by default; inverted background (onSurface) +
- * background-colored icon in the locked state.
+ * Lock button: transparent background and tertiary icon by default; inverted background (onSurface)
+ * and background-colored icon in the locked state.
  *
  * #17 review feedback #6: no ripple box. Press feedback scales the icon to 0.9
  * (feedback on pointer-down, no waiting for release).
@@ -326,8 +326,7 @@ private fun WordCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(0.dp),
             // Review feedback 2: centering the card vertically sat too low; shifted up by
-            // about 12% of the screen (reasonable breathing room at the top, not touching
-            // the top bar and not sinking to the middle).
+            // about 12% of the screen (clear of the top bar, above the vertical center).
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 80.dp),

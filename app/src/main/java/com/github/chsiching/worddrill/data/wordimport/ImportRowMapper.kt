@@ -21,9 +21,9 @@ internal object ImportRowMapper {
     }
 
     /**
-     * Column array -> [ImportRow]. col1=word / col2=phonetic / col3=posMeaning.
-     * - Fewer than 2 columns, or col1 (word) empty -> returns null
-     * - Phonetic / meaning columns empty after trim -> null
+     * Maps a column array to [ImportRow]. col1=word / col2=phonetic / col3=posMeaning.
+     * - Fewer than 2 columns, or an empty col1 (word), returns null.
+     * - Phonetic or meaning columns that are empty after trim become null.
      */
     fun toRow(cols: List<String>): ImportRow? {
         if (cols.size < 2) return null

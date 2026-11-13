@@ -10,8 +10,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Ticket #19: built-in dictionary first-launch import orchestration. Idempotency check ->
- * read assets -> parse -> write Room -> set the flag.
+ * Ticket #19: built-in dictionary first-launch import orchestration. It checks the
+ * idempotency flag, then reads the assets, parses, writes Room, and sets the flag.
  *
  * Same pattern as [PresetImportOrchestrator]. The trigger (Application.onCreate) just calls
  * [ensureDictionaryImported]; if already imported, it returns immediately. The import runs on
@@ -21,9 +21,9 @@ import javax.inject.Singleton
  * the user's existing books (the dictionary is read-only reference data).
  *
  * Ticket #23: the version number [DICTIONARY_VERSION] replaces the "imported once, never
- * again" semantics. Incremented for every release that fixes dictionary.json; after upgrading,
- * a stored version < the expected version -> clear the table and re-import, solving the
- * problem that INSERT IGNORE cannot overwrite old rows.
+ * again" semantics. Increment it for every release that fixes dictionary.json; after
+ * upgrading, if the stored version is behind the expected version, the import clears the
+ * table and re-imports, solving the problem that INSERT IGNORE cannot overwrite old rows.
  */
 @Singleton
 class DictionaryImportOrchestrator @Inject constructor(
@@ -35,7 +35,7 @@ class DictionaryImportOrchestrator @Inject constructor(
     private val assetFile = "dictionary.json"
 
     /**
-     * Built-in dictionary data version. Incremented for every release that fixes [assetFile]:
+     * Built-in dictionary data version. Increment it for every release that fixes [assetFile]:
      * - v1: Ticket #19 initial release (ECDICT top 100k words, parse_translation continuation strategy).
      * - v2: Ticket #23 fix (POS_PREFIXES gained adj./interj.; rows without a POS no longer continue).
      * The orchestrator writes it to DataStore and compares it on startup; when stale, clear the
@@ -47,14 +47,14 @@ class DictionaryImportOrchestrator @Inject constructor(
      * If the built-in dictionary has not been imported, or is behind [DICTIONARY_VERSION],
      * finish the import and set the flag; skip when already up to date.
      *
-     * Idempotency note: expected to be triggered once by a single caller (Application.onCreate).
+     * Idempotency note: a single caller (Application.onCreate) triggers this once.
      * The DataStore version flag guarantees later launches do not re-import; when the version is
      * behind, [DictionaryImporter.clear] runs before the insert, overwriting old rows.
      *
-     * clearFirst decision: stored == 0 and the old boolean [SettingsRepository.dictionaryImported]
-     * is true -> upgrading from the old #19 version, the dictionary table holds old rows, must
-     * clear; stored > 0 -> cross-version upgrade, also clear; only a true first launch
-     * (stored == 0 and the boolean false) needs no clear (the table is already empty).
+     * clearFirst decision: stored == 0 with the boolean true means an upgrade from the old #19
+     * version: the table holds old rows and must be cleared. stored > 0 means a cross-version
+     * upgrade, which also clears. Only a true first launch (stored == 0 and the boolean false)
+     * needs no clear, because the table is already empty.
      */
     suspend fun ensureDictionaryImported() = withContext(Dispatchers.IO) {
         val stored = settings.dictionaryVersion.first()

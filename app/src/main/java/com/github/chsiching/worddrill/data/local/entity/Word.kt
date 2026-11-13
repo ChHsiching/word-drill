@@ -11,7 +11,7 @@ import androidx.room.PrimaryKey
  * Deduplicated by "spelling": text has a unique index, guaranteeing one row per spelling globally.
  *
  * Ticket #14: phonetic stores the IPA transcription (e.g. "/əˈbændən/"), nullable (dictionary missing the phonetic or user-entered word).
- * Introduced by the v2 migration via ALTER TABLE ADD COLUMN; NULL for existing users after upgrade.
+ * Introduced by the v2 migration via ALTER TABLE ADD COLUMN; existing users get NULL after the upgrade.
  */
 @Entity(
     tableName = "word",

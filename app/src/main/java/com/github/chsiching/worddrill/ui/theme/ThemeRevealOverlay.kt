@@ -78,7 +78,7 @@ fun ThemeRevealContent(
                 revealProgress.snapTo(0f)
                 revealProgress.animateTo(1f, animationSpec = tween(800))
                 // 4. When the animation ends, remove the overlay (the layer below is already
-                //    the new theme, so the transition is seamless)
+                //    the new theme)
                 snapshot = null
                 animating = false
             }

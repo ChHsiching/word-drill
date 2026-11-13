@@ -14,7 +14,7 @@ import javax.inject.Inject
 
 /**
  * Application entry point. @HiltAndroidApp triggers Hilt's code generation, producing the ApplicationComponent.
- * All subsequent ViewModel / Repository dependency injection hangs off this root component.
+ * All subsequent ViewModel / Repository dependency injection is provided by this root component.
  *
  * Note: this project does not enable the Hilt Gradle Plugin (it requires AGP 9, which conflicts with the specified AGP 8.13.x).
  * Therefore, per the official Dagger docs, @HiltAndroidApp must explicitly specify the base class,
@@ -33,7 +33,7 @@ class WordDrillApp : Hilt_WordDrillApp() {
         super.onCreate()
         // Ticket #21: PdfBox-Android's native library (libpdfbox.so) must be initialized before use.
         // PDF file import relies on it via [com.github.chsiching.worddrill.data.wordimport.PdfTableParser];
-        // initialized once here at Application startup, idempotent (PDFBoxResourceLoader already guards against re-init internally).
+        // it is initialized once here at Application startup and is idempotent (PDFBoxResourceLoader already guards against re-init internally).
         PDFBoxResourceLoader.init(this)
 
         // On first launch, idempotently import the preset word books in the background; if already imported, return immediately with no duplicated cost.

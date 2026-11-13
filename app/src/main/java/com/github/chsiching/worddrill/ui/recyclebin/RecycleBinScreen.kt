@@ -245,7 +245,7 @@ private fun RowSeparator() {
  * Permanent-delete double-confirmation dialog (Ticket #22).
  * Same pattern as DeleteWordDialog in
  * [com.github.chsiching.worddrill.ui.library.WordListScreen], but the text says
- * "irreversible" (permanent delete = real DELETE, cannot be restored), with a destructive
+ * "irreversible" (permanent delete is a real DELETE and cannot be restored), with a destructive
  * light-red button.
  */
 @Composable

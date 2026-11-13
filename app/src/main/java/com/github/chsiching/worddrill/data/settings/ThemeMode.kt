@@ -20,7 +20,7 @@ enum class ThemeMode {
     companion object {
         /**
          * Safely decodes a string read back from DataStore into a [ThemeMode].
-         * - null (key absent) or an unrecognized value -> [SYSTEM] (default)
+         * - null (key absent) or an unrecognized value falls back to [SYSTEM] (default)
          *
          * Extracted as a pure function for easy JVM unit testing (no Android dependency).
          */

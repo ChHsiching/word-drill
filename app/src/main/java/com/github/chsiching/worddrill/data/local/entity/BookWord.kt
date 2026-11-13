@@ -14,10 +14,10 @@ import androidx.room.Index
  * Independent per book: skipping in CET-4 only sets skipped=1 on the CET-4 association row and does not affect the CET-6 association row for the same word.
  * Skipping is recoverable: [com.github.chsiching.worddrill.data.local.dao.BookDao.setSkipped] sets it back to 0 to restore.
  *
- * Ticket #22: [deleted] marks this word as "deleted" within this book (hidden + moved to the recycle bin, recoverable).
+ * Ticket #22: [deleted] marks this word as "deleted" within this book (hidden and moved to the recycle bin, recoverable).
  * Parallel to [skipped]: independent per book (deleting in CET-4 only touches the CET-4 association), deleted=0 restores.
  * Difference: skipped means "skip review" (automatically goes into the review book), deleted means "recover from accidental deletion" (goes to the recycle bin).
- * Soft delete = only mark deleted=1, do not actually delete the association row; the word itself always stays in the global word pool.
+ * Soft delete only marks deleted=1, it does not actually delete the association row; the word itself always stays in the global word pool.
  *
  * `@ColumnInfo(defaultValue = "0")` must be declared explicitly. Room codegen does not translate the Kotlin
  * default value (`= false`) into a SQL DEFAULT clause, while the ALTER TABLE in
