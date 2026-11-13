@@ -27,16 +27,16 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 「库」Tab 二级页词条列表的主接缝（Ticket #7）：Compose UI + 内存版 Room。
+ * Main seam of the word entry list page, the second-level page of the library tab (Ticket #7): Compose UI + in-memory Room.
  *
- * 验收覆盖：
- * - 列表展示该词书词条（单词 + 词性 + 释义）
- * - 新增词条：输入后点确定，列表刷新出现新词（全局词条池复用）
- * - 编辑义项：改释义，列表刷新
- * - 从词书移除：列表刷新，词条消失
- * - 预置词书只读：不渲染「新增词条」入口
+ * Acceptance coverage:
+ * - The list shows the book's word entries (word + part of speech + meaning)
+ * - Add entry: type the text, tap confirm, and the new word appears after the list refreshes (the global word pool is reused)
+ * - Edit sense: change the meaning, the list refreshes
+ * - Remove from book: the list refreshes, the entry disappears
+ * - Preset books are read-only: no "add entry" entry point is rendered
  *
- * 不测 TextField 的 IME 注入细节（只测用户可见行为：输入文字 → 提交 → 列表变化）。
+ * IME injection details of TextField are not tested (only user-visible behavior: type text, submit, list changes).
  */
 @RunWith(AndroidJUnit4::class)
 class WordListScreenTest {
@@ -75,7 +75,7 @@ class WordListScreenTest {
 
     private fun setContentFor(bookId: Long) {
         val vm = WordListViewModel(
-            // 用一个内存 SavedStateHandle，模拟 nav arg bookId
+            // Use an in-memory SavedStateHandle to simulate the nav arg bookId
             savedStateHandle = androidx.lifecycle.SavedStateHandle(
                 mapOf("bookId" to bookId.toString())
             ).also { /* no-op */ },
@@ -100,57 +100,57 @@ class WordListScreenTest {
     @Test
     fun customBook_showsWords_andAddEntry() {
         setContentFor(customBookId)
-        // 列表展示已种子词条（#16 起 pos 与 meaning 拆成独立 Text 节点）
+        // The list shows the seeded entry (pos and meaning are split into separate Text nodes since #16)
         composeRule.onNodeWithText("apple").assertIsDisplayed()
         composeRule.onNodeWithText("苹果").assertIsDisplayed()
-        // 自定义词书：有「新增词条」入口（IconButton 的 contentDescription）
+        // Custom book: the "add entry" entry point exists (IconButton contentDescription)
         composeRule.onNodeWithContentDescription("新增词条").assertIsDisplayed()
     }
 
     @Test
     fun addWord_appearsInListAfterSubmit() {
         setContentFor(customBookId)
-        // 点「新增词条」入口（IconButton contentDescription）打开对话框
+        // Tap the "add entry" entry point (IconButton contentDescription) to open the dialog
         composeRule.onNodeWithContentDescription("新增词条").performClick()
         composeRule.waitForIdle()
-        // 输入单词与释义（performTextInput 走程序化设置，不走 IME，可靠）
+        // Type the word and meaning (performTextInput sets the text programmatically instead of going through the IME; reliable)
         composeRule.onNodeWithText("单词").performTextInput("balance")
-        // POS 走下拉（#9 起 POS 不能自由输入）：点开下拉 → 选 n.
+        // POS uses a dropdown (since #9 POS cannot be typed freely): open the dropdown, then pick n.
         selectPosFromDropdown("n.")
         composeRule.onNodeWithText("释义").performTextInput("平衡")
         composeRule.waitForIdle()
-        // 点「确定」
+        // Tap "confirm"
         composeRule.onNodeWithText("确定").performClick()
         composeRule.waitForIdle()
 
-        // 列表应出现新词（UI 刷新验证）
+        // The new word should appear in the list (verifies the UI refresh)
         composeRule.onNodeWithText("balance").assertIsDisplayed()
         composeRule.onNodeWithText("平衡").assertIsDisplayed()
-        // 落库也确认
+        // Also confirm it landed in the database
         val words = runBlocking { db.wordDao().getWordsWithSensesByBook(customBookId) }
         assertThat(words.any { it.word.text == "balance" }).isTrue()
     }
 
     @Test
     fun addWord_reusesGlobalWordPool() {
-        // apple 已在全局词池（来自种子），向同词书再加一次不同词性的 sense
+        // apple is already in the global word pool (from the seed); add a sense with a different part of speech to the same book again
         setContentFor(customBookId)
         composeRule.onNodeWithContentDescription("新增词条").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("单词").performTextInput("apple")
-        // POS 走下拉：选 v.
+        // POS uses the dropdown: pick v.
         selectPosFromDropdown("v.")
         composeRule.onNodeWithText("释义").performTextInput("囤积")
         composeRule.waitForIdle()
         composeRule.onNodeWithText("确定").performClick()
         composeRule.waitForIdle()
 
-        // 全局 word 表 apple 仍只有一行（复用，未新建）
+        // The global word table still has only one apple row (reused, not re-created)
         val appleCount = runBlocking {
             db.wordDao().getByText("apple")?.let { 1 } ?: 0
         }
         assertThat(appleCount).isEqualTo(1)
-        // 但 sense 多了一条（同词新词性）
+        // But there is one more sense (same word, new part of speech)
         val senses = runBlocking {
             db.wordDao().getByText("apple")?.let { db.wordDao().getSensesForWord(it.wordId) } ?: emptyList()
         }
@@ -158,12 +158,12 @@ class WordListScreenTest {
     }
 
     /**
-     * 模拟 POS 下拉选择（#9 起 POS 从下拉选，不自由输入）。
+     * Simulates selecting a POS from the dropdown (since #9 POS is picked from a dropdown, not typed freely).
      *
-     * 步骤：点 POS 字段（label "词性"）展开下拉 → 点目标 POS 菜单项。
+     * Steps: tap the POS field (label "part of speech") to open the dropdown, then tap the target POS menu item.
      *
-     * 注意：列表里已展示的词条 POS（如种子 "n."）会与下拉项 "n." 同文本，
-     * 用 [onAllNodesWithText] + 最后一个匹配（AlertDialog popup 在语义树后部）。
+     * Note: a POS already shown in the list (for example the seeded "n.") has the same text as the dropdown item "n.",
+     * so use [onAllNodesWithText] plus the last match (the AlertDialog popup sits later in the semantics tree).
      */
     private fun selectPosFromDropdown(pos: String) {
         composeRule.onNodeWithText("词性").performClick()
@@ -178,12 +178,12 @@ class WordListScreenTest {
     @Test
     fun editSense_updatesPosAndMeaning_inListAndDb() {
         setContentFor(customBookId)
-        // 点行内释义文本打开编辑对话框（#16 起点 meaning 节点「苹果」触发编辑）
+        // Tap the inline meaning text to open the edit dialog (since #16 the apple meaning node triggers editing)
         composeRule.onNodeWithText("苹果").performClick()
         composeRule.waitForIdle()
-        // #16 起 pos / meaning 拆成独立 Text 节点：列表显示的 "n." + "苹果" 与对话框
-        // TextField 的初始值 "n." + "苹果" 同名（两个同名节点）。用 hasSetTextAction()
-        // 只匹配可编辑的 TextField（列表 Text 不可编辑），精确定位对话框字段。
+        // Since #16 pos / meaning are split into separate Text nodes: the "n." + apple meaning shown in the list and the dialog
+        // TextField initial values "n." + apple meaning share the same text (two same-text nodes). hasSetTextAction()
+        // matches only the editable TextFields (the list Text is not editable), which pinpoints the dialog fields.
         composeRule.onAllNodes(androidx.compose.ui.test.hasSetTextAction())[0].performTextReplacement("v.")
         composeRule.waitForIdle()
         composeRule.onAllNodes(androidx.compose.ui.test.hasSetTextAction())[1].performTextReplacement("囤积")
@@ -191,10 +191,10 @@ class WordListScreenTest {
         composeRule.onNodeWithText("确定").performClick()
         composeRule.waitForIdle()
 
-        // UI 列表刷新：原 meaning "苹果" 消失，新 meaning "囤积" 出现
+        // UI list refresh: the old apple meaning disappears, the new hoard meaning appears
         composeRule.onNodeWithText("囤积").assertIsDisplayed()
         composeRule.onNodeWithText("苹果").assertDoesNotExist()
-        // 落库确认：词性与释义都已更新
+        // Database check: both the part of speech and the meaning are updated
         val sense = runBlocking {
             db.wordDao().getByText("apple")!!.let { db.wordDao().getSensesForWord(it.wordId).single() }
         }
@@ -206,23 +206,23 @@ class WordListScreenTest {
     @Test
     fun deleteWord_opensConfirmDialog_thenSoftDeletesOnConfirm() {
         setContentFor(customBookId)
-        // 点「删除」（IconButton contentDescription）→ 先弹二次确认对话框
+        // Tap "delete" (IconButton contentDescription) and a confirmation dialog opens first
         composeRule.onNodeWithContentDescription("删除").performClick()
         composeRule.waitForIdle()
-        // 确认对话框展示（标题 + 词名 + 删除按钮）
+        // The confirm dialog is shown (title + word name + delete button)
         composeRule.onNodeWithText("删除词条").assertIsDisplayed()
         composeRule.onNodeWithText("确定删除「apple」？可从回收站恢复。").assertIsDisplayed()
 
-        // 点对话框里的「删除」确认按钮（确认按钮文案与标题同为「删除」，用精确匹配点确认按钮）
+        // Tap the dialog's "delete" confirm button (the confirm button label and the title are both "delete"; use exact matching to click the confirm button)
         composeRule.onAllNodes(androidx.compose.ui.test.hasText("删除", substring = false)).onFirst().performClick()
         composeRule.waitForIdle()
 
-        // 列表里 apple 应消失（UI 刷新验证）
+        // apple should disappear from the list (verifies the UI refresh)
         composeRule.onNodeWithText("apple").assertDoesNotExist()
-        // 但全局 word 表里 apple 仍在（软删只标 deleted=1，不删全局词）
+        // But apple is still in the global word table (soft delete only sets deleted=1; it does not delete the global word)
         val stillThere = runBlocking { db.wordDao().getByText("apple") != null }
         assertThat(stillThere).isTrue()
-        // 关联行还在（软删 ≠ 真删），deleted 标记为 true
+        // The link row is still there (soft delete is not a real delete), and the deleted flag is true
         val deleted = runBlocking { db.bookDao().getDeleted(customBookId, 1L) }
         assertThat(deleted).isTrue()
     }
@@ -232,13 +232,13 @@ class WordListScreenTest {
         setContentFor(customBookId)
         composeRule.onNodeWithContentDescription("删除").performClick()
         composeRule.waitForIdle()
-        // 取消是安全选项
+        // Cancel is the safe option
         composeRule.onNodeWithText("取消").performClick()
         composeRule.waitForIdle()
 
-        // 列表里 apple 应还在
+        // apple should still be in the list
         composeRule.onNodeWithText("apple").assertIsDisplayed()
-        // 关联行未被软删
+        // The link row was not soft-deleted
         val deleted = runBlocking { db.bookDao().getDeleted(customBookId, 1L) }
         assertThat(deleted).isFalse()
     }
@@ -246,26 +246,26 @@ class WordListScreenTest {
     @Test
     fun presetBook_isReadOnly_noAddEditRemoveEntries() {
         setContentFor(presetBookId)
-        // 预置词书验收：增/改/删三个入口都不渲染（规格："预置词书的词条不可增删改"）
+        // Preset book acceptance: none of the three entry points add / edit / delete are rendered (spec: "entries of a preset book cannot be added, deleted, or edited")
         composeRule.onNodeWithContentDescription("新增词条").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("编辑释义").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("删除").assertDoesNotExist()
-        // 顶部展示预置词书名
+        // The preset book name shows at the top
         composeRule.onNodeWithText("CET-4").assertIsDisplayed()
     }
 
-    // ---- Ticket #9：POS 下拉（不能自由输入）----
+    // ---- Ticket #9: POS dropdown (no free typing) ----
 
     @Test
     fun addDialog_posField_isDropdownWithOptions() {
         setContentFor(customBookId)
         composeRule.onNodeWithContentDescription("新增词条").performClick()
         composeRule.waitForIdle()
-        // 点开 POS 下拉
+        // Open the POS dropdown
         composeRule.onNodeWithText("词性").performClick()
         composeRule.waitForIdle()
-        // 固定 12 个 POS 选项应展示。
-        // 注：列表里已展示的 POS（如种子 "n."）与下拉项 "n." 同文本，用 >= 1 断言。
+        // The fixed 12 POS options should show.
+        // Note: a POS already shown in the list (for example the seeded "n.") has the same text as the dropdown item "n.", so assert >= 1.
         for (pos in WORD_LIST_POS_OPTIONS) {
             val matches = composeRule.onAllNodes(androidx.compose.ui.test.hasText(pos, substring = false))
             assertThat(matches.fetchSemanticsNodes().size).isAtLeast(1)

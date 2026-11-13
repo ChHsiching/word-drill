@@ -13,8 +13,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * PresetImporter 的 instrumented 测试（内存版 Room，与 WordDrillDatabaseTest 同接缝）。
- * 验证：导入正确性、跨词书去重、sense 合并、幂等性（重复导入不产生重复行）。
+ * Instrumented test for PresetImporter (in-memory Room, same seam as WordDrillDatabaseTest).
+ * Verifies import correctness, cross-book dedup, sense merging, and idempotency (repeated imports create no duplicate rows).
  */
 @RunWith(AndroidJUnit4::class)
 class PresetImporterTest {
@@ -33,7 +33,7 @@ class PresetImporterTest {
                         phonetic = "/ˈæpl/",
                         senses = listOf(PresetWords.Sense("n.", "苹果")),
                     ),
-                    // 同一词多词性：导入后应在一个 word 行下产生两条 sense；phonetic 缺省（验证可空）
+                    // One word with multiple parts of speech: after import it should produce two senses under one word row; phonetic omitted (verifies nullability)
                     PresetWords.Word(
                         text = "run",
                         senses = listOf(
@@ -46,7 +46,7 @@ class PresetImporterTest {
             PresetWords.Book(
                 name = "CET-6",
                 words = listOf(
-                    // apple 跨词书重复 —— 应复用同一 word 行，各自 linkBookWord
+                    // apple repeats across books; the same word row should be reused, with each book calling linkBookWord
                     PresetWords.Word(
                         text = "apple",
                         phonetic = "/ˈæpl/",
@@ -87,8 +87,8 @@ class PresetImporterTest {
     @Test
     fun import_dedupesWordAcrossBooks() = runTest {
         importer.importWords(sample)
-        // apple 在 CET-4/CET-6 都出现，但 word 表应只有一行 apple；
-        // 且两本词书通过 book_word 各自引用同一 wordId。
+        // apple appears in both CET-4/CET-6, but the word table should hold only one apple row;
+        // and both books reference the same wordId through book_word.
         val apple = db.wordDao().getByText("apple")
         assertThat(apple).isNotNull()
         val cet4 = db.bookDao().getByName("CET-4")!!
@@ -97,7 +97,7 @@ class PresetImporterTest {
         val cet6Words = db.wordDao().getWordsWithSensesByBook(cet6.bookId).map { it.word.wordId }
         assertThat(cet4Words).contains(apple!!.wordId)
         assertThat(cet6Words).contains(apple.wordId)
-        // 两个词书引用的是同一行 word（而非各自新建一份）
+        // Both books reference the same word row (instead of each creating its own copy)
         assertThat(cet4Words.intersect(cet6Words.toSet())).contains(apple.wordId)
     }
 
@@ -121,9 +121,9 @@ class PresetImporterTest {
     @Test
     fun import_isIdempotent_noDuplicateRows() = runTest {
         importer.importWords(sample)
-        importer.importWords(sample) // 第二次
+        importer.importWords(sample) // second call
 
-        // book 表：CET-4/CET-6 不应出现重复行（按 name 去重，否则会各有两行）
+        // book table: CET-4/CET-6 must not have duplicate rows (dedup by name; otherwise each would have two rows)
         val books = db.bookDao().observeAll().first()
         assertThat(books).hasSize(2)
         assertThat(books.map { it.name }).containsExactly("CET-4", "CET-6")
@@ -133,13 +133,13 @@ class PresetImporterTest {
         assertThat(db.bookDao().countWordsInBook(cet4.bookId)).isEqualTo(2)
         assertThat(db.bookDao().countWordsInBook(cet6.bookId)).isEqualTo(2)
 
-        // word 表仍只有 apple/run/balance 三行（去重生效）
+        // The word table still has only the three rows apple/run/balance (dedup works)
         val apple = db.wordDao().getByText("apple")
         val run = db.wordDao().getByText("run")
         val balance = db.wordDao().getByText("balance")
         assertThat(listOf(apple, run, balance).filterNotNull()).hasSize(3)
 
-        // run 的 sense 仍只有两条（IGNORE 兜底）
+        // run still has only two senses (IGNORE as the fallback)
         val runSenses = db.wordDao().getSensesForWord(run!!.wordId)
         assertThat(runSenses).hasSize(2)
     }
@@ -154,7 +154,7 @@ class PresetImporterTest {
         assertThat(words.first { it.word.text == "run" }.senses).hasSize(2)
     }
 
-    // ---- Ticket #14: phonetic（IPA 音标，导入写库）----
+    // ---- Ticket #14: phonetic (IPA transcription, imported into the database) ----
 
     @Test
     fun import_writesPhonetic_whenPresent() = runTest {
@@ -180,7 +180,7 @@ class PresetImporterTest {
 
     @Test
     fun import_phoneticSurvivesIdempotentReimport() = runTest {
-        // 重复导入不应清空已有行的 phonetic（findIdByText 命中后不覆盖）
+        // Repeated import must not clear the phonetic of an existing row (no overwrite after findIdByText hits)
         importer.importWords(sample)
         importer.importWords(sample)
         val apple = db.wordDao().getByText("apple")
@@ -189,10 +189,10 @@ class PresetImporterTest {
 
     @Test
     fun import_phoneticIsNull_notStringNull_whenJsonNull() = runTest {
-        // ⚠️ 回归防护：assets 里 JSON 显式 "phonetic": null 的情况。
-        // 在 Android 真实 org.json 下，optString(key, "") 对 JSON null 会返回字符串 "null"
-        // （与 JVM 单测的 org.json:json 行为不同），曾导致落库 "null" 字符串（实机踩到）。
-        // 这里跑 Android org.json 验证 PresetWordsParser 的 isNull 挡板真的生效。
+        // Regression guard: assets JSON with an explicit "phonetic": null.
+        // Under Android's real org.json, optString(key, "") returns the string "null" for a JSON null
+        // (unlike the org.json:json artifact used in JVM unit tests); this once stored the "null" string in the database (hit on a real device).
+        // This runs Android org.json to verify that PresetWordsParser's isNull guard really works.
         val json = """
             {"source":"x","books":[{"name":"b","words":[
               {"text":"ghost","phonetic":null,"senses":[{"pos":"n.","meaning":"鬼"}]}

@@ -18,15 +18,15 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * BackupService 的 instrumented 测试（内存版 Room）。
+ * Instrumented test for BackupService (in-memory Room).
  *
- * 验收覆盖（规格 AC「导入后刷卡统计、词书、词条均正确恢复」）：
- * - export 读全量 5 张表（含孤立 swipe_log）
- * - import 覆盖：导入新快照后旧数据被清空、新数据按原始主键落库
- * - 导入后刷卡统计、词书、词条、义项、关联均正确
- * - 序列化往返（export → serialize → deserialize → import）端到端
+ * Acceptance coverage (spec AC "swipe stats, books, and entries all restore correctly after import"):
+ * - export reads all 5 tables in full (including orphan swipe_logs)
+ * - import overwrites: after importing a new snapshot the old data is cleared and the new data lands with the original primary keys
+ * - After import, swipe stats, books, entries, senses, and links are all correct
+ * - Full serialization round trip (export, serialize, deserialize, import)
  *
- * 与 [DatabaseJsonSerializerTest]（JVM 副接缝）互补：本测试覆盖"表 ↔ 快照"映射与事务编排。
+ * Complements [DatabaseJsonSerializerTest] (the JVM sub-seam): this test covers the table <-> snapshot mapping and transaction orchestration.
  */
 @RunWith(AndroidJUnit4::class)
 class BackupServiceTest {
@@ -51,7 +51,7 @@ class BackupServiceTest {
     @Test
     fun export_readsAllFiveTables_includingOrphanSwipeLogs() = runTest {
         seedFixtures()
-        // 制造一个孤立 swipe_log（引用不存在的 bookId）
+        // Create an orphan swipe_log (referencing a nonexistent bookId)
         db.swipeLogDao().insert(SwipeLog(logId = 9999, bookId = 999, wordId = 10, timestamp = 123L))
 
         val snapshot = backup.export(nickname = "测试")
@@ -61,18 +61,18 @@ class BackupServiceTest {
         assertThat(snapshot.words.map { it.text }).containsExactly("apple", "run")
         assertThat(snapshot.senses.map { it.pos }).containsExactly("n.", "vi.", "vt.")
         assertThat(snapshot.bookWords).hasSize(3)
-        // 孤立日志必须读到（累计统计不可丢）
+        // The orphan log must be read (total stats must not be lost)
         assertThat(snapshot.swipeLogs.map { it.logId }).contains(9999L)
     }
 
     @Test
     fun import_overwritesOldData_andRestoresByOriginalIds() = runTest {
         seedFixtures()
-        // 原始：2 词书 2 词
+        // Original state: 2 books, 2 words
         assertThat(db.bookDao().getAll()).hasSize(2)
         assertThat(db.wordDao().getAll()).hasSize(2)
 
-        // 导入一份全新的快照（覆盖）
+        // Import a brand-new snapshot (overwrite)
         val snapshot = DatabaseSnapshot(
             version = 1,
             nickname = null,
@@ -84,14 +84,14 @@ class BackupServiceTest {
         )
         backup.import(snapshot)
 
-        // 旧数据被清空
+        // The old data is cleared
         assertThat(db.bookDao().getAll().map { it.name }).containsExactly("新词书")
         assertThat(db.wordDao().getAll().map { it.text }).containsExactly("newword")
-        // 按原始主键落库
+        // Landed with the original primary keys
         assertThat(db.bookDao().getById(50)?.name).isEqualTo("新词书")
         assertThat(db.wordDao().getById(60)?.text).isEqualTo("newword")
         assertThat(db.wordDao().getSensesForWord(60).map { it.pos }).containsExactly("n.")
-        // 关联与日志恢复
+        // Links and logs restored
         assertThat(db.bookDao().countWordsInBook(50)).isEqualTo(1)
         assertThat(db.swipeLogDao().totalCount()).isEqualTo(1)
     }
@@ -103,7 +103,7 @@ class BackupServiceTest {
 
         backup.import(DatabaseSnapshot(version = 1, nickname = null))
 
-        // 空快照导入后日志被清空
+        // After importing an empty snapshot the logs are cleared
         assertThat(db.swipeLogDao().totalCount()).isEqualTo(0)
         assertThat(db.bookDao().getAll()).isEmpty()
     }
@@ -113,11 +113,11 @@ class BackupServiceTest {
         seedFixtures()
         val original = backup.export(nickname = "往返")
         val json = DatabaseJsonSerializer.serialize(original)
-        // 清空后用反序列化的快照恢复
+        // Clear, then restore with the deserialized snapshot
         backup.import(DatabaseJsonSerializer.deserialize(json))
 
         val restored = backup.export(nickname = null)
-        // nickname 在 import 时由快照覆盖，第二次 export 不传 → null；比较其余字段
+        // nickname is overwritten by the snapshot on import, and the second export passes none, so it is null; compare the other fields
         assertThat(restored.books).isEqualTo(original.books)
         assertThat(restored.words).isEqualTo(original.words)
         assertThat(restored.senses).isEqualTo(original.senses)
@@ -127,8 +127,8 @@ class BackupServiceTest {
 
     @Test
     fun import_thenStats_recoverCorrectly() = runTest {
-        // 规格 AC「导入后刷卡统计、词书、词条均正确恢复」
-        // 词书 1（10 词，刷 3 distinct），词书 2（5 词，刷 2 distinct），累计 5 条日志
+        // Spec AC "swipe stats, books, and entries all restore correctly after import"
+        // Book 1 (10 words, 3 distinct swiped), book 2 (5 words, 2 distinct swiped), 5 logs in total
         val book1Words = (1..10).map { Word(wordId = it.toLong(), text = "w$it") }
         val book2Words = (11..15).map { Word(wordId = it.toLong(), text = "w$it") }
         val book1Links = (1..10).map { BookWord(bookId = 1, wordId = it.toLong()) }
@@ -155,18 +155,18 @@ class BackupServiceTest {
             )
         )
 
-        // 累计 5 条
+        // 5 logs in total
         assertThat(db.swipeLogDao().totalCount()).isEqualTo(5)
-        // B1 已刷 3 distinct / 总 10；B2 已刷 2 distinct / 总 5
+        // B1 has 3 distinct swiped / 10 total; B2 has 2 distinct swiped / 5 total
         assertThat(db.swipeLogDao().distinctWordCountForBook(1)).isEqualTo(3)
         assertThat(db.bookDao().countWordsInBook(1)).isEqualTo(10)
         assertThat(db.swipeLogDao().distinctWordCountForBook(2)).isEqualTo(2)
         assertThat(db.bookDao().countWordsInBook(2)).isEqualTo(5)
-        // 词书列表顺序：预置优先（无），再按名
+        // Book list order: preset first (none here), then by name
         assertThat(db.bookDao().observeAll().first().map { it.name }).containsExactly("B1", "B2")
     }
 
-    /** 种入标准测试数据：2 词书（CET-4 预置 + 我的自定义）、2 词、3 义、3 关联、2 日志。 */
+    /** Seeds standard fixtures: 2 books (preset CET-4 + a custom one), 2 words, 3 senses, 3 links, 2 logs. */
     private suspend fun seedFixtures() {
         db.bookDao().insertAll(
             listOf(

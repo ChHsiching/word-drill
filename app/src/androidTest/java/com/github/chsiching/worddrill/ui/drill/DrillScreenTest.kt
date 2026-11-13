@@ -27,18 +27,18 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 「刷」Tab 主接缝：Compose UI 集成测试 + 内存版 Room。
+ * Main seam of the drill tab: Compose UI integration test + in-memory Room.
  *
- * 验证规格验收项（用户可见行为）：
- * - 卡片同屏显示单词（含词性）+ 中文释义，大字号
- * - 顶部展示当前词书名（纯文字）
- * - 到头显示提示文案（已是第一张 / 已是最后一张）
+ * Verifies the spec acceptance items (user-visible behavior):
+ * - The card shows the word (with part of speech) and the Chinese meaning on one screen, in a large font
+ * - The current word book name shows at the top (plain text)
+ * - At the ends a hint text shows (first card reached / last card reached)
  *
- * 滑动计数决策逻辑（向右+1 / 向左+0 / 到头+0）由纯函数 JVM 单测
- * [SwipeDirectionTest] 覆盖；端到端「滑动→写 swipe_log」在模拟器上手验过
- * （MCP adb 查 swipe_log：向右 2 次 = 2 行，向左/到头不增加）。
+ * The swipe counting decision logic (right swipe +1 / left swipe +0 / at the end +0) is covered
+ * by the pure-function JVM unit test [SwipeDirectionTest]; the end-to-end "swipe then write swipe_log" path
+ * was verified by hand on an emulator (MCP adb query on swipe_log: 2 right swipes = 2 rows, left swipes and hitting the end add nothing).
  *
- * 不测 HorizontalPager 的手势内部（脆弱且与实现耦合），只测用户可见行为。
+ * The gesture internals of HorizontalPager are not tested (fragile and coupled to the implementation); only user-visible behavior is tested.
  */
 @RunWith(AndroidJUnit4::class)
 class DrillScreenTest {
@@ -62,13 +62,13 @@ class DrillScreenTest {
         db.close()
     }
 
-    /** 3 张卡的词书，便于验证首/中/末三态。 */
+    /** A word book with 3 cards, to verify the first / middle / last states. */
     private fun seedData() = runBlocking {
         val bookId = db.bookDao().insert(Book(name = "测试词书", isPreset = false))
         val w1 = db.wordDao().insert(Word(text = "apple"))
         val w2 = db.wordDao().insert(Word(text = "balance"))
         val w3 = db.wordDao().insert(Word(text = "circle"))
-        // apple 多词性：验证一张卡同屏显示全部 sense
+        // apple has multiple parts of speech: verify one card shows all senses on the same screen
         db.wordDao().insertSense(Sense(wordId = w1, pos = "n.", meaning = "苹果"))
         db.wordDao().insertSense(Sense(wordId = w1, pos = "v.", meaning = "囤积"))
         db.wordDao().insertSense(Sense(wordId = w2, pos = "n.", meaning = "平衡"))
@@ -114,69 +114,69 @@ class DrillScreenTest {
     fun showsBookNameAndFirstCardContent() {
         composeDrillPager()
 
-        // 顶部词书名
+        // Word book name at the top
         composeRule.onNodeWithText("测试词书").assertIsDisplayed()
-        // 第一张卡：英文单词 + 两个词性的 pos / 中文释义都同屏（#16 起拆成独立 Text 节点）
+        // First card: the English word plus the pos / Chinese meaning of both parts of speech all on the same screen (split into separate Text nodes since #16)
         composeRule.onNodeWithText("apple").assertIsDisplayed()
         composeRule.onNodeWithText("n.").assertIsDisplayed()
         composeRule.onNodeWithText("苹果").assertIsDisplayed()
         composeRule.onNodeWithText("v.").assertIsDisplayed()
         composeRule.onNodeWithText("囤积").assertIsDisplayed()
-        // 顶部计数器（审核反馈：去掉边界提示后，计数器「1 / 3」表达位置）
+        // Top counter (review feedback: with the boundary hints removed, the counter "1 / 3" conveys position)
         composeRule.onNodeWithText("1 / 3").assertIsDisplayed()
     }
 
     @Test
     fun lastCardCounterShowsLastIndex() {
         composeDrillPager()
-        // 向右滑（左滑手势）到底：3 张卡需滑 2 次到最后一张。
+        // Swipe forward to the end (leftward gesture): with 3 cards it takes 2 swipes to reach the last one.
         repeat(2) {
             composeRule.onRoot().performTouchInput { swipeLeft() }
             composeRule.waitForIdle()
         }
 
         composeRule.onNodeWithText("circle").assertIsDisplayed()
-        // 计数器显示 3 / 3（替代原「已是最后一张」边界提示）
+        // Counter shows 3 / 3 (replaces the old "last card reached" boundary hint)
         composeRule.onNodeWithText("3 / 3").assertIsDisplayed()
     }
 
     /**
-     * #17 (审核反馈 #3) + #20：锁定状态下跳过按钮仍可点击触发回调。
-     * 回归：早期实现里 onSkip 内含 `!locked` 守卫，锁定后跳过无效。验收要求锁定只隐藏
-     * 导航栏，不影响跳过。Ticket #20 改为回调式 onSkip(page)，这里验证锁定态回调仍触发。
+     * #17 (review feedback #3) + #20: while locked, the skip button still fires its callback on click.
+     * Regression: in an early implementation onSkip contained a `!locked` guard, so skipping did nothing once locked. Acceptance requires locking to only hide
+     * the navigation bar, not affect skipping. Ticket #20 changed to the callback-style onSkip(page); this test verifies the callback still fires while locked.
      */
     @Test
     fun skipButtonWorksWhileLocked() {
         var skippedPage: Int? = null
         composeDrillPager(locked = true, onSkip = { page -> skippedPage = page })
 
-        // 起始：第 1 张（page=0）
+        // Start: first card (page=0)
         composeRule.onNodeWithText("apple").assertIsDisplayed()
-        // 锁定状态下点击「跳过」仍触发回调
+        // Clicking "skip" while locked still triggers the callback
         composeRule.onNodeWithText("跳过").performClick()
         composeRule.waitForIdle()
         assertThat(skippedPage).isEqualTo(0)
     }
 
     /**
-     * Ticket #20：跳过按钮回调会拿到当前页码（pagerState.currentPage）。
-     * 这是 ViewModel.skipCurrentWord 定位要跳过哪个 word 的依据。用捕获回调验证：
-     * 在第 1 张点跳过 → 回调收到 page=0。
+     * Ticket #20: the skip button callback receives the current page number (pagerState.currentPage).
+     * This is what ViewModel.skipCurrentWord uses to locate the word to skip. Verified with a captured callback:
+     * tap skip on the first card and the callback receives page=0.
      */
     @Test
     fun skipButton_passesCurrentPageToCallback() {
         var skippedPage: Int? = null
         composeDrillPager(onSkip = { page -> skippedPage = page })
 
-        // 第 1 张（page=0）点跳过
+        // Tap skip on the first card (page=0)
         composeRule.onNodeWithText("跳过").performClick()
         composeRule.waitForIdle()
         assertThat(skippedPage).isEqualTo(0)
     }
 
     /**
-     * issue #1：复习词书态显示「恢复」按钮（替代「跳过」），点击触发 onRestore 而非 onSkip。
-     * 回归：之前复习词书也是「跳过」按钮，点了会把词从复习词书也 skipped → 永久丢词。
+     * issue #1: in review-book mode a "restore" button shows (replacing "skip"); tapping it triggers onRestore instead of onSkip.
+     * Regression: previously the review book also had a "skip" button, and tapping it also marked the word as skipped in the review book, permanently losing the word.
      */
     @Test
     fun reviewBook_showsRestoreButton_notSkip() {
@@ -188,11 +188,11 @@ class DrillScreenTest {
             onRestore = { restoreCalled = true },
         )
 
-        // 复习词书显示「恢复」，不显示「跳过」
+        // Review book shows "restore" and not "skip"
         composeRule.onNodeWithText("恢复").assertIsDisplayed()
         composeRule.onNodeWithText("跳过").assertDoesNotExist()
 
-        // 点击「恢复」触发 onRestore，不触发 onSkip
+        // Tapping "restore" triggers onRestore, not onSkip
         composeRule.onNodeWithText("恢复").performClick()
         composeRule.waitForIdle()
         assertThat(restoreCalled).isTrue()
@@ -200,7 +200,7 @@ class DrillScreenTest {
     }
 
     /**
-     * issue #1：普通词书仍显示「跳过」（回归保护，确保 isReviewBook 切换没破坏普通词书）。
+     * issue #1: a normal book still shows "skip" (regression guard, making sure the isReviewBook branch did not break normal books).
      */
     @Test
     fun normalBook_showsSkipButton_notRestore() {
@@ -211,14 +211,14 @@ class DrillScreenTest {
     }
 
     /**
-     * #26：词书名过长时不应挤压右侧的跳过/锁定按钮。
+     * #26: an overly long word book name must not squeeze out the skip / lock buttons on the right.
      *
-     * 用一条超长词书名（远超屏幕宽度）渲染 DrillPager，验证：
-     * - 跳过按钮仍可见可点击
-     * - 锁定按钮 contentDescription（「锁定」）对应的节点仍存在
-     * - 计数器「1 / 3」仍显示
+     * Renders DrillPager with an extra-long word book name (far wider than the screen) and verifies:
+     * - the skip button is still visible and clickable
+     * - the node for the lock button's contentDescription ("lock") still exists
+     * - the counter "1 / 3" still shows
      *
-     * 视觉换行效果在模拟器上手验（截图），这里只验证节点存在性（不被挤出树）。
+     * The visual wrapping was verified by hand on an emulator (screenshot); here we only verify node existence (not pushed out of the tree).
      */
     @Test
     fun longBookName_doesNotPushOutRightSideButtons() {
@@ -242,12 +242,12 @@ class DrillScreenTest {
         }
         composeRule.waitForIdle()
 
-        // 右侧两按钮仍可见（跳过 = Text，锁定 = Icon contentDescription）
+        // Both right-side buttons still visible (skip = Text, lock = Icon contentDescription)
         composeRule.onNodeWithText("跳过").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("锁定").assertIsDisplayed()
-        // 计数器位置不受影响
+        // Counter position unaffected
         composeRule.onNodeWithText("1 / 3").assertIsDisplayed()
-        // 词书名完整文本仍渲染（换行后整段文本节点仍存在 —— Compose Text 节点保留完整字符串）
+        // The full word book name still renders (after wrapping the whole text node still exists, because Compose Text nodes keep the full string)
         composeRule.onNodeWithText(longName).assertIsDisplayed()
     }
 }

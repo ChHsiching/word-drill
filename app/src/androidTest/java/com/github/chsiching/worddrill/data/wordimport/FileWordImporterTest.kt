@@ -17,19 +17,19 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * Ticket #21：[FileWordImporter] 端到端测试（内存 Room + 真实 ContentResolver 文件）。
+ * Ticket #21: end-to-end test for [FileWordImporter] (in-memory Room + a real ContentResolver file).
  *
- * 主接缝已在 JVM 单测覆盖（[PosMeaningParserTest] / [TextTableParserTest] / [XlsxParserTest]），
- * 本测试验证"解析 → 词典查词 → 写库"的编排正确性（issue #21 单词处理逻辑 3 步）。
+ * The main seam is already covered by JVM unit tests ([PosMeaningParserTest] / [TextTableParserTest] / [XlsxParserTest]);
+ * this test verifies the "parse -> dictionary lookup -> database write" orchestration (the 3 steps of the word-handling logic in issue #21).
  *
- * 覆盖：
- * - 词典有词 → 用词典的 pos+meaning+phonetic
- * - 词典没词 → 用文件 col3+4
- * - col3+4 全空 → skipped
- * - 去重静默：跨词书重复 word 复用同一行
- * - 完成统计正确
+ * Coverage:
+ * - Word in the dictionary -> use the dictionary's pos + meaning + phonetic
+ * - Word not in the dictionary -> use file col3 + col4
+ * - col3 + col4 both empty -> skipped
+ * - Silent dedup: a word repeated across books reuses the same row
+ * - The completion summary is correct
  *
- * 不覆盖 PDF（需 PdfBox-Android native，且要构造 PDF 测试 fixture）：PDF 端到端走 MCP 手验。
+ * PDF is not covered (needs PdfBox-Android native plus a PDF test fixture); the PDF end-to-end path was verified by hand with MCP.
  */
 @RunWith(AndroidJUnit4::class)
 class FileWordImporterTest {
@@ -53,7 +53,7 @@ class FileWordImporterTest {
         db.close()
     }
 
-    // ---- 词典优先（issue #21 单词处理逻辑 step 1）----
+    // ---- Dictionary first (issue #21 word-handling logic step 1) ----
 
     @Test
     fun dictHit_usesDictPosAndMeaningAndPhonetic() = runTest {
@@ -67,15 +67,15 @@ class FileWordImporterTest {
             )
         )
 
-        // 文件 col3/4 与词典不同 —— 词典应胜出
+        // File col3/4 differ from the dictionary; the dictionary should win
         val file = txtFile("1,apple,/file_phonetic/,n.水果\n")
         val summary = importer.import(uriOf(file), bookName = "我的词书", filenameDecoded = "test.csv")
 
         assertThat(summary).isEqualTo(ImportSummary(success = 1, skipped = 0))
         val word = db.wordDao().getByText("apple")!!
-        // phonetic 来自词典（不取文件 /file_phonetic/）
+        // phonetic comes from the dictionary (not the file's /file_phonetic/)
         assertThat(word.phonetic).isEqualTo("/ˈæpl/")
-        // senses 来自词典（不取文件 n.水果）
+        // senses come from the dictionary (not the file's fruit sense)
         val senses = db.wordDao().getSensesForWord(word.wordId).map { it.pos to it.meaning }
         assertThat(senses).containsExactly(
             "n." to "苹果（词典）",
@@ -83,11 +83,11 @@ class FileWordImporterTest {
         )
     }
 
-    // ---- 文件兜底（issue #21 单词处理逻辑 step 2）----
+    // ---- File fallback (issue #21 word-handling logic step 2) ----
 
     @Test
     fun dictMiss_usesFileCol3Col4() = runTest {
-        // 词典无 "unusualsexample"，文件应兜底
+        // "unusualsexample" is not in the dictionary; the file should serve as the fallback
         val file = txtFile("1,unusualsexample,/uf/,vt.做 vi.行动\n")
         val summary = importer.import(uriOf(file), bookName = "我的", filenameDecoded = "test.csv")
 
@@ -103,8 +103,8 @@ class FileWordImporterTest {
 
     @Test
     fun dictMiss_fileOnlyPhonetic_posDefaultedToNoun_succeedsWithNoSenses() = runTest {
-        // col3 有音标，col4 空 → senses 空，但 col3+4 并非全空 → 视为有效导入（保留音标，
-        // 用户可后续手填释义）。卡片正面有单词 + 音标可用。
+        // col3 has a phonetic and col4 is empty, so senses are empty, but col3+4 are not both empty, so it counts as a valid import (keep the phonetic;
+        // the user can fill in the meaning later). The card front has the word + phonetic to work with.
         val file = txtFile("1,lonelyword,/lp/,\n")
         val summary = importer.import(uriOf(file), bookName = "我的", filenameDecoded = "test.csv")
 
@@ -114,7 +114,7 @@ class FileWordImporterTest {
         assertThat(db.wordDao().getSensesForWord(word.wordId)).isEmpty()
     }
 
-    // ---- 全空跳过（issue #21 单词处理逻辑 step 3）----
+    // ---- Both empty, skipped (issue #21 word-handling logic step 3) ----
 
     @Test
     fun col3And4Empty_skippedAsIncomplete() = runTest {
@@ -127,15 +127,15 @@ class FileWordImporterTest {
 
     @Test
     fun blankWordLine_skipped() = runTest {
-        // word 列（col1）空的行：解析器已跳过，importer 不应计入 summary
+        // Rows with an empty word column (col1): the parser already skips them; the importer must not count them in the summary
         val file = txtFile("1,,,n.空单词\n2,apple,,n.苹果\n")
         val summary = importer.import(uriOf(file), bookName = "我的", filenameDecoded = "test.csv")
 
-        // TextTableParser 跳过了 word 列空的行，importer 只看到一行 apple
+        // TextTableParser skipped the row with the empty word column; the importer only sees the apple row
         assertThat(summary).isEqualTo(ImportSummary(success = 1, skipped = 0))
     }
 
-    // ---- 去重静默（issue #21 去重不提示）----
+    // ---- Silent dedup (issue #21: dedup without prompting) ----
 
     @Test
     fun duplicateWordAcrossBooks_sharesGlobalWordRow_silentDedup() = runTest {
@@ -150,10 +150,10 @@ class FileWordImporterTest {
         importer.import(uriOf(file), bookName = "词书1", filenameDecoded = "a.csv")
         importer.import(uriOf(file), bookName = "词书2", filenameDecoded = "b.csv")
 
-        // word 表只一行 apple（全局唯一索引兜底）
+        // Only one apple row in the word table (the global unique index as the fallback)
         val appleRows = db.wordDao().getAll().filter { it.text == "apple" }
         assertThat(appleRows).hasSize(1)
-        // 两本词书各自 link 同一 wordId
+        // Both books link the same wordId
         val book1 = db.bookDao().getByName("词书1")!!
         val book2 = db.bookDao().getByName("词书2")!!
         val book1Words = db.wordDao().getWordsWithSensesByBook(book1.bookId).map { it.word.wordId }
@@ -163,7 +163,7 @@ class FileWordImporterTest {
         assertThat(book1Words.single()).isEqualTo(book2Words.single())
     }
 
-    // ---- 完成统计正确（issue #21 完成提示）----
+    // ---- Completion summary correct (issue #21 completion prompt) ----
 
     @Test
     fun summary_countsSuccessAndSkippedCorrectly() = runTest {
@@ -173,7 +173,7 @@ class FileWordImporterTest {
                 words = listOf(DictionaryWords.Entry(word = "apple", phonetic = "/p/", pos = "n.", meaning = "苹果")),
             )
         )
-        // 行：apple（dict 命中） / missword（col3/4 兜底） / emptyword（全空跳过） / banana（col3/4 兜底）
+        // Rows: apple (dict hit) / missword (col3/4 fallback) / emptyword (both empty, skipped) / banana (col3/4 fallback)
         val file = txtFile(
             """
             1,apple,,n.苹果
@@ -186,12 +186,12 @@ class FileWordImporterTest {
         val summary = importer.import(uriOf(file), bookName = "测试", filenameDecoded = "test.csv")
 
         assertThat(summary).isEqualTo(ImportSummary(success = 3, skipped = 1))
-        // 写库验证：3 个有效词都进了词书
+        // Database check: all 3 valid words made it into the book
         val book = db.bookDao().getByName("测试")!!
         assertThat(db.bookDao().countWordsInBook(book.bookId)).isEqualTo(3)
     }
 
-    // ---- 词书创建 ----
+    // ---- Book creation ----
 
     @Test
     fun createsCustomBook_notPreset() = runTest {
@@ -202,7 +202,7 @@ class FileWordImporterTest {
         assertThat(book.isPreset).isFalse()
     }
 
-    // ---- xlsx 格式路由 ----
+    // ---- xlsx format routing ----
 
     @Test
     fun xlsxFormat_routedToXlsxParser() = runTest {
@@ -217,7 +217,7 @@ class FileWordImporterTest {
         }
         val summary = importer.import(uriOf(file), bookName = "xlsx词书", filenameDecoded = "test.xlsx")
 
-        // ghost 不在词典，走 col3+4 兜底
+        // ghost is not in the dictionary; the col3+4 fallback applies
         assertThat(summary).isEqualTo(ImportSummary(success = 1, skipped = 0))
         val ghost = db.wordDao().getByText("ghost")!!
         assertThat(ghost.phonetic).isEqualTo("/g/")
@@ -232,7 +232,7 @@ class FileWordImporterTest {
 
     private fun uriOf(file: File): Uri = Uri.fromFile(file)
 
-    /** 构造最小 .xlsx（与 XlsxParserTest 同款，重复在这里避免 JVM 测试代码跨 source set 引用）。 */
+    /** Builds a minimal .xlsx (same as XlsxParserTest; duplicated here to avoid referencing JVM test code across source sets). */
     private fun buildMinimalXlsx(sharedStrings: List<String>, rows: List<String>): ByteArray {
         val baos = java.io.ByteArrayOutputStream()
         java.util.zip.ZipOutputStream(baos).use { zip ->

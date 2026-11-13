@@ -31,22 +31,22 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 「我的」Tab 主接缝（Ticket #8 + #16 重写）：Compose UI + 内存 Room + 真 ViewModel。
+ * Main seam of the Me tab (Ticket #8, rewritten in #16): Compose UI + in-memory Room + real ViewModel.
  *
- * 验收覆盖（规格 AC）：
- * - 展示今日/累计/进度三个统计
- * - 刷 N 张后数字正确（聚合正确性）
- * - 切换当前词书后，进度对应新词书
+ * Acceptance coverage (spec ACs):
+ * - Shows the three stats: today / total / progress
+ * - The numbers are correct after swiping N cards (aggregation correctness)
+ * - After switching the current book, the progress tracks the new book
  *
- * Ticket #16 后：
- * - 设置分三组（显示/导航/通用），不再有「软件设置」「数据」标题
- * - 主题三选项移到主题选择对话框（点「主题」行触发）
- * - 「关于」入口在通用组
- * - 导出/导入在通用组，文案「导出数据」「导入数据」
+ * Since Ticket #16:
+ * - Settings are split into three groups (display / navigation / general); the "app settings" and "data" headings are gone
+ * - The three theme options moved into the theme picker dialog (opened by tapping the "theme" row)
+ * - The "about" entry is in the general group
+ * - Export / import are in the general group, labeled "export data" and "import data"
  *
- * 接缝：通过 MeScreen(viewModel = ...) 注入真 MeViewModel（内存 Room DAO +
- * 真 SettingsRepository），collectAsStateWithLifecycle 驱动 UI；UI 文案断言聚合结果。
- * 用 Truth assertThat（repo 约定，坑 H：勿用 kotlin.assert）。
+ * Seam: injects a real MeViewModel through MeScreen(viewModel = ...) (in-memory Room DAO +
+ * real SettingsRepository); collectAsStateWithLifecycle drives the UI; UI text asserts the aggregated results.
+ * Uses Truth assertThat (repo convention, pitfall H: do not use kotlin.assert).
  */
 @RunWith(AndroidJUnit4::class)
 class MeScreenTest {
@@ -66,7 +66,7 @@ class MeScreenTest {
             .build()
         settings = SettingsRepository(context)
         bookId = db.bookDao().insert(Book(name = "测试词书", isPreset = false))
-        // 词书内 3 个词（进度分母 = 3）
+        // 3 words in the book (progress denominator = 3)
         val w1 = db.wordDao().insert(Word(text = "apple"))
         val w2 = db.wordDao().insert(Word(text = "balance"))
         val w3 = db.wordDao().insert(Word(text = "circle"))
@@ -102,9 +102,9 @@ class MeScreenTest {
     }
 
     /**
-     * 等待 ViewModel 把上游 combine 解析稳定后取首条解析值。
-     * stateIn(WhileSubscribed) 首值是空 MeStatsUiState()（bookName=""）；
-     * 所有测试都已 setCurrentBookId，解析后的状态 bookName 必非空，作为就绪信号。
+     * Waits for the ViewModel to settle the upstream combine, then takes the first resolved value.
+     * The initial value of stateIn(WhileSubscribed) is the empty MeStatsUiState() (bookName="");
+     * every test has already called setCurrentBookId, so the resolved state always has a non-empty bookName, which serves as the ready signal.
      */
     private suspend fun stableState(viewModel: MeViewModel): MeStatsUiState =
         viewModel.uiState.first { it.bookName.isNotEmpty() }
@@ -134,23 +134,23 @@ class MeScreenTest {
         renderWithVm(vm())
         composeRule.onNodeWithText("今日刷卡").assertIsDisplayed()
         composeRule.onNodeWithText("累计刷卡").assertIsDisplayed()
-        // 当前进度区域：书名 + 进度都在
+        // Current progress area: both the book name and the progress are there
         composeRule.onNodeWithText("测试词书").assertIsDisplayed()
     }
 
     @Test
     fun viewModel_aggregatesStatsCorrectly_afterSwipes() = runBlocking {
         val now = System.currentTimeMillis()
-        // 今日刷 3 张（wordId 1 两次 + wordId 2 一次），很久前刷 wordId 3 一次
+        // Today 3 cards swiped (wordId 1 twice + wordId 2 once); wordId 3 swiped once long ago
         seedSwipe(wordId = 1, timestamp = now - 1000)
         seedSwipe(wordId = 2, timestamp = now - 500)
-        seedSwipe(wordId = 1, timestamp = now - 200) // 重复词
-        seedSwipe(wordId = 3, timestamp = now - 100_000_000L) // 累计但不计入今日
+        seedSwipe(wordId = 1, timestamp = now - 200) // repeated word
+        seedSwipe(wordId = 3, timestamp = now - 100_000_000L) // counts toward the total but not today
 
         val state = stableState(vm())
-        // 累计 = 4 条事件；今日 = 3 条（now 附近）；
-        // 进度 = distinct 词数 / 总词数：词书内 wordId 1/2/3 都刷过 → 3 distinct / 3 总 = 100%
-        // （distinctWordCountForBook 跨全时段按 bookId 统计，与今日窗口无关）
+        // Total = 4 events; today = 3 (near now);
+        // Progress = distinct words / total words: wordIds 1/2/3 in the book were all swiped, so 3 distinct / 3 total = 100%
+        // (distinctWordCountForBook counts by bookId over all time, independent of the today window)
         assertThat(state.totalCount).isEqualTo(4)
         assertThat(state.todayCount).isEqualTo(3)
         assertThat(state.brushed).isEqualTo(3)
@@ -166,11 +166,11 @@ class MeScreenTest {
             seedSwipe(wordId = 2, timestamp = now)
         }
         renderWithVm(vm())
-        // #16 起进度区拆为：书名（独立 Text）+ "done / total"（独立 Text）+ "percent%"（独立 Text）
+        // Since #16 the progress area is split into: book name (its own Text) + "done / total" (its own Text) + "percent%" (its own Text)
         composeRule.onNodeWithText("测试词书").assertIsDisplayed()
         composeRule.onNodeWithText("2 / 3").assertIsDisplayed()
         composeRule.onNodeWithText("66%").assertIsDisplayed()
-        // 两个统计标签
+        // The two stats labels
         composeRule.onNodeWithText("今日刷卡").assertIsDisplayed()
         composeRule.onNodeWithText("累计刷卡").assertIsDisplayed()
     }
@@ -178,7 +178,7 @@ class MeScreenTest {
     @Test
     fun progressLine_showsZeroPercent_whenBookEmpty() {
         runBlocking {
-            // 空词书：分母 0，进度显示 0% 不崩溃
+            // Empty book: denominator 0; progress shows 0% without crashing
             val emptyBookId = db.bookDao().insert(Book(name = "空词书", isPreset = false))
             settings.setCurrentBookId(emptyBookId)
         }
@@ -190,13 +190,13 @@ class MeScreenTest {
 
     @Test
     fun progress_followsNewCurrentBook_afterSwitch() = runBlocking {
-        // 当前词书 bookId（3 词）刷了 2 distinct → 66%
+        // Current book bookId (3 words) has 2 distinct swiped, so 66%
         val now = System.currentTimeMillis()
         seedSwipe(wordId = 1, timestamp = now)
         seedSwipe(wordId = 2, timestamp = now)
         assertThat(stableState(vm()).percent).isEqualTo(66)
 
-        // 新建另一词书（2 词），切为当前，刷 1 个 → 50%
+        // Create another book (2 words), switch to it as current, swipe 1, so 50%
         val other = db.bookDao().insert(Book(name = "另一本", isPreset = false))
         val ow1 = db.wordDao().insert(Word(text = "dog"))
         val ow2 = db.wordDao().insert(Word(text = "egg"))
@@ -212,32 +212,32 @@ class MeScreenTest {
         assertThat(state.bookName).isEqualTo("另一本")
     }
 
-    // ---- Ticket #16：设置分三组 + 主题选择对话框 + 关于 ----
+    // ---- Ticket #16: settings in three groups + theme picker dialog + about ----
 
     @Test
     fun settingsGroups_showDisplayNavigationGeneralLabels() {
         renderWithVm(vm())
-        // 三个分组标签（#16 起：显示 / 导航 / 通用）
+        // The three group labels (since #16: display / navigation / general)
         composeRule.onNodeWithText("显示").assertIsDisplayed()
         composeRule.onNodeWithText("导航").assertIsDisplayed()
-        // 通用组在屏外（verticalScroll + 底部 padding），用 onNodeWithText 验证存在（找不到会抛）
+        // The general group is off-screen (verticalScroll + bottom padding); verify existence with onNodeWithText (it throws when not found)
         composeRule.onNodeWithText("通用", substring = false)
-        // 显示组：隐藏音标
+        // Display group: hide phonetics
         composeRule.onNodeWithText("隐藏音标").assertIsDisplayed()
-        // 导航组：导航栏风格 + 简约导航
+        // Navigation group: nav bar style + minimal navigation
         composeRule.onNodeWithText("导航栏风格").assertIsDisplayed()
         composeRule.onNodeWithText("简约导航").assertIsDisplayed()
-        // 通用组：导出 + 导入 + 关于（审核反馈 5：主题移到右上角 icon，不在通用组）
+        // General group: export + import + about (review feedback 5: theme moved to the top-right icon, no longer in the general group)
         composeRule.onNodeWithText("导出数据")
         composeRule.onNodeWithText("导入数据")
         composeRule.onNodeWithText("关于", substring = false)
-        // 右上角主题 icon（contentDescription = "主题"）
+        // Top-right theme icon (contentDescription = "theme")
         composeRule.onNodeWithContentDescription("主题").assertIsDisplayed()
     }
 
     @Test
     fun themeIcon_togglesToOppositeMode() = runBlocking {
-        // 审核反馈 5：右上角 icon 点击切深/浅（当前 LIGHT → 切 DARK）。
+        // Review feedback 5: tapping the top-right icon toggles dark/light (currently LIGHT, so it switches to DARK).
         runBlocking { settings.setTheme(ThemeMode.LIGHT) }
         renderWithVm(vm())
         composeRule.onNodeWithContentDescription("主题").performClick()
@@ -249,7 +249,7 @@ class MeScreenTest {
 
     @Test
     fun themeIcon_darkToLight_togglesBack() = runBlocking {
-        // 审核反馈 5：当前 DARK → 切 LIGHT。
+        // Review feedback 5: currently DARK, so it switches to LIGHT.
         runBlocking { settings.setTheme(ThemeMode.DARK) }
         renderWithVm(vm())
         composeRule.onNodeWithContentDescription("主题").performClick()
@@ -262,49 +262,49 @@ class MeScreenTest {
     @Test
     fun aboutDialog_showsAppNameAndVersion_whenOpened() {
         renderWithVm(vm())
-        // 「关于」入口在屏外，先 scroll 到它再点
+        // The "about" entry is off-screen; scroll to it first, then tap
         composeRule.onNodeWithText("关于", substring = false).performScrollTo()
         composeRule.onNodeWithText("关于", substring = false).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("关于 WordDrill").assertIsDisplayed()
-        // 坑 G：onNodeWithText 默认子串匹配，"WordDrill" 会同时命中标题"关于 WordDrill"
-        // 与正文"WordDrill"。正文用 substring=false 精确匹配唯一节点。
+        // Pitfall G: onNodeWithText does substring matching by default, so "WordDrill" would match both the "About WordDrill" title
+        // and the body text "WordDrill". Use substring=false to exactly match the single body node.
         composeRule.onNodeWithText("WordDrill", substring = false).assertIsDisplayed()
-        // 版本号行：与 build.gradle.kts 的 versionName 一致；bump 时同步更新。
+        // Version line: matches versionName in build.gradle.kts; update it in sync when bumping.
         composeRule.onNodeWithText("版本 0.2.1").assertIsDisplayed()
     }
 
-    // ---- Ticket #10/#16：数据导出/导入入口（通用组下两行）----
+    // ---- Ticket #10/#16: data export / import entries (two rows under the general group) ----
 
     @Test
     fun exportDialog_showsNicknameField_whenExportClicked() {
         renderWithVm(vm())
-        // 「导出数据」入口在屏外，先 scroll 到它再点
+        // The "export data" entry is off-screen; scroll to it first, then tap
         composeRule.onNodeWithText("导出数据").performScrollTo()
         composeRule.onNodeWithText("导出数据").performClick()
         composeRule.waitForIdle()
-        // 导出弹窗：说明 + 昵称输入框 + 确认/取消（标题与行同名「导出数据」故跳过）
+        // Export dialog: hint + nickname field + confirm/cancel (the title shares the text "export data" with the row, so it is skipped)
         composeRule.onNodeWithText("将整库（词条池、词书、刷卡日志）导出为 JSON 文件，用于换机迁移。").assertIsDisplayed()
         composeRule.onNodeWithText("可选昵称标签").assertIsDisplayed()
-        // 点取消后弹窗关闭（坑 M：避重复词，用 substring=false 精确匹配）
+        // Tap cancel and the dialog closes (pitfall M: to avoid duplicate words, use substring=false exact matching)
         composeRule.onNodeWithText("取消", substring = false).performClick()
         composeRule.waitForIdle()
-        // 关闭后：说明文本消失（弹窗关闭判定）
+        // After closing: the hint text is gone (how we detect the dialog closed)
         composeRule.onNodeWithText("将整库（词条池、词书、刷卡日志）导出为 JSON 文件，用于换机迁移。").assertIsNotDisplayed()
     }
 
     @Test
     fun importDialog_showsOverwriteWarning_whenImportClicked() {
         renderWithVm(vm())
-        // 「导入数据」入口在屏外，先 scroll 到它再点
+        // The "import data" entry is off-screen; scroll to it first, then tap
         composeRule.onNodeWithText("导入数据").performScrollTo()
         composeRule.onNodeWithText("导入数据").performClick()
         composeRule.waitForIdle()
-        // 导入弹窗：标题 + 覆盖警告 + 确认/取消
+        // Import dialog: title + overwrite warning + confirm/cancel
         composeRule.onNodeWithText("确认导入").assertIsDisplayed()
         composeRule.onNodeWithText("导入将覆盖当前所有数据，此操作不可撤销。").assertIsDisplayed()
         composeRule.onNodeWithText("覆盖导入").assertIsDisplayed()
-        // 点取消后弹窗关闭
+        // Tap cancel and the dialog closes
         composeRule.onNodeWithText("取消", substring = false).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("确认导入").assertIsNotDisplayed()

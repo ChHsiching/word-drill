@@ -17,8 +17,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Ticket #3 主接缝：内存版 Room，验证 5 张表 schema、外键级联、DAO CRUD、聚合查询。
- * 只测外部行为（DAO 的契约），不测 Room 内部实现。
+ * Ticket #3 main seam: in-memory Room, verifying the 5-table schema, foreign-key cascades, DAO CRUD, and aggregate queries.
+ * Only external behavior is tested (the DAO contract), not Room internals.
  */
 @RunWith(AndroidJUnit4::class)
 class WordDrillDatabaseTest {
@@ -38,7 +38,7 @@ class WordDrillDatabaseTest {
         db.close()
     }
 
-    // ---- 词条 CRUD ----
+    // ---- Word entry CRUD ----
 
     @Test
     fun insertWord_assignsAutoIncrementId() = runTest {
@@ -53,7 +53,7 @@ class WordDrillDatabaseTest {
         val wordDao = db.wordDao()
         val firstId = wordDao.insert(Word(text = "apple"))
         val secondId = wordDao.insert(Word(text = "apple"))
-        // IGNORE 冲突策略：重复插入返回 -1，原始行保留
+        // IGNORE conflict strategy: a duplicate insert returns -1 and the original row is kept
         assertThat(secondId).isEqualTo(-1L)
         assertThat(wordDao.getByText("apple")!!.wordId).isEqualTo(firstId)
     }
@@ -63,7 +63,7 @@ class WordDrillDatabaseTest {
         assertThat(db.wordDao().findIdByText("ghost")).isNull()
     }
 
-    // ---- Ticket #14：word.phonetic（IPA 音标，可空）----
+    // ---- Ticket #14: word.phonetic (IPA transcription, nullable) ----
 
     @Test
     fun insertWord_withPhonetic_persists() = runTest {
@@ -88,8 +88,8 @@ class WordDrillDatabaseTest {
 
     @Test
     fun getWordsWithSensesByBook_carriesPhonetic() = runTest {
-        // @Relation 回填的 Word 也应带 phonetic（验证 getWordsWithSensesByBook 的 SELECT w.*
-        // 覆盖新列，而非显式列清单漏掉 phonetic）
+        // The Word backfilled by @Relation should also carry phonetic (verifies that getWordsWithSensesByBook's SELECT w.*
+        // covers the new column, instead of an explicit column list that would miss phonetic)
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -143,7 +143,7 @@ class WordDrillDatabaseTest {
         assertThat(wordDao.getSensesForWord(wordId).map { it.pos }).containsExactly("v.")
     }
 
-    // ---- 外键级联：删 word 级联删 sense ----
+    // ---- Foreign-key cascade: deleting a word cascades to its senses ----
 
     @Test
     fun deleteWord_cascadesDeleteSenses() = runTest {
@@ -154,7 +154,7 @@ class WordDrillDatabaseTest {
         assertThat(wordDao.getSensesForWord(wordId)).isEmpty()
     }
 
-    // ---- 词书 CRUD ----
+    // ---- Book CRUD ----
 
     @Test
     fun insertBook_assignsIdAndDefaults() = runTest {
@@ -172,7 +172,7 @@ class WordDrillDatabaseTest {
         bookDao.insert(Book(name = "CET-4", isPreset = true))
 
         val books = bookDao.observeAll().first()
-        // 两个预置在前（按 name 升序），两个自定义在后（按 name 升序）
+        // The two preset books come first (by name ascending), the two custom ones after (by name ascending)
         assertThat(books.map { it.name }).containsExactly("CET-4", "CET-6", "alpha", "zebra").inOrder()
     }
 
@@ -186,19 +186,19 @@ class WordDrillDatabaseTest {
 
     @Test
     fun rename_refusesPresetBook() = runTest {
-        // Ticket #11：预置词书不可重命名（DAO 层兜底，与 deleteCustom 的 isPreset=0 同模式）
+        // Ticket #11: preset books cannot be renamed (DAO-level guard, same pattern as deleteCustom's isPreset=0)
         val bookDao = db.bookDao()
         val id = bookDao.insert(Book(name = "CET-4", isPreset = true))
         val affected = bookDao.rename(id, "hacked")
-        // WHERE isPreset = 0 不匹配，受影响行数为 0，原行保留
+        // WHERE isPreset = 0 does not match, 0 rows affected, the original row is kept
         assertThat(affected).isEqualTo(0)
         assertThat(bookDao.getById(id)!!.name).isEqualTo("CET-4")
     }
 
-    // Ticket #22：deleteCustom 现为软删（deleted=1），完整覆盖见下方 #22 段的
-    // deleteCustom_softDeletesInsteadOfPhysicalDelete / deleteCustom_refusesPresetBook。
+    // Ticket #22: deleteCustom is now a soft delete (deleted=1); full coverage is in the #22 section below,
+    // deleteCustom_softDeletesInsteadOfPhysicalDelete / deleteCustom_refusesPresetBook.
 
-    // ---- 词书-词条 关联 ----
+    // ---- Book-word links ----
 
     @Test
     fun linkBookWord_enablesCount() = runTest {
@@ -219,7 +219,7 @@ class WordDrillDatabaseTest {
         val bookId = bookDao.insert(Book(name = "b1"))
         val w1 = wordDao.insert(Word(text = "a"))
         bookDao.linkBookWord(BookWord(bookId, w1))
-        bookDao.linkBookWord(BookWord(bookId, w1)) // 重复
+        bookDao.linkBookWord(BookWord(bookId, w1)) // duplicate
         assertThat(bookDao.countWordsInBook(bookId)).isEqualTo(1)
     }
 
@@ -236,8 +236,8 @@ class WordDrillDatabaseTest {
 
     @Test
     fun softDeleteBook_preservesBookWordLinks() = runTest {
-        // Ticket #22：词书软删（deleteCustom）不真删行，也不动其下 book_word 关联。
-        // CASCADE 只在永久删除（purgeBook）时触发，见 purgeBook_physicallyDeletesAndCascades。
+        // Ticket #22: soft-deleting a book (deleteCustom) does not really delete the row and does not touch its book_word links.
+        // CASCADE fires only on permanent delete (purgeBook); see purgeBook_physicallyDeletesAndCascades.
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1", isPreset = false))
@@ -245,15 +245,15 @@ class WordDrillDatabaseTest {
         bookDao.linkBookWord(BookWord(bookId, w1))
         assertThat(bookDao.countWordsInBook(bookId)).isEqualTo(1)
 
-        bookDao.deleteCustom(bookId) // 软删
+        bookDao.deleteCustom(bookId) // soft delete
 
-        // 关联行仍在（软删词书不动 book_word），countWordsInBook 仍能查到
+        // The link rows are still there (soft-deleting the book does not touch book_word); countWordsInBook still finds them
         assertThat(bookDao.countWordsInBook(bookId)).isEqualTo(1)
-        // 但词书从可见列表消失（observeAllWithCounts 过滤 deleted=0）
+        // But the book disappears from the visible list (observeAllWithCounts filters to deleted=0)
         assertThat(bookDao.observeAllWithCounts().first().none { it.bookId == bookId }).isTrue()
     }
 
-    // ---- 按词书查词条（含 sense）----
+    // ---- Query words by book (with senses) ----
 
     @Test
     fun getWordsWithSensesByBook_returnsWordsWithTheirSenses() = runTest {
@@ -264,7 +264,7 @@ class WordDrillDatabaseTest {
         val wBanana = wordDao.insert(Word(text = "banana"))
         wordDao.insertSense(Sense(wordId = wApple, pos = "n.", meaning = "苹果"))
         wordDao.insertSense(Sense(wordId = wBanana, pos = "n.", meaning = "香蕉"))
-        // 另一个词书里的词不应出现
+        // Words from another book must not appear
         val otherBook = bookDao.insert(Book(name = "b2"))
         val wCherry = wordDao.insert(Word(text = "cherry"))
         wordDao.insertSense(Sense(wordId = wCherry, pos = "n.", meaning = "樱桃"))
@@ -292,7 +292,7 @@ class WordDrillDatabaseTest {
         assertThat(result.senses).hasSize(3)
     }
 
-    // ---- Ticket #7: observe 词书词条（响应式，列表页订阅）----
+    // ---- Ticket #7: observe book words (reactive, subscribed by the list page) ----
 
     @Test
     fun observeWordsWithSensesByBook_emitsCurrentList() = runTest {
@@ -325,7 +325,7 @@ class WordDrillDatabaseTest {
             .containsExactly("banana")
     }
 
-    // ---- 刷卡日志聚合 ----
+    // ---- Swipe log aggregation ----
 
     @Test
     fun swipeLog_totalCount_countsAllEvents() = runTest {
@@ -345,7 +345,7 @@ class WordDrillDatabaseTest {
         logDao.insert(SwipeLog(bookId = bookId, wordId = 1, timestamp = 500L))
         logDao.insert(SwipeLog(bookId = bookId, wordId = 2, timestamp = 1500L))
         logDao.insert(SwipeLog(bookId = bookId, wordId = 3, timestamp = 2500L))
-        // 今日起点 = 1000L：应只计 2 条
+        // Today's start = 1000L: only 2 entries should count
         assertThat(logDao.countSince(1000L)).isEqualTo(2)
     }
 
@@ -354,7 +354,7 @@ class WordDrillDatabaseTest {
         val logDao = db.swipeLogDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
-        // 同一词书内，wordId 1 被刷 3 次，wordId 2 被刷 1 次 → distinct = 2
+        // Within one book, wordId 1 is swiped 3 times and wordId 2 once, so distinct = 2
         logDao.insert(SwipeLog(bookId = bookId, wordId = 1, timestamp = 1L))
         logDao.insert(SwipeLog(bookId = bookId, wordId = 1, timestamp = 2L))
         logDao.insert(SwipeLog(bookId = bookId, wordId = 1, timestamp = 3L))
@@ -375,7 +375,7 @@ class WordDrillDatabaseTest {
         assertThat(logDao.distinctWordCountForBook(b2)).isEqualTo(1)
     }
 
-    // ---- Ticket #8: observe 版本（响应式，「我的」Tab 统计随刷卡刷新）----
+    // ---- Ticket #8: observe variants (reactive; the Me tab stats refresh on swipes) ----
 
     @Test
     fun observeTotalCount_emitsCurrentCount() = runTest {
@@ -409,7 +409,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun observeTotalCount_reflectsNewInserts() = runTest {
-        // 响应式核心：插入后再次 .first() 应读到新值
+        // Reactive core: calling .first() again after inserts should read the new value
         val logDao = db.swipeLogDao()
         val bookId = db.bookDao().insert(Book(name = "b1"))
         assertThat(logDao.observeTotalCount().first()).isEqualTo(0)
@@ -418,7 +418,7 @@ class WordDrillDatabaseTest {
         assertThat(logDao.observeTotalCount().first()).isEqualTo(2)
     }
 
-    // ---- Ticket #20：跳过标记（book_word.skipped）----
+    // ---- Ticket #20: skip flag (book_word.skipped) ----
 
     @Test
     fun insertBookWord_defaultsNotSkipped() = runTest {
@@ -433,7 +433,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun setSkipped_marksOnlyThatBookWordLink() = runTest {
-        // 词书级独立：CET-4 跳过 apple 只标记 CET-4 的关联，不影响 CET-6
+        // Book-level independence: skipping apple in CET-4 marks only CET-4's link, not CET-6
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val cet4 = bookDao.insert(Book(name = "CET-4", isPreset = true))
@@ -444,14 +444,14 @@ class WordDrillDatabaseTest {
 
         bookDao.setSkipped(cet4, wApple, skipped = true)
 
-        // CET-4 的关联被标记跳过，CET-6 的同词关联仍为未跳过
+        // CET-4's link is marked skipped; CET-6's link to the same word stays not skipped
         assertThat(bookDao.getSkipped(cet4, wApple)).isTrue()
         assertThat(bookDao.getSkipped(cet6, wApple)).isFalse()
     }
 
     @Test
     fun setSkipped_isReversible() = runTest {
-        // 跳过可恢复：setSkipped(false) 置回 0，词重新进刷卡列表
+        // Skipping is reversible: setSkipped(false) sets it back to 0 and the word re-enters the drill list
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -466,7 +466,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun getWordsWithSensesByBook_excludesSkipped() = runTest {
-        // 刷卡只显示 skipped=0 的词 —— 跳过的词从卡片列表消失
+        // Drilling shows only skipped=0 words; skipped words disappear from the card list
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -482,7 +482,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun getWordsWithSensesByBook_includesAllAfterUnskip() = runTest {
-        // 恢复跳过后词重新进刷卡列表
+        // After unskipping, the word re-enters the drill list
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -502,7 +502,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun countWordsInBook_excludesSkipped() = runTest {
-        // 词书列表副标题词数只计未跳过
+        // The book-list subtitle word count counts only unskipped words
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -521,7 +521,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun observeAllWithCounts_excludesSkippedFromCount() = runTest {
-        // 词库列表副标题的「X 词」只计未跳过
+        // The library-list subtitle "X words" counts only unskipped words
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -537,7 +537,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun unskipWordEverywhere_clearsSkippedAcrossAllBooks() = runTest {
-        // 恢复语义(issue #1):一个词可能在 CET-4 和 CET-6 都被跳过,恢复要全清
+        // Restore semantics (issue #1): a word may be skipped in both CET-4 and CET-6; restore must clear all of them
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val cet4 = bookDao.insert(Book(name = "CET-4", isPreset = true))
@@ -545,20 +545,20 @@ class WordDrillDatabaseTest {
         val wApple = wordDao.insert(Word(text = "apple"))
         bookDao.linkBookWord(BookWord(cet4, wApple))
         bookDao.linkBookWord(BookWord(cet6, wApple))
-        // 两本词书都跳过 apple
+        // Skip apple in both books
         bookDao.setSkipped(cet4, wApple, skipped = true)
         bookDao.setSkipped(cet6, wApple, skipped = true)
 
         bookDao.unskipWordEverywhere(wApple)
 
-        // 两本词书的 apple 关联都恢复未跳过
+        // apple's links in both books are restored to not skipped
         assertThat(bookDao.getSkipped(cet4, wApple)).isFalse()
         assertThat(bookDao.getSkipped(cet6, wApple)).isFalse()
     }
 
     @Test
     fun unskipWordEverywhere_doesNotAffectOtherWords() = runTest {
-        // 只清目标词,不动其他词的 skipped 状态
+        // Clear only the target word; other words' skipped state is untouched
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -572,11 +572,11 @@ class WordDrillDatabaseTest {
         bookDao.unskipWordEverywhere(wApple)
 
         assertThat(bookDao.getSkipped(bookId, wApple)).isFalse()
-        // run 仍处于跳过态,不被波及
+        // run stays skipped, unaffected
         assertThat(bookDao.getSkipped(bookId, wRun)).isTrue()
     }
 
-    // ---- Ticket #22：软删除（book_word.deleted，词书级独立，进回收站）----
+    // ---- Ticket #22: soft delete (book_word.deleted, book-level independent, into the recycle bin) ----
 
     @Test
     fun insertBookWord_defaultsNotDeleted() = runTest {
@@ -591,7 +591,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun setDeleted_marksOnlyThatBookWordLink() = runTest {
-        // 词书级独立：CET-4 删 apple 只标记 CET-4 的关联，不影响 CET-6
+        // Book-level independence: deleting apple in CET-4 marks only CET-4's link, not CET-6
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val cet4 = bookDao.insert(Book(name = "CET-4", isPreset = true))
@@ -602,14 +602,14 @@ class WordDrillDatabaseTest {
 
         bookDao.setDeleted(cet4, wApple, deleted = true)
 
-        // CET-4 的关联被标记软删，CET-6 的同词关联仍为未删
+        // CET-4's link is marked soft-deleted; CET-6's link to the same word stays not deleted
         assertThat(bookDao.getDeleted(cet4, wApple)).isTrue()
         assertThat(bookDao.getDeleted(cet6, wApple)).isFalse()
     }
 
     @Test
     fun setDeleted_isReversible() = runTest {
-        // 软删可恢复：setDeleted(false) 置回 0，词回到词书列表
+        // Soft delete is reversible: setDeleted(false) sets it back to 0 and the word returns to the book list
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -624,7 +624,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun getWordsWithSensesByBook_excludesDeleted() = runTest {
-        // 刷卡只显示 deleted=0 的词 —— 软删的词从卡片列表消失
+        // Drilling shows only deleted=0 words; soft-deleted words disappear from the card list
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -640,7 +640,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun getWordsWithSensesByBook_includesAllAfterRestore() = runTest {
-        // 恢复后词重新进刷卡列表
+        // After restore, the word re-enters the drill list
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -660,7 +660,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun countWordsInBook_excludesDeleted() = runTest {
-        // 词书列表副标题词数只计未软删
+        // The book-list subtitle word count counts only non-soft-deleted words
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -679,7 +679,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun observeAllWithCounts_excludesDeletedFromCount() = runTest {
-        // 词库列表副标题的「X 词」只计未软删
+        // The library-list subtitle "X words" counts only non-soft-deleted words
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -695,7 +695,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun deletedAndSkippedAreIndependent() = runTest {
-        // 两个标记互不影响：跳过的词不等于删除，删除的词不等于跳过
+        // The two flags are independent: skipped does not mean deleted, and deleted does not mean skipped
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -703,10 +703,10 @@ class WordDrillDatabaseTest {
         bookDao.linkBookWord(BookWord(bookId, w1))
 
         bookDao.setSkipped(bookId, w1, skipped = true)
-        assertThat(bookDao.getDeleted(bookId, w1)).isFalse() // 跳过不等于删除
+        assertThat(bookDao.getDeleted(bookId, w1)).isFalse() // skipping does not mean deleting
 
         bookDao.setDeleted(bookId, w1, deleted = true)
-        assertThat(bookDao.getSkipped(bookId, w1)).isTrue() // 删除不改变跳过态
+        assertThat(bookDao.getSkipped(bookId, w1)).isTrue() // deleting does not change the skipped state
     }
 
     @Test
@@ -719,7 +719,7 @@ class WordDrillDatabaseTest {
         bookDao.linkBookWord(BookWord(cet4, wApple))
         bookDao.linkBookWord(BookWord(cet4, wRun))
 
-        // 初始无软删 → 回收站空
+        // Initially nothing soft-deleted, so the recycle bin is empty
         assertThat(bookDao.observeDeletedEntries().first()).isEmpty()
 
         bookDao.setDeleted(cet4, wApple, deleted = true)
@@ -733,7 +733,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun observeDeletedEntries_isEmptyAfterRestore() = runTest {
-        // 恢复后条目从回收站消失
+        // After restore, the entry disappears from the recycle bin
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -748,7 +748,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun purgeDeleted_actuallyDeletesRow() = runTest {
-        // 永久删除 = 真 DELETE 关联行（不可恢复）
+        // Permanent delete = a real DELETE of the link row (irreversible)
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -758,38 +758,38 @@ class WordDrillDatabaseTest {
 
         bookDao.purgeDeleted(bookId, w1)
 
-        // 关联行真删了，getDeleted 返回 null
+        // The link row is really deleted; getDeleted returns null
         assertThat(bookDao.getDeleted(bookId, w1)).isNull()
-        // 回收站也空了
+        // The recycle bin is empty too
         assertThat(bookDao.observeDeletedEntries().first()).isEmpty()
-        // 但全局 word 池里 apple 还在（永久删除只删关联，不删全局词）
+        // But apple is still in the global word pool (permanent delete removes only the link, not the global word)
         assertThat(wordDao.getByText("apple")).isNotNull()
     }
 
     @Test
     fun purgeDeleted_refusesNonDeletedLink() = runTest {
-        // deleted=1 兜底：未软删的关联不会被 purgeDeleted 误删
+        // deleted=1 guard: a link that is not soft-deleted cannot be wrongly deleted by purgeDeleted
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
         val w1 = wordDao.insert(Word(text = "apple"))
         bookDao.linkBookWord(BookWord(bookId, w1))
 
-        bookDao.purgeDeleted(bookId, w1) // 关联 deleted=0，兜底不删
+        bookDao.purgeDeleted(bookId, w1) // link deleted=0; the guard prevents deletion
 
-        assertThat(bookDao.getDeleted(bookId, w1)).isFalse() // 关联还在
+        assertThat(bookDao.getDeleted(bookId, w1)).isFalse() // the link is still there
     }
 
-    // ---- Ticket #22：词书软删除（book.deleted）----
+    // ---- Ticket #22: book soft delete (book.deleted) ----
 
     @Test
     fun deleteCustom_softDeletesInsteadOfPhysicalDelete() = runTest {
-        // 删除自定义词书 = 软删（deleted=1），行还在，可恢复
+        // Deleting a custom book = soft delete (deleted=1); the row stays and is recoverable
         val bookDao = db.bookDao()
         val id = bookDao.insert(Book(name = "mybook", isPreset = false))
         val affected = bookDao.deleteCustom(id)
         assertThat(affected).isEqualTo(1)
-        // 行还在（软删），getById 能读到
+        // The row is still there (soft-deleted); getById can read it
         val book = bookDao.getById(id)
         assertThat(book).isNotNull()
         assertThat(book!!.deleted).isTrue()
@@ -837,13 +837,13 @@ class WordDrillDatabaseTest {
 
         bookDao.restoreBook(id)
         assertThat(bookDao.getById(id)!!.deleted).isFalse()
-        // 恢复后回到可见列表
+        // After restore the book returns to the visible list
         assertThat(bookDao.observeAll().first().map { it.name }).contains("b1")
     }
 
     @Test
     fun restoreBook_preservesBookWordLinks() = runTest {
-        // 软删/恢复词书不动其下 book_word 关联（含各自 deleted/skipped 状态）
+        // Soft-deleting/restoring a book does not touch its book_word links (including their own deleted/skipped state)
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1", isPreset = false))
@@ -851,16 +851,16 @@ class WordDrillDatabaseTest {
         val w2 = wordDao.insert(Word(text = "run"))
         bookDao.linkBookWord(BookWord(bookId, w1))
         bookDao.linkBookWord(BookWord(bookId, w2))
-        bookDao.setDeleted(bookId, w1, deleted = true) // w1 关联软删
-        bookDao.setSkipped(bookId, w2, skipped = true) // w2 关联跳过
+        bookDao.setDeleted(bookId, w1, deleted = true) // w1's link soft-deleted
+        bookDao.setSkipped(bookId, w2, skipped = true) // w2's link skipped
 
-        bookDao.deleteCustom(bookId) // 软删整本书
-        bookDao.restoreBook(bookId) // 恢复
+        bookDao.deleteCustom(bookId) // soft-delete the whole book
+        bookDao.restoreBook(bookId) // restore
 
-        // 关联行原样保留：w1 仍软删，w2 仍跳过
+        // The link rows are preserved as-is: w1 stays soft-deleted, w2 stays skipped
         assertThat(bookDao.getDeleted(bookId, w1)).isTrue()
         assertThat(bookDao.getSkipped(bookId, w2)).isTrue()
-        assertThat(bookDao.countWordsInBook(bookId)).isEqualTo(0) // w1 软删、w2 跳过，都不计
+        assertThat(bookDao.countWordsInBook(bookId)).isEqualTo(0) // w1 is soft-deleted and w2 skipped; neither counts
     }
 
     @Test
@@ -880,33 +880,33 @@ class WordDrillDatabaseTest {
 
     @Test
     fun purgeBook_physicallyDeletesAndCascades() = runTest {
-        // 永久删除词书 = 真 DELETE book，CASCADE 清其下 book_word 关联
+        // Permanently deleting a book = a real DELETE of the book row; CASCADE clears its book_word links
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1", isPreset = false))
         val w1 = wordDao.insert(Word(text = "apple"))
         bookDao.linkBookWord(BookWord(bookId, w1))
-        bookDao.deleteCustom(bookId) // 先软删进回收站
+        bookDao.deleteCustom(bookId) // soft-delete into the recycle bin first
 
         bookDao.purgeBook(bookId)
 
-        // 词书行真删了
+        // The book row is really deleted
         assertThat(bookDao.getById(bookId)).isNull()
         assertThat(bookDao.observeDeletedBooks().first()).isEmpty()
-        // CASCADE 清了关联行
+        // CASCADE cleared the link rows
         assertThat(bookDao.getDeleted(bookId, w1)).isNull()
-        // 全局 word 池里 apple 还在（永久删词书不删全局词）
+        // apple is still in the global word pool (permanently deleting the book does not delete global words)
         assertThat(wordDao.getByText("apple")).isNotNull()
     }
 
     @Test
     fun purgeBook_refusesNonDeletedBook() = runTest {
-        // deleted=1 兜底：未软删的词书不会被 purgeBook 误删
+        // deleted=1 guard: a book that is not soft-deleted cannot be wrongly deleted by purgeBook
         val bookDao = db.bookDao()
         val id = bookDao.insert(Book(name = "b1", isPreset = false))
 
-        bookDao.purgeBook(id) // 词书 deleted=0，兜底不删
+        bookDao.purgeBook(id) // book deleted=0; the guard prevents deletion
 
-        assertThat(bookDao.getById(id)).isNotNull() // 词书还在
+        assertThat(bookDao.getById(id)).isNotNull() // the book is still there
     }
 }

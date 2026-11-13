@@ -11,18 +11,18 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Ticket #20：v3 → v4 migration（book_word 表加 skipped 列）测试。
+ * Ticket #20: test for the v3 -> v4 migration (add the skipped column to the book_word table).
  *
- * 与 [Migration23Test] 同模式：不引入 room-testing（要 schema 导出，本项目
- * exportSchema=false，路径不通）；直接造一个 v3 形态的 SQLite 库（手工 CREATE TABLE
- * 仿照 Room codegen 生成的 schema），跑 [WordDrillDatabase.MIGRATION_3_4.migrate]，
- * 再用 PRAGMA 验证：
- *  - skipped 列已加，类型 INTEGER NOT NULL DEFAULT 0
- *  - 老关联行未丢，skipped 默认 0（未跳过）
- *  - 升级后该列可写（setSkipped 的 UPDATE 路径）
+ * Same pattern as [Migration23Test]: room-testing is not used (it needs schema export, and this project has
+ * exportSchema=false, so that path is closed); instead, build a v3-shaped SQLite database by hand (manual CREATE TABLE
+ * mimicking the Room codegen schema), run [WordDrillDatabase.MIGRATION_3_4.migrate],
+ * then verify with PRAGMA:
+ *  - the skipped column is added, typed INTEGER NOT NULL DEFAULT 0
+ *  - old link rows are not lost and skipped defaults to 0 (not skipped)
+ *  - after the upgrade the column is writable (the UPDATE path of setSkipped)
  *
- * 全链路（v3 库 → 升级后 Room 正常读写）由 [WordDrillDatabaseTest] 的内存版 Room
- * 兜住（它在 v4 schema 上直接操作 book_word.skipped）。
+ * The full chain (v3 database -> Room reads and writes normally after the upgrade) is covered by the in-memory Room
+ * in [WordDrillDatabaseTest] (it operates on book_word.skipped directly on the v4 schema).
  */
 @RunWith(AndroidJUnit4::class)
 class Migration34Test {
@@ -33,11 +33,11 @@ class Migration34Test {
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(null) // 内存库
+            .name(null) // in-memory database
             .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(3) {
                 override fun onCreate(db: SupportSQLiteDatabase) {
-                    // v3 形态：book / word / book_word 表（无 skipped 列）。
-                    // 仿 Room codegen 的 schema 形态。
+                    // v3 shape: book / word / book_word tables (no skipped column).
+                    // Mimics the Room codegen schema shape.
                     db.execSQL(
                         """
                         CREATE TABLE `book` (
@@ -76,7 +76,7 @@ class Migration34Test {
                     oldVersion: Int,
                     newVersion: Int,
                 ) {
-                    // 由测试主体手动调 migrate()，这里不实现。
+                    // The test body calls migrate() manually; not implemented here.
                 }
             })
             .build()
@@ -108,7 +108,7 @@ class Migration34Test {
 
         WordDrillDatabase.MIGRATION_3_4.migrate(db)
 
-        // 老关联行 skipped 应为 0（ALTER ADD COLUMN DEFAULT 0 填回旧行）
+        // Old link rows should have skipped 0 (ALTER ADD COLUMN DEFAULT 0 backfills old rows)
         db.query("SELECT skipped FROM book_word WHERE bookId = 1 AND wordId = 1").use { c ->
             assertThat(c.moveToFirst()).isTrue()
             assertThat(c.getInt(0)).isEqualTo(0)
@@ -133,7 +133,7 @@ class Migration34Test {
 
     @Test
     fun migrate_skippedIsWritable() {
-        // 升级后 skipped 必须可写（setSkipped 的 UPDATE 路径）
+        // After the upgrade skipped must be writable (the UPDATE path of setSkipped)
         db.execSQL("INSERT INTO book (name, isPreset) VALUES ('b', 0)")
         db.execSQL("INSERT INTO word (text) VALUES ('apple')")
         db.execSQL("INSERT INTO book_word (bookId, wordId) VALUES (1, 1)")
@@ -147,16 +147,16 @@ class Migration34Test {
     }
 
     /**
-     * 端到端 schema 校验：建一个落盘的 v3 库 → 让 Room 跑 migration 打开 v4 → CRUD。
+     * End-to-end schema validation: create an on-disk v3 database, let Room run the migration and open v4, then do CRUD.
      *
-     * 这是 [Migration34Test] 其余用例（直接调 migrate() 跑 SupportSQLiteDatabase）补不上的：
-     * Room 在 `databaseBuilder.openDatabase()` 时会比对 codegen 生成的 v4 schema 与磁盘实际 schema，
-     * 若 entity 的 `@ColumnInfo(defaultValue)` 与 migration 的 `ALTER ... DEFAULT` 不一致，
-     * 这里会抛 IllegalStateException（"Migration didn't properly handle: skipped"）。
+     * The other cases in [Migration34Test] (calling migrate() directly on a SupportSQLiteDatabase) cannot cover this:
+     * on `databaseBuilder.openDatabase()` Room compares the codegen-generated v4 schema with the actual on-disk schema,
+     * and if the entity's `@ColumnInfo(defaultValue)` disagrees with the migration's `ALTER ... DEFAULT`,
+     * this throws IllegalStateException ("Migration didn't properly handle: skipped").
      *
-     * 用落盘库（非内存）：内存库 Room 不会走 version/ migration 路径，直接 onCreate 建 v4。
-     * v3 fixture 必须建全所有 v3 表（word/sense/book/book_word/swipe_log/dictionary），
-     * 否则 Room schema 校验会因为缺表报错（与 skipped 无关）。
+     * An on-disk database is used (not in-memory): for an in-memory database Room skips the version/migration path and just calls onCreate to build v4.
+     * The v3 fixture must create all v3 tables (word/sense/book/book_word/swipe_log/dictionary),
+     * otherwise Room schema validation fails on the missing tables (unrelated to skipped).
      */
     @Test
     fun roomOpensAfterMigration_schemaValidationPasses() {
@@ -164,7 +164,7 @@ class Migration34Test {
         val dbFile = java.io.File(context.cacheDir, "migration34-room-test.db")
         dbFile.delete()
 
-        // 1) 建全 v3 形态库文件（仿 Room codegen 的全部 6 张表）
+        // 1) Build a complete v3-shaped database file (all 6 tables mimicking Room codegen)
         val v3Config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
             .name(dbFile.absolutePath)
             .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(3) {
@@ -243,15 +243,15 @@ class Migration34Test {
             .build()
         val v3Helper = FrameworkSQLiteOpenHelperFactory().create(v3Config)
         val v3Db = v3Helper.writableDatabase
-        // 灌一条数据，验证升级后不丢
+        // Load one row of data to verify it survives the upgrade
         v3Db.execSQL("INSERT INTO book (name, isPreset) VALUES ('b', 0)")
         v3Db.execSQL("INSERT INTO word (text) VALUES ('apple')")
         v3Db.execSQL("INSERT INTO book_word (bookId, wordId) VALUES (1, 1)")
         v3Db.close()
         v3Helper.close()
 
-        // 2) 让 Room 打开这个 v3 库文件，注册全部 migration，触发 v3→v4 升级 + schema 校验。
-        //    若 entity defaultValue 与 migration DEFAULT 不一致 → 这里抛 IllegalStateException。
+        // 2) Let Room open this v3 database file with all migrations registered, triggering the v3->v4 upgrade + schema validation.
+        //    If the entity defaultValue disagrees with the migration DEFAULT, IllegalStateException is thrown here.
         val roomDb = androidx.room.Room.databaseBuilder(
             context,
             WordDrillDatabase::class.java,
@@ -265,13 +265,13 @@ class Migration34Test {
             )
             .build()
         val skipped = kotlinx.coroutines.runBlocking {
-            // 打开即触发 migration；CRUD 验证 skipped 列可读写
+            // Opening triggers the migration; CRUD verifies the skipped column is readable and writable
             roomDb.bookDao().getSkipped(1, 1)
         }
         roomDb.close()
         dbFile.delete()
 
-        // 老关联行升级后 skipped 默认 0（未跳过）
+        // After the upgrade old link rows have skipped defaulting to 0 (not skipped)
         assertThat(skipped).isFalse()
     }
 }

@@ -23,14 +23,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 回收站页面主接缝（Ticket #22）：Compose UI + 内存版 Room。
+ * Main seam of the recycle bin screen (Ticket #22): Compose UI + in-memory Room.
  *
- * 验收覆盖：
- * - 空态：无软删条目时显示「回收站为空」
- * - 列表展示软删条目（词名 + 「（从 X 词书移除）」副标题）
- * - 恢复：点「恢复」→ 条目从列表消失 + 关联 deleted 置 0
- * - 永久删除：点「永久删除」→ 二次确认 → 确认 → 条目消失 + 关联真删
- * - 永久删除取消：点「永久删除」→ 取消 → 条目仍在
+ * Acceptance coverage:
+ * - Empty state: with no soft-deleted entries, "recycle bin is empty" shows
+ * - The list shows soft-deleted entries (word name + "(removed from word book X)" subtitle)
+ * - Restore: tap "restore" and the entry disappears from the list and the link's deleted flag is set back to 0
+ * - Permanently delete: tap "permanently delete", a confirmation dialog opens, confirm, and the entry disappears and the link is really deleted
+ * - Permanently delete cancelled: tap "permanently delete", cancel, and the entry stays
  */
 @RunWith(AndroidJUnit4::class)
 class RecycleBinScreenTest {
@@ -56,7 +56,7 @@ class RecycleBinScreenTest {
         db.close()
     }
 
-    /** 种一个词并软删它（进回收站）。返回 wordId。 */
+    /** Seeds one word and soft-deletes it (into the recycle bin). Returns the wordId. */
     private suspend fun seedDeletedWord(text: String): Long {
         val wId = db.wordDao().insert(Word(text = text))
         db.bookDao().linkBookWord(BookWord(bookId, wId))
@@ -86,7 +86,7 @@ class RecycleBinScreenTest {
     fun listsDeletedEntries_withBookNameSubtitle() = runBlocking {
         seedDeletedWord("apple")
         setContent()
-        // 词名 + 副标题「apple（从 我的生词本 移除）」都展示
+        // Both the word name and the subtitle "apple (removed from My word book)" are displayed
         composeRule.onNodeWithText("apple").assertIsDisplayed()
         composeRule.onNodeWithText("apple（从 我的生词本 移除）").assertIsDisplayed()
         Unit
@@ -101,11 +101,11 @@ class RecycleBinScreenTest {
         composeRule.onNodeWithText("恢复").performClick()
         composeRule.waitForIdle()
 
-        // 回收站列表里 apple 消失
+        // apple disappears from the recycle bin list
         composeRule.onNodeWithText("apple").assertDoesNotExist()
-        // 关联 deleted 标记置 0
+        // The link's deleted flag is set to 0
         assertThat(db.bookDao().getDeleted(bookId, wId)).isFalse()
-        // 回收站空了
+        // The recycle bin is empty now
         assertThat(db.bookDao().observeDeletedEntries().first()).isEmpty()
         Unit
     }
@@ -117,13 +117,13 @@ class RecycleBinScreenTest {
 
         composeRule.onNodeWithText("永久删除").performClick()
         composeRule.waitForIdle()
-        // 二次确认对话框展示
+        // The confirmation dialog is shown
         composeRule.onNodeWithText("永久删除「apple」？此操作不可撤销。").assertIsDisplayed()
 
-        // 点对话框确认按钮「永久删除」。
-        // 「永久删除」节点有 3 个：列表项 TextButton + 对话框标题 Text + 对话框确认按钮。
-        // 用 hasClickAction 过滤掉标题 Text（不可点击），剩 2 个可点击节点（列表项 + 对话框确认）；
-        // 取 popup（最后一个）—— 与 LibraryScreenTest.confirmDelete 同模式。
+        // Click the dialog's confirm button "permanently delete".
+        // There are 3 nodes with the text "permanently delete": the list item TextButton + the dialog title Text + the dialog confirm button.
+        // hasClickAction filters out the title Text (not clickable), leaving 2 clickable nodes (list item + dialog confirm);
+        // take the popup one (the last), the same pattern as LibraryScreenTest.confirmDelete.
         val purgeNodes = composeRule.onAllNodes(
             androidx.compose.ui.test.hasText("永久删除", substring = false) and
                 androidx.compose.ui.test.hasClickAction()
@@ -132,11 +132,11 @@ class RecycleBinScreenTest {
         purgeNodes[1].performClick()
         composeRule.waitForIdle()
 
-        // 列表里 apple 消失
+        // apple disappears from the list
         composeRule.onNodeWithText("apple").assertDoesNotExist()
-        // 关联真删了（getDeleted 返回 null）
+        // The link was really deleted (getDeleted returns null)
         assertThat(db.bookDao().getDeleted(bookId, wId)).isNull()
-        // 全局 word 池里 apple 仍在（永久删除只删关联，不删全局词）
+        // apple is still in the global word pool (permanent delete removes only the link, not the global word)
         assertThat(db.wordDao().getByText("apple")).isNotNull()
         Unit
     }
@@ -148,11 +148,11 @@ class RecycleBinScreenTest {
 
         composeRule.onNodeWithText("永久删除").performClick()
         composeRule.waitForIdle()
-        // 取消是安全选项
+        // Cancel is the safe option
         composeRule.onNodeWithText("取消").performClick()
         composeRule.waitForIdle()
 
-        // 条目仍在回收站
+        // The entry is still in the recycle bin
         composeRule.onNodeWithText("apple").assertIsDisplayed()
         assertThat(db.bookDao().getDeleted(bookId, wId)).isTrue()
         Unit

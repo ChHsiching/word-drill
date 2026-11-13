@@ -11,18 +11,18 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Ticket #22：v4 → v5 migration（book_word 表加 deleted 列）测试。
+ * Ticket #22: test for the v4 -> v5 migration (add the deleted column to the book_word table).
  *
- * 与 [Migration34Test]（v3→v4 加 skipped）同模式：不引入 room-testing（要 schema 导出，
- * 本项目 exportSchema=false，路径不通）；直接造一个 v4 形态的 SQLite 库（手工 CREATE TABLE
- * 仿照 Room codegen 生成的 schema，含 skipped 列），跑 [WordDrillDatabase.MIGRATION_4_5.migrate]，
- * 再用 PRAGMA 验证：
- *  - deleted 列已加，类型 INTEGER NOT NULL DEFAULT 0
- *  - 老关联行未丢，deleted 默认 0（未删）
- *  - 升级后该列可写（setDeleted 的 UPDATE 路径）
+ * Same pattern as [Migration34Test] (v3->v4 added skipped): room-testing is not used (it needs schema export,
+ * and this project has exportSchema=false, so that path is closed); instead, build a v4-shaped SQLite database by hand
+ * (manual CREATE TABLE mimicking the Room codegen schema, including the skipped column), run [WordDrillDatabase.MIGRATION_4_5.migrate],
+ * then verify with PRAGMA:
+ *  - the deleted column is added, typed INTEGER NOT NULL DEFAULT 0
+ *  - old link rows are not lost and deleted defaults to 0 (not deleted)
+ *  - after the upgrade the column is writable (the UPDATE path of setDeleted)
  *
- * 全链路（v4 库 → 升级后 Room 正常读写）由 [roomOpensAfterMigration_schemaValidationPasses]
- * 兜住（落盘库 + Room schema 校验）。
+ * The full chain (v4 database -> Room reads and writes normally after the upgrade) is covered by
+ * [roomOpensAfterMigration_schemaValidationPasses] (on-disk database + Room schema validation).
  */
 @RunWith(AndroidJUnit4::class)
 class Migration45Test {
@@ -33,11 +33,11 @@ class Migration45Test {
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(null) // 内存库
+            .name(null) // in-memory database
             .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(4) {
                 override fun onCreate(db: SupportSQLiteDatabase) {
-                    // v4 形态：book / word / book_word 表（含 skipped 列，无 deleted 列）。
-                    // 仿 Room codegen 的 schema 形态。
+                    // v4 shape: book / word / book_word tables (with the skipped column, no deleted column).
+                    // Mimics the Room codegen schema shape.
                     db.execSQL(
                         """
                         CREATE TABLE `book` (
@@ -77,7 +77,7 @@ class Migration45Test {
                     oldVersion: Int,
                     newVersion: Int,
                 ) {
-                    // 由测试主体手动调 migrate()，这里不实现。
+                    // The test body calls migrate() manually; not implemented here.
                 }
             })
             .build()
@@ -94,14 +94,14 @@ class Migration45Test {
     fun migrate_addsDeletedColumn() {
         WordDrillDatabase.MIGRATION_4_5.migrate(db)
 
-        // book_word 加 deleted
+        // book_word gets deleted
         val bwColumns = mutableListOf<String>()
         db.query("PRAGMA table_info(book_word)").use { c ->
             while (c.moveToNext()) bwColumns.add(c.getString(1))
         }
         assertThat(bwColumns).contains("deleted")
 
-        // book 也加 deleted
+        // book also gets deleted
         val bookColumns = mutableListOf<String>()
         db.query("PRAGMA table_info(book)").use { c ->
             while (c.moveToNext()) bookColumns.add(c.getString(1))
@@ -117,12 +117,12 @@ class Migration45Test {
 
         WordDrillDatabase.MIGRATION_4_5.migrate(db)
 
-        // 老关联行 deleted 应为 0
+        // Old link rows should have deleted 0
         db.query("SELECT deleted FROM book_word WHERE bookId = 1 AND wordId = 1").use { c ->
             assertThat(c.moveToFirst()).isTrue()
             assertThat(c.getInt(0)).isEqualTo(0)
         }
-        // 老词书行 deleted 也应为 0
+        // Old book rows should also have deleted 0
         db.query("SELECT deleted FROM book WHERE bookId = 1").use { c ->
             assertThat(c.moveToFirst()).isTrue()
             assertThat(c.getInt(0)).isEqualTo(0)
@@ -131,7 +131,7 @@ class Migration45Test {
 
     @Test
     fun migrate_preservesExistingLinksAndSkipped() {
-        // 升级不应丢老数据，也不应改既有 skipped 状态
+        // The upgrade must not lose old data or change existing skipped state
         db.execSQL("INSERT INTO book (name, isPreset) VALUES ('b', 0)")
         db.execSQL("INSERT INTO word (text) VALUES ('apple')")
         db.execSQL("INSERT INTO word (text) VALUES ('run')")
@@ -144,7 +144,7 @@ class Migration45Test {
             assertThat(c.moveToFirst()).isTrue()
             assertThat(c.getInt(0)).isEqualTo(2)
         }
-        // skipped 状态保留：apple=1（跳过），run=0（未跳过）
+        // skipped state preserved: apple=1 (skipped), run=0 (not skipped)
         db.query("SELECT skipped FROM book_word WHERE bookId = 1 AND wordId = 1").use { c ->
             assertThat(c.moveToFirst()).isTrue()
             assertThat(c.getInt(0)).isEqualTo(1)
@@ -153,7 +153,7 @@ class Migration45Test {
 
     @Test
     fun migrate_deletedIsWritable() {
-        // 升级后 deleted 必须可写（setDeleted 的 UPDATE 路径）
+        // After the upgrade deleted must be writable (the UPDATE path of setDeleted)
         db.execSQL("INSERT INTO book (name, isPreset) VALUES ('b', 0)")
         db.execSQL("INSERT INTO word (text) VALUES ('apple')")
         db.execSQL("INSERT INTO book_word (bookId, wordId) VALUES (1, 1)")
@@ -167,14 +167,14 @@ class Migration45Test {
     }
 
     /**
-     * 端到端 schema 校验：建一个落盘的 v4 库 → 让 Room 跑 migration 打开 v5 → CRUD。
+     * End-to-end schema validation: create an on-disk v4 database, let Room run the migration and open v5, then do CRUD.
      *
-     * 这是直接调 migrate() 跑 SupportSQLiteDatabase 补不上的：Room 在打开时比对 codegen
-     * 生成的 v5 schema 与磁盘实际 schema，若 entity 的 `@ColumnInfo(defaultValue)` 与
-     * migration 的 `ALTER ... DEFAULT` 不一致，这里会抛 IllegalStateException。
+     * This is what calling migrate() directly on a SupportSQLiteDatabase cannot cover: on open, Room compares the
+     * codegen-generated v5 schema with the actual on-disk schema; if the entity's `@ColumnInfo(defaultValue)` disagrees
+     * with the migration's `ALTER ... DEFAULT`, this throws IllegalStateException.
      *
-     * v4 fixture 必须建全所有 v4 表（word/sense/book/book_word[含 skipped]/swipe_log/dictionary），
-     * 否则 Room schema 校验会因为缺表报错（与 deleted 无关）。
+     * The v4 fixture must create all v4 tables (word/sense/book/book_word[with skipped]/swipe_log/dictionary),
+     * otherwise Room schema validation fails on the missing tables (unrelated to deleted).
      */
     @Test
     fun roomOpensAfterMigration_schemaValidationPasses() {
@@ -182,7 +182,7 @@ class Migration45Test {
         val dbFile = java.io.File(context.cacheDir, "migration45-room-test.db")
         dbFile.delete()
 
-        // 1) 建全 v4 形态库文件（仿 Room codegen 的全部 6 张表，book_word 含 skipped）
+        // 1) Build a complete v4-shaped database file (all 6 tables mimicking Room codegen; book_word includes skipped)
         val v4Config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
             .name(dbFile.absolutePath)
             .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(4) {
@@ -262,15 +262,15 @@ class Migration45Test {
             .build()
         val v4Helper = FrameworkSQLiteOpenHelperFactory().create(v4Config)
         val v4Db = v4Helper.writableDatabase
-        // 灌一条数据，验证升级后不丢
+        // Load one row of data to verify it survives the upgrade
         v4Db.execSQL("INSERT INTO book (name, isPreset) VALUES ('b', 0)")
         v4Db.execSQL("INSERT INTO word (text) VALUES ('apple')")
         v4Db.execSQL("INSERT INTO book_word (bookId, wordId) VALUES (1, 1)")
         v4Db.close()
         v4Helper.close()
 
-        // 2) 让 Room 打开这个 v4 库文件，注册全部 migration，触发 v4→v5 升级 + schema 校验。
-        //    若 entity defaultValue 与 migration DEFAULT 不一致 → 这里抛 IllegalStateException。
+        // 2) Let Room open this v4 database file with all migrations registered, triggering the v4->v5 upgrade + schema validation.
+        //    If the entity defaultValue disagrees with the migration DEFAULT, IllegalStateException is thrown here.
         val roomDb = androidx.room.Room.databaseBuilder(
             context,
             WordDrillDatabase::class.java,
@@ -284,13 +284,13 @@ class Migration45Test {
             )
             .build()
         val deleted = kotlinx.coroutines.runBlocking {
-            // 打开即触发 migration；CRUD 验证 deleted 列可读写
+            // Opening triggers the migration; CRUD verifies the deleted column is readable and writable
             roomDb.bookDao().getDeleted(1, 1)
         }
         roomDb.close()
         dbFile.delete()
 
-        // 老关联行升级后 deleted 默认 0（未删）
+        // After the upgrade old link rows have deleted defaulting to 0 (not deleted)
         assertThat(deleted).isFalse()
     }
 }

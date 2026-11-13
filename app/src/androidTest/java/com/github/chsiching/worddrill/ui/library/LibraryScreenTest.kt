@@ -23,21 +23,21 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 「库」Tab 词书列表删除流程的主接缝（Ticket #18）：Compose UI + 内存版 Room。
+ * Main seam of the book-list delete flow on the library tab (Ticket #18): Compose UI + in-memory Room.
  *
- * 验收覆盖（对应 Issue #18 acceptance criteria）：
- * - 点「删除」→ 弹出确认对话框（标题 + 不可撤销提示 + 取消/删除按钮）
- * - 取消：词书保留（UI + 落库）
- * - 确认删除：词书消失（UI + 落库）
- * - 预置词书不渲染「删除」入口（既有 isPreset 守卫不回归）
+ * Acceptance coverage (maps to Issue #18 acceptance criteria):
+ * - Tap "delete" and a confirm dialog opens (title + irreversible warning + cancel/delete buttons)
+ * - Cancel: the book is kept (UI + database)
+ * - Confirm delete: the book disappears (UI + database)
+ * - Preset books do not render the "delete" entry point (no regression of the existing isPreset guard)
  *
- * 模板套 [WordListScreenTest]：createComposeRule + 内存 Room + 直接构造 ViewModel。
- * SettingsRepository 用真实 Context（DataStore 文件在测试 app 私有目录；本测试只读
- * currentBookId 默认值，不写，无跨测试污染）。
+ * Follows the [WordListScreenTest] template: createComposeRule + in-memory Room + directly constructed ViewModel.
+ * SettingsRepository uses the real Context (the DataStore file lives in the test app's private dir; this test only reads
+ * the currentBookId default and never writes, so there is no cross-test pollution).
  *
- * 对话框确认按钮文案与列表入口同为「删除」，弹窗后语义树存在两个同文本节点。
- * 沿用 repo 既有模式（见 [WordListScreenTest] 用 onAllNodes(...)[index] 处理同名节点）：
- * 列表入口在前、AlertDialog popup 在后，取最后一个匹配。
+ * The dialog confirm button label and the list entry point are both "delete", so after the popup the semantics tree has two same-text nodes.
+ * This follows the repo's existing pattern (see [WordListScreenTest], which uses onAllNodes(...)[index] for same-text nodes):
+ * the list entry comes first and the AlertDialog popup after, so take the last match.
  */
 @RunWith(AndroidJUnit4::class)
 class LibraryScreenTest {
@@ -89,14 +89,14 @@ class LibraryScreenTest {
     @Test
     fun deleteClick_opensConfirmDialog() {
         setContent()
-        // 点行内「删除」TextButton → 弹确认对话框
+        // Tap the inline "delete" TextButton and the confirm dialog opens
         composeRule.onNodeWithText("删除").performClick()
         composeRule.waitForIdle()
 
-        // 对话框标题 + 含书名的可恢复提示出现（Ticket #22：软删，文案改为「可从回收站恢复」）
+        // The dialog title plus the recoverable-from-recycle-bin warning containing the book name appear (Ticket #22: soft delete, so the copy changed to "recoverable from the recycle bin")
         composeRule.onNodeWithText("删除词书").assertIsDisplayed()
         composeRule.onNodeWithText("确定删除「我的生词本」？可从回收站恢复。").assertIsDisplayed()
-        // 取消按钮存在（对话框渲染证据）
+        // The cancel button exists (evidence the dialog rendered)
         composeRule.onNodeWithText("取消").assertIsDisplayed()
     }
 
@@ -108,9 +108,9 @@ class LibraryScreenTest {
         composeRule.onNodeWithText("取消").performClick()
         composeRule.waitForIdle()
 
-        // 词书仍在列表（substring=false 精确匹配书名，避免命中副标题格式串）
+        // The book is still in the list (substring=false matches the exact book name, avoiding hits on the subtitle format string)
         composeRule.onNodeWithText("我的生词本", substring = false).assertIsDisplayed()
-        // 落库也仍在
+        // Still there in the database too
         val stillThere = runBlocking {
             db.bookDao().observeAllWithCounts().first().any { it.bookId == customBookId }
         }
@@ -122,22 +122,22 @@ class LibraryScreenTest {
         setContent()
         composeRule.onNodeWithText("删除").performClick()
         composeRule.waitForIdle()
-        // 弹窗后「删除」节点 == 2（列表入口 + 对话框确认）；取 popup（最后一个）
-        // hasText 默认 substring=false（与 onNodeWithText 不同），精确匹配"删除"二字，
-        // 避免误匹配对话框标题"删除词书"等含"删除"的文本
+        // After the popup there are 2 "delete" nodes (list entry + dialog confirm); take the popup one (the last)
+        // hasText defaults to substring=false (unlike onNodeWithText), matching the exact label "delete",
+        // which avoids wrongly matching texts that contain "delete", such as the dialog title for deleting a book
         val deleteNodes = composeRule.onAllNodes(hasText("删除", substring = false))
         assertThat(deleteNodes.fetchSemanticsNodes().size).isEqualTo(2)
         deleteNodes[1].performClick()
         composeRule.waitForIdle()
 
-        // 列表里词书消失（Ticket #22：软删 deleted=1，observeAllWithCounts 过滤掉）
+        // The book disappears from the list (Ticket #22: soft delete sets deleted=1 and observeAllWithCounts filters it out)
         composeRule.onNodeWithText("我的生词本", substring = false).assertDoesNotExist()
-        // 可见列表（deleted=0）里也消失
+        // Also gone from the visible list (deleted=0)
         val gone = runBlocking {
             db.bookDao().observeAllWithCounts().first().none { it.bookId == customBookId }
         }
         assertThat(gone).isTrue()
-        // 软删 ≠ 真删：词书行还在，deleted 标记为 true（可从回收站恢复）
+        // Soft delete is not a real delete: the book row is still there with deleted true (recoverable from the recycle bin)
         val softDeleted = runBlocking { db.bookDao().getById(customBookId)?.deleted }
         assertThat(softDeleted).isTrue()
     }
@@ -145,17 +145,17 @@ class LibraryScreenTest {
     @Test
     fun presetBook_hasNoDeleteEntry() {
         setContent()
-        // 预置词书验收：CET-4 行不显示删除入口 → 全列表「删除」TextButton 数 == 自定义词书数(1)
+        // Preset book acceptance: the CET-4 row shows no delete entry, so the count of "delete" TextButtons in the whole list == the number of custom books (1)
         val deleteButtons = composeRule.onAllNodes(hasText("删除", substring = false))
         assertThat(deleteButtons.fetchSemanticsNodes().size).isEqualTo(1)
     }
 
-    // ---- Ticket #21：文件导入入口 ----
+    // ---- Ticket #21: file import entry point ----
 
     @Test
     fun importButton_isDisplayed() {
         setContent()
-        // 「从文件导入」按钮在新建词书按钮下方，应展示
+        // The "import from file" button sits below the new-book button and should show
         composeRule.onNodeWithText("从文件导入").assertIsDisplayed()
     }
 
@@ -164,7 +164,7 @@ class LibraryScreenTest {
         setContent()
         composeRule.onNodeWithText("从文件导入").performClick()
         composeRule.waitForIdle()
-        // 对话框标题 + 选择文件按钮 + 说明文案 都应展示
+        // The dialog title + pick-file button + hint text should all show
         composeRule.onNodeWithText("从文件导入词书").assertIsDisplayed()
         composeRule.onNodeWithText("选择文件").assertIsDisplayed()
     }

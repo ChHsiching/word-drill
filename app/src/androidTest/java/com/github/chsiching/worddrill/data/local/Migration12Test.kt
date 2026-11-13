@@ -11,18 +11,18 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Ticket #14：v1 → v2 migration（word 表加 phonetic 列）测试。
+ * Ticket #14: test for the v1 -> v2 migration (add the phonetic column to the word table).
  *
- * 不引入 room-testing（要 schema 导出，本项目 exportSchema=false，路径不通）；
- * 直接造一个 v1 形态的 SQLite 库（手工 CREATE TABLE 仿照 Room 生成的 schema），
- * 跑 [WordDrillDatabase.MIGRATION_1_2.migrate]，再用 PRAGMA / SELECT 验证：
- *  - phonetic 列已加（PRAGMA table_info 出现该列）
- *  - 老数据（word/sense 行）未丢
- *  - phonetic 列默认 NULL（老行未被 ALTER 写入值）
+ * room-testing is not used (it needs schema export, and this project has exportSchema=false, so that path is closed);
+ * instead, build a v1-shaped SQLite database by hand (manual CREATE TABLE mimicking the Room-generated schema),
+ * run [WordDrillDatabase.MIGRATION_1_2.migrate], then verify with PRAGMA / SELECT:
+ *  - the phonetic column is added (it shows up in PRAGMA table_info)
+ *  - old data (word/sense rows) is not lost
+ *  - the phonetic column defaults to NULL (ALTER wrote no value into old rows)
  *
- * 这是 AGENTS.md §3「外科手术式改动」的最小覆盖：只测 migration 这一刀。
- * 全链路（v1 库 → 升级后 Room 正常读写）由 [WordDrillDatabaseTest] 的内存版 Room
- * 兜住（它在 v2 schema 上直接插带 phonetic 的 Word）。
+ * This is the minimal coverage of AGENTS.md §3 "surgical changes": test only this one cut, the migration.
+ * The full chain (v1 database -> Room reads and writes normally after the upgrade) is covered by the in-memory Room
+ * in [WordDrillDatabaseTest] (it directly inserts a Word with phonetic on the v2 schema).
  */
 @RunWith(AndroidJUnit4::class)
 class Migration12Test {
@@ -31,13 +31,13 @@ class Migration12Test {
 
     @Before
     fun setUp() {
-        // 内存 SQLite，不落盘；用 SupportSQLiteOpenHelper 直接拿到底层 SupportSQLiteDatabase。
+        // In-memory SQLite, nothing on disk; use SupportSQLiteOpenHelper to get the underlying SupportSQLiteDatabase directly.
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(null) // 内存库
+            .name(null) // in-memory database
             .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
                 override fun onCreate(db: SupportSQLiteDatabase) {
-                    // 仿 Room v1 生成的 word 表 schema（无 phonetic 列）。其余表与本测试无关，不建。
+                    // Mimics the Room v1-generated word table schema (no phonetic column). The other tables are irrelevant to this test and are not created.
                     db.execSQL(
                         """
                         CREATE TABLE word (
@@ -55,7 +55,7 @@ class Migration12Test {
                     oldVersion: Int,
                     newVersion: Int,
                 ) {
-                    // 由测试主体手动调 migrate()，这里不实现。
+                    // The test body calls migrate() manually; not implemented here.
                 }
             })
             .build()
@@ -98,7 +98,7 @@ class Migration12Test {
         db.execSQL("INSERT INTO word (text) VALUES ('apple')")
         WordDrillDatabase.MIGRATION_1_2.migrate(db)
 
-        // ALTER TABLE ADD COLUMN 不填默认值，老行 phonetic 应为 NULL
+        // ALTER TABLE ADD COLUMN sets no default value; the phonetic of old rows should be NULL
         db.query("SELECT phonetic FROM word WHERE text = 'apple'").use { c ->
             assertThat(c.moveToFirst()).isTrue()
             assertThat(c.isNull(0)).isTrue()
@@ -107,7 +107,7 @@ class Migration12Test {
 
     @Test
     fun migrate_canThenWritePhonetic() {
-        // 升级后该列必须可写（验证 ALTER 加的是可写普通列，非生成列）
+        // After the upgrade the column must be writable (verifies ALTER added a normal writable column, not a generated one)
         db.execSQL("INSERT INTO word (text) VALUES ('apple')")
         WordDrillDatabase.MIGRATION_1_2.migrate(db)
         db.execSQL("UPDATE word SET phonetic = '/ˈæpl/' WHERE text = 'apple'")

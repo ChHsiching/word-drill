@@ -11,19 +11,19 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Ticket #19：v2 → v3 migration（新增 dictionary 表）测试。
+ * Ticket #19: test for the v2 -> v3 migration (add the dictionary table).
  *
- * 与 [Migration12Test] 同模式：不引入 room-testing（要 schema 导出，本项目
- * exportSchema=false，路径不通）；直接造一个 v2 形态的 SQLite 库（手工 CREATE TABLE
- * 仿照 Room codegen 生成的 schema），跑 [WordDrillDatabase.MIGRATION_2_3.migrate]，
- * 再用 PRAGMA / sqlite_master 验证：
- *  - dictionary 表已建，schema 与 Room codegen 一致（含 AUTOINCREMENT、NOT NULL、反引号）
- *  - (word, pos) 唯一索引已建
- *  - 老表（word / sense 等）未受影响（既有用户数据保留）
+ * Same pattern as [Migration12Test]: room-testing is not used (it needs schema export, and this project has
+ * exportSchema=false, so that path is closed); instead, build a v2-shaped SQLite database by hand (manual CREATE TABLE
+ * mimicking the Room codegen schema), run [WordDrillDatabase.MIGRATION_2_3.migrate],
+ * then verify with PRAGMA / sqlite_master:
+ *  - the dictionary table is created with a schema matching Room codegen (including AUTOINCREMENT, NOT NULL, backticks)
+ *  - the (word, pos) unique index is created
+ *  - old tables (word / sense, etc.) are untouched (existing user data is preserved)
  *
- * 这是 AGENTS.md §3「外科手术式改动」的最小覆盖：只测 migration 这一刀。
- * 全链路（v2 库 → 升级后 Room 正常读写）由 [DictionaryDaoTest] 的内存版 Room 兜住
- * （它在 v3 schema 上直接操作 dictionary 表）。
+ * This is the minimal coverage of AGENTS.md §3 "surgical changes": test only this one cut, the migration.
+ * The full chain (v2 database -> Room reads and writes normally after the upgrade) is covered by the in-memory Room
+ * in [DictionaryDaoTest] (it operates on the dictionary table directly on the v3 schema).
  */
 @RunWith(AndroidJUnit4::class)
 class Migration23Test {
@@ -34,11 +34,11 @@ class Migration23Test {
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(null) // 内存库
+            .name(null) // in-memory database
             .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(2) {
                 override fun onCreate(db: SupportSQLiteDatabase) {
-                    // v2 形态：word 表（含 phonetic）、sense 表；dictionary 表尚未建。
-                    // 只建与本测试断言相关的表，其余略。
+                    // v2 shape: word table (with phonetic) and sense table; the dictionary table does not exist yet.
+                    // Only tables relevant to this test's assertions are created; the rest are skipped.
                     db.execSQL(
                         """
                         CREATE TABLE `word` (
@@ -70,7 +70,7 @@ class Migration23Test {
                     oldVersion: Int,
                     newVersion: Int,
                 ) {
-                    // 由测试主体手动调 migrate()，这里不实现。
+                    // The test body calls migrate() manually; not implemented here.
                 }
             })
             .build()
@@ -96,8 +96,8 @@ class Migration23Test {
 
     @Test
     fun migrate_dictionarySchemaMatchesRoomCodegen() {
-        // 验证 migration 生成的 CREATE TABLE 与 Room codegen 形态一致。
-        // codegen 实际形态（从实机 sqlite_master 抓取）：
+        // Verifies the migration-generated CREATE TABLE matches the Room codegen shape.
+        // Actual codegen shape (captured from sqlite_master on a real device):
         //   CREATE TABLE `dictionary` (`dictId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         //     `word` TEXT NOT NULL, `phonetic` TEXT, `pos` TEXT NOT NULL, `meaning` TEXT NOT NULL)
         WordDrillDatabase.MIGRATION_2_3.migrate(db)
@@ -123,7 +123,7 @@ class Migration23Test {
         ).use { c ->
             while (c.moveToNext()) indexes.add(c.getString(0) ?: "")
         }
-        // codegen 形态：CREATE UNIQUE INDEX `index_dictionary_word_pos` ON `dictionary` (`word`, `pos`)
+        // codegen shape: CREATE UNIQUE INDEX `index_dictionary_word_pos` ON `dictionary` (`word`, `pos`)
         assertThat(indexes).hasSize(1)
         assertThat(indexes[0]).contains("UNIQUE INDEX")
         assertThat(indexes[0]).contains("`index_dictionary_word_pos`")
@@ -155,7 +155,7 @@ class Migration23Test {
 
     @Test
     fun migrate_dictionaryIsWritableAfterUpgrade() {
-        // 升级后该表必须可写（首启导入需要 INSERT）
+        // After the upgrade the table must be writable (first-launch import needs INSERT)
         WordDrillDatabase.MIGRATION_2_3.migrate(db)
         db.execSQL(
             "INSERT INTO dictionary (word, phonetic, pos, meaning) VALUES ('apple', '/ˈæpl/', 'n.', '苹果')"

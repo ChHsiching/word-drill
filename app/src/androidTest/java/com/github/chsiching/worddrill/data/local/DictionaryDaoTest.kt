@@ -16,10 +16,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Ticket #19：内置词典 DAO + Importer 的 instrumented 测试（内存版 Room）。
- * 验证：schema、findByWord 查询、(word,pos) 唯一索引兜底、phonetic 可空、幂等导入。
+ * Ticket #19: instrumented test for the built-in dictionary DAO + Importer (in-memory Room).
+ * Verifies the schema, the findByWord query, the (word,pos) unique-index fallback, nullable phonetic, and idempotent import.
  *
- * 主接缝见 [WordDrillDatabaseTest]；这里是 #19 加的 dictionary 表新接缝。
+ * The main seam is in [WordDrillDatabaseTest]; this is the new dictionary-table seam added by #19.
  */
 @RunWith(AndroidJUnit4::class)
 class DictionaryDaoTest {
@@ -43,7 +43,7 @@ class DictionaryDaoTest {
         db.close()
     }
 
-    // ---- schema 与基础读写 ----
+    // ---- schema and basic reads/writes ----
 
     @Test
     fun count_startsAtZero() = runTest {
@@ -61,7 +61,7 @@ class DictionaryDaoTest {
         assertThat(dao.count()).isEqualTo(2)
     }
 
-    // ---- findByWord：核心查询 ----
+    // ---- findByWord: the core query ----
 
     @Test
     fun findByWord_returnsEmptyForAbsent() = runTest {
@@ -84,7 +84,7 @@ class DictionaryDaoTest {
 
     @Test
     fun findByWord_isCaseSensitive() = runTest {
-        // ECDICT 的 word 列原形小写为主；大写 Apple 默认查不到（调用方需要 lower 后再查）。
+        // ECDICT's word column is mostly lowercase base forms; a capitalized Apple is not found by default (callers must lower the word before querying).
         dao.insertAll(
             listOf(DictionaryEntry(word = "apple", pos = "n.", meaning = "苹果"))
         )
@@ -112,16 +112,16 @@ class DictionaryDaoTest {
         assertThat(dao.findByWord("run").single().phonetic).isNull()
     }
 
-    // ---- (word, pos) 唯一索引兜底 ----
+    // ---- (word, pos) unique-index fallback ----
 
     @Test
     fun insertAll_ignoresDuplicateWordPos() = runTest {
         val e1 = DictionaryEntry(word = "apple", phonetic = "/p1/", pos = "n.", meaning = "苹果")
         val e2 = DictionaryEntry(word = "apple", phonetic = "/p2/", pos = "n.", meaning = "苹果（重复）")
         dao.insertAll(listOf(e1, e2))
-        // IGNORE 兜底：只有一行 (apple, n.)
+        // IGNORE fallback: only one (apple, n.) row
         assertThat(dao.count()).isEqualTo(1)
-        // 首条保留，第二条不覆盖
+        // The first row is kept; the second does not overwrite it
         assertThat(dao.findByWord("apple").single().phonetic).isEqualTo("/p1/")
     }
 
@@ -136,7 +136,7 @@ class DictionaryDaoTest {
         assertThat(dao.findByWord("match")).hasSize(2)
     }
 
-    // ---- Importer：端到端导入 ----
+    // ---- Importer: end-to-end import ----
 
     @Test
     fun importer_insertsAllEntries() = runTest {
@@ -149,7 +149,7 @@ class DictionaryDaoTest {
     @Test
     fun importer_queryByWordReturnsAllPos() = runTest {
         importer.importDictionary(sampleDictionary())
-        // apple 在 sample 里有 n. 和 v. 两条
+        // apple has two entries in the sample: n. and v.
         val result = dao.findByWord("apple")
         assertThat(result.map { it.pos }).containsExactly("n.", "v.")
     }
@@ -159,16 +159,16 @@ class DictionaryDaoTest {
         val data = sampleDictionary()
         importer.importDictionary(data)
         val secondRun = importer.importDictionary(data)
-        // 第二次导入：所有 (word,pos) 已存在，IGNORE 兜底，新增 0
+        // Second import: every (word,pos) already exists, the IGNORE fallback applies, 0 new rows
         assertThat(secondRun).isEqualTo(0)
         assertThat(dao.count()).isEqualTo(data.words.size)
     }
 
     @Test
     fun importer_phoneticIsNull_notStringNull_whenJsonNull() = runTest {
-        // ⚠️ 回归防护（与 PresetImporterTest 同坑）：assets 里 JSON 显式 "phonetic": null。
-        // Android 真实 org.json 的 optString 在 JSON null 时返回 "null" 字符串，
-        // 验证 DictionaryWordsParser 的 isNull 挡板真的生效。
+        // Regression guard (same pitfall as PresetImporterTest): assets JSON with an explicit "phonetic": null.
+        // Android's real org.json optString returns the string "null" for a JSON null;
+        // this verifies that DictionaryWordsParser's isNull guard really works.
         val json = """
             {"source":"x","words":[
               {"word":"ghost","phonetic":null,"pos":"n.","meaning":"鬼"}
