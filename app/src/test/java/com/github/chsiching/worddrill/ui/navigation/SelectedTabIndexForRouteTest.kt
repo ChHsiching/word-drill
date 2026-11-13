@@ -4,13 +4,14 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
- * [selectedTabIndexForRoute] 单测：导航栏高亮归属（修复「进回收站高亮『刷』」的 bug）。
+ * Unit tests for [selectedTabIndexForRoute]: which tab the bottom bar highlights.
+ * Fixes the bug where entering the recycle bin highlighted the "Drill" tab.
  *
- * 覆盖：
- * - 三个顶层 route 精确匹配各自 Tab
- * - 二级页 library/{bookId} → Library Tab（pre-existing 同类 bug 一并覆盖）
- * - 二级页 recycle_bin → Me Tab（本次修复的目标）
- * - 未知 route / null → null（不高亮任一项）
+ * Covers:
+ * - The three top-level routes each match their own tab exactly
+ * - Secondary route library/{bookId} maps to the Library Tab (also covers a pre-existing bug of the same kind)
+ * - Secondary route recycle_bin maps to the Me Tab (the target of this fix)
+ * - Unknown route / null maps to null (no tab highlighted)
  */
 class SelectedTabIndexForRouteTest {
 
@@ -34,7 +35,7 @@ class SelectedTabIndexForRouteTest {
 
     @Test
     fun wordListRoute_mapsToLibrary() {
-        // library/{bookId} 二级页应归属 Library Tab（之前 fallback 到 0/Drill 是 bug）
+        // The library/{bookId} secondary page belongs to the Library Tab. The old fallback to 0/Drill was the bug.
         val idx = selectedTabIndexForRoute("library/123")
         assertThat(idx).isEqualTo(topDestinations.indexOfFirst { it.route == "library" })
         assertThat(idx).isNotEqualTo(topDestinations.indexOfFirst { it.route == "drill" })
@@ -42,7 +43,7 @@ class SelectedTabIndexForRouteTest {
 
     @Test
     fun recycleBinRoute_mapsToMe() {
-        // recycle_bin 从「我的」进入，应归属 Me Tab（本次修复核心）
+        // recycle_bin is entered from "Me", so it belongs to the Me Tab. This is the core of the fix.
         val idx = selectedTabIndexForRoute("recycle_bin")
         assertThat(idx).isEqualTo(topDestinations.indexOfFirst { it.route == "me" })
         assertThat(idx).isNotEqualTo(topDestinations.indexOfFirst { it.route == "drill" })
@@ -50,7 +51,7 @@ class SelectedTabIndexForRouteTest {
 
     @Test
     fun unknownRoute_returnsNull() {
-        // 未知 route 不高亮任一项（好过错误高亮第一个）
+        // An unknown route highlights no tab, which beats wrongly highlighting the first one.
         assertThat(selectedTabIndexForRoute("unknown")).isNull()
     }
 

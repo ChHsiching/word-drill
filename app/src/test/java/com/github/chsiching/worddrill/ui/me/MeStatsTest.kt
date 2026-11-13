@@ -6,13 +6,13 @@ import java.time.Instant
 import java.time.ZoneId
 
 /**
- * 「我的」Tab 统计纯函数单测（Ticket #8）。
+ * Unit tests for the "Me" tab statistics pure functions (Ticket #8).
  *
- * 覆盖规格验收点的可计算部分：
- * - 今日起点：给定时刻 → 今日 0 点毫秒（跨午夜、时区、UTC 边界）
- * - 进度百分比：含除零（空词书）、正常、满额、超额防御
+ * Covers the computable parts of the spec acceptance points:
+ * - Start of today: from a given instant to the milliseconds of today's 00:00 (midnight crossing, time zones, UTC boundaries)
+ * - Progress percent: division by zero (empty book), the normal case, full, and over-full defensive cases
  *
- * 使用 Truth assertThat（repo 约定，见坑 H —— 勿用 kotlin.assert）。
+ * Uses Truth assertThat (repo convention, see pitfall H. Do not use kotlin.assert).
  */
 class MeStatsTest {
 
@@ -31,20 +31,20 @@ class MeStatsTest {
 
     @Test
     fun progressPercent_zeroDenominator_returnsZero_notCrash() {
-        // 空词书：分母 0，不除零，返回 0%（规格：「别除零」）
+        // Empty book: denominator 0, no division by zero, returns 0%. The spec says "don't divide by zero".
         assertThat(MeStats.progressPercent(brushed = 0, total = 0)).isEqualTo(0)
         assertThat(MeStats.progressPercent(brushed = 3, total = 0)).isEqualTo(0)
     }
 
     @Test
     fun progressPercent_truncatesNotRounds() {
-        // 整数截断：1/3 = 33%（向下取整，不是 33.33%）
+        // Integer truncation: 1/3 = 33%, rounded down, not 33.33%.
         assertThat(MeStats.progressPercent(brushed = 1, total = 3)).isEqualTo(33)
     }
 
     @Test
     fun progressPercent_defensiveAgainstOverflow() {
-        // 大数不溢出 int：用 Long 中间计算
+        // Large numbers must not overflow int: use Long intermediate arithmetic.
         assertThat(MeStats.progressPercent(brushed = 1_000_000, total = 4_000_000)).isEqualTo(25)
     }
 
@@ -52,7 +52,7 @@ class MeStatsTest {
 
     @Test
     fun startOfTodayMillis_middayReturnsSameDayMidnight() {
-        // 固定 UTC 2026-07-23 13:45:30 → 今日 0 点 = 2026-07-23 00:00:00 UTC
+        // Fixed UTC 2026-07-23 13:45:30 gives start of today 2026-07-23 00:00:00 UTC.
         val now = Instant.parse("2026-07-23T13:45:30Z")
         val zone = ZoneId.of("UTC")
         val start = MeStats.startOfTodayMillis(now = now, zone = zone)
@@ -61,7 +61,7 @@ class MeStatsTest {
 
     @Test
     fun startOfTodayMillis_justBeforeMidnightStillSameDay() {
-        // 23:59:59 仍属当日，0 点是当天 00:00，不是次日
+        // 23:59:59 is still the same day. Start of today is 00:00 of that day, not the next day.
         val now = Instant.parse("2026-07-23T23:59:59Z")
         val zone = ZoneId.of("UTC")
         val start = MeStats.startOfTodayMillis(now = now, zone = zone)
@@ -70,7 +70,7 @@ class MeStatsTest {
 
     @Test
     fun startOfTodayMillis_justAfterMidnightRollsToNewDay() {
-        // 00:00:01 属新一天，0 点是当天 00:00
+        // 00:00:01 belongs to the new day. Start of today is 00:00 of that day.
         val now = Instant.parse("2026-07-24T00:00:01Z")
         val zone = ZoneId.of("UTC")
         val start = MeStats.startOfTodayMillis(now = now, zone = zone)
@@ -79,18 +79,18 @@ class MeStatsTest {
 
     @Test
     fun startOfTodayMillis_respectsTimeZone() {
-        // 同一 UTC 时刻，UTC+8 时区的「今日 0 点」比 UTC 晚 8 小时对应的毫秒
-        val now = Instant.parse("2026-07-23T10:00:00Z") // UTC+8 = 18:00 当日
+        // For the same UTC instant, the UTC+8 "today at 00:00" differs from UTC's by 8 hours in milliseconds.
+        val now = Instant.parse("2026-07-23T10:00:00Z") // UTC+8 = 18:00 same day
         val utcStart = MeStats.startOfTodayMillis(now = now, zone = ZoneId.of("UTC"))
         val cstStart = MeStats.startOfTodayMillis(now = now, zone = ZoneId.of("+08:00"))
-        // UTC 0 点 = 2026-07-23T00:00Z；UTC+8 当日 0 点 = 2026-07-22T16:00Z（早 8h）
+        // UTC midnight = 2026-07-23T00:00Z. UTC+8 same-day midnight = 2026-07-22T16:00Z, 8 hours earlier.
         assertThat(cstStart).isEqualTo(utcStart - 8 * 3600_000L)
     }
 
     @Test
     fun startOfTodayMillis_utcMidnightCrossesDayInPositiveZone() {
-        // UTC 2026-07-23T15:00:00Z = UTC+8 2026-07-23T23:00:00 仍属 7/23
-        // 但 UTC 2026-07-23T16:00:00Z = UTC+8 2026-07-24T00:00:00 已跨入 7/24
+        // UTC 2026-07-23T15:00:00Z is 2026-07-23T23:00:00 in UTC+8, still day 7/23.
+        // But UTC 2026-07-23T16:00:00Z is 2026-07-24T00:00:00 in UTC+8, already day 7/24.
         val before = MeStats.startOfTodayMillis(
             now = Instant.parse("2026-07-23T15:59:59Z"),
             zone = ZoneId.of("+08:00"),
@@ -99,7 +99,7 @@ class MeStatsTest {
             now = Instant.parse("2026-07-23T16:00:01Z"),
             zone = ZoneId.of("+08:00"),
         )
-        // before 的今日 0 点对应 UTC 7/23 16:00 = 7/23 当日；after 跨日到 7/24
+        // "before" resolves to UTC 7/23 16:00, still day 7/23. "after" rolls over to 7/24.
         assertThat(after).isGreaterThan(before)
     }
 }

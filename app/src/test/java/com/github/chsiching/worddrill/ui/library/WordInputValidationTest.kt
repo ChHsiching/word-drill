@@ -5,20 +5,20 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
- * 新增词条 / 编辑义项的输入校验（纯函数，无 Android 运行时依赖）。
+ * Input validation for adding a word or editing a sense (pure functions, no Android runtime dependency).
  *
- * 规格（Ticket #7 acceptance）：
- * - 新增词条：输入单词、词性、释义，三者为空之一则拒绝
- * - 编辑义项：修改词性/释义，二者为空之一则拒绝
+ * Spec (Ticket #7 acceptance):
+ * - Add word: word, part of speech, and meaning are all inputs; reject if any of the three is blank
+ * - Edit sense: part of speech and meaning are the inputs; reject if either of the two is blank
  *
- * 校验必须在 trim 后的基准上做（沿用 #6 坑 B 的教训：写库会 trim，
- * 校验不 trim 则 "  " 能绕过非空约束，写库后变 ""）。
+ * Validation must run on the trimmed value (lesson carried over from pitfall B in #6: the write path trims,
+ * so without trimming in validation "  " bypasses the non-blank check and becomes "" after the write).
  *
- * Ticket #12：返回值由 String? 改为 @StringRes Int?，断言对应资源 id。
+ * Ticket #12: the return type changed from String? to @StringRes Int?, so tests assert the resource id.
  */
 class WordInputValidationTest {
 
-    // ---- 新增词条：text + pos + meaning ----
+    // ---- Add word: text + pos + meaning ----
 
     @Test
     fun addWord_allFilled_isValid() {
@@ -45,11 +45,11 @@ class WordInputValidationTest {
 
     @Test
     fun addWord_paddedValidInput_isValid_afterTrim() {
-        // 写库会 trim，校验在 trim 后的基准上判 → 通过
+        // The write path trims, and validation judges the trimmed value, so this passes.
         assertThat(validateAddWordInput("  apple  ", "  n.  ", "  苹果  ")).isNull()
     }
 
-    // ---- 编辑义项：pos + meaning ----
+    // ---- Edit sense: pos + meaning ----
 
     @Test
     fun editSense_bothFilled_isValid() {

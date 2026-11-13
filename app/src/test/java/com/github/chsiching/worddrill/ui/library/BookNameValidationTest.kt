@@ -5,22 +5,22 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
- * 新建/重命名词书时的名称校验（纯函数，无 Android 运行时依赖）。
+ * Name validation when creating or renaming a word book (pure function, no Android runtime dependency).
  *
- * 规格：
- * - 新建词书输入名称（is_preset = false）
- * - 重命名词书
- * - 不允许重名（交接链坑 C：@Insert(REPLACE)+autoGenerate 不会按 name 去重，需显式查重）
+ * Spec:
+ * - Enter a name when creating a book (is_preset = false)
+ * - Rename a book
+ * - Duplicate names are not allowed (handoff-chain pitfall C: @Insert(REPLACE)+autoGenerate does not dedupe by name, so an explicit duplicate check is needed)
  *
- * 拆成纯函数便于 JVM 单测（无 Android 运行时依赖、无 Room/DataStore 耦合）。
+ * The logic is a pure function so JVM tests can cover it, with no Android runtime dependency and no Room/DataStore coupling.
  *
- * Ticket #12：返回值由 String? 改为 @StringRes Int?，断言对应资源 id。
+ * Ticket #12: the return type changed from String? to @StringRes Int?, so tests assert the resource id.
  */
 class BookNameValidationTest {
 
     private val existingNames = listOf("CET-4", "CET-6", "考研")
 
-    // ---- 空名 → 报错 ----
+    // ---- Empty name, report error ----
 
     @Test
     fun emptyName_isInvalid() {
@@ -34,7 +34,7 @@ class BookNameValidationTest {
             .isEqualTo(R.string.validation_book_name_empty)
     }
 
-    // ---- 重名 → 报错（大小写敏感，与 SQLite 默认一致）----
+    // ---- Duplicate name, report error (case-sensitive, matching the SQLite default) ----
 
     @Test
     fun duplicateName_isInvalid() {
@@ -49,23 +49,23 @@ class BookNameValidationTest {
 
     @Test
     fun nameDifferingCase_isValid() {
-        // SQLite 默认大小写敏感（text LIKE/比较区分大小写）。
-        // "cet-4" 与 "CET-4" 是两个不同的名字，不视为重复。
+        // SQLite is case-sensitive by default (text LIKE and comparisons distinguish case).
+        // "cet-4" and "CET-4" are two different names, so this is not a duplicate.
         assertThat(validateBookName("cet-4", existingNames)).isNull()
     }
 
-    // ---- 回归：trim 后查重（防 "CET-4 " 绕过校验写库成 "CET-4"）----
+    // ---- Regression: duplicate check on the trimmed value (prevents "CET-4 " from bypassing validation and being stored as "CET-4") ----
 
     @Test
     fun paddedDuplicate_isInvalid_afterTrim() {
-        // 写库时会 trim，校验必须在 trim 后的基准上，否则带空格的重名会漏过。
+        // The write path trims, so validation must judge the trimmed value, otherwise a padded duplicate slips through.
         assertThat(validateBookName("  CET-4  ", existingNames))
             .isEqualTo(R.string.validation_book_name_duplicate)
     }
 
     @Test
     fun paddedNewName_isValid_afterTrim() {
-        // 带空格但 trim 后不重名 → 通过（写库会 trim 成 "我的生词本"）
+        // Padded but not a duplicate after trim, so it passes. The write trims the padded value.
         assertThat(validateBookName("  我的生词本  ", existingNames)).isNull()
     }
 }

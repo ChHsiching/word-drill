@@ -5,8 +5,8 @@ import org.json.JSONException
 import org.junit.Test
 
 /**
- * PresetWordsParser 的纯 JVM 单测（副接缝：JSON 反序列化逻辑）。
- * 规格把序列化/反序列化列为副接缝，用小段 JSON 验证解析正确性。
+ * Pure JVM tests for PresetWordsParser (secondary seam: the JSON deserialization logic).
+ * The spec lists serialization/deserialization as a secondary seam, so small JSON snippets verify the parse is correct.
  */
 class PresetWordsParserTest {
 
@@ -53,13 +53,13 @@ class PresetWordsParserTest {
 
     @Test
     fun parse_keepsDuplicateAcrossBooksAsListed() {
-        // apple 在 CET-4 和 CET-6 都列出 —— 解析按原样保留（去重在导入逻辑做）
+        // "apple" is listed in both CET-4 and CET-6. The parser keeps it as listed. Deduplication happens in the import logic.
         val parsed = PresetWordsParser.parse(sample)
         assertThat(parsed.books[0].words.map { it.text }).contains("apple")
         assertThat(parsed.books[1].words.map { it.text }).contains("apple")
     }
 
-    // ---- Ticket #14: phonetic（IPA 音标，可空）----
+    // ---- Ticket #14: phonetic (IPA transcription, nullable) ----
 
     @Test
     fun parse_readsPhonetic_whenPresent() {
@@ -70,14 +70,14 @@ class PresetWordsParserTest {
 
     @Test
     fun parse_phoneticIsNull_whenAbsent() {
-        // run 没有 phonetic 字段 → null（而非空字符串，避免两种"无值"语义）
+        // "run" has no phonetic field, so it parses to null. Not an empty string, which would create two "no value" semantics.
         val parsed = PresetWordsParser.parse(sample)
         assertThat(parsed.books[0].words.first { it.text == "run" }.phonetic).isNull()
     }
 
     @Test
     fun parse_phoneticIsNull_whenBlank() {
-        // 空白 phonetic 视为无音标，统一为 null
+        // A blank phonetic counts as no transcription and is normalized to null.
         val json = """
             {"source":"x","books":[{"name":"b","words":[
               {"text":"a","phonetic":"   ","senses":[{"pos":"n.","meaning":"甲"}]}
@@ -89,11 +89,11 @@ class PresetWordsParserTest {
 
     @Test
     fun parse_phoneticIsNull_whenJsonNull() {
-        // ⚠️ 回归防护：JSON 里显式 "phonetic": null 必须解析为 Kotlin null，
-        // 而非字符串 "null"。Android 自带 org.json 的 optString(key, "") 在值为
-        // JSON null 时会返回 "null" 字符串，导致把 "null" 写进数据库（实机踩到过）。
-        // （本 JVM 单测用的是 org.json:json，行为可能不同；真正兜底看 connectedAndroidTest
-        //  和 PresetImporterTest 的 import_phoneticIsNull_whenAbsent。）
+        // ⚠️ Regression guard: an explicit "phonetic": null in the JSON must parse to Kotlin null,
+        // not the string "null". Android's bundled org.json optString(key, "") returns the string
+        // "null" when the value is JSON null, which wrote "null" into the database (hit on a real device).
+        // (This JVM test uses org.json:json, whose behavior may differ. The real backstop is connectedAndroidTest
+        //  and PresetImporterTest's import_phoneticIsNull_whenAbsent.)
         val json = """
             {"source":"x","books":[{"name":"b","words":[
               {"text":"a","phonetic":null,"senses":[{"pos":"n.","meaning":"甲"}]}

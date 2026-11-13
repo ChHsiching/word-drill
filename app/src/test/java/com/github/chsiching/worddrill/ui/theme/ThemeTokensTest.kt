@@ -6,17 +6,18 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
- * Ticket #15 — 锁定设计稿（designs/worddrill-ui/index.html :root）的色值和字体规范。
+ * Ticket #15 locks the color values and font spec of the design mock (designs/worddrill-ui/index.html :root).
  *
- * 这些 token 是 13c UI 重写的基础；任何一个值漂了都会让 UI 偏离设计稿。
- * 用 JVM 单测（纯 Color/Float 常量断言）就能覆盖，不需要 instrumented。
+ * These tokens are the basis of the 13c UI rewrite. If any value drifts, the UI departs from the mock.
+ * JVM unit tests with plain Color/Float constant assertions cover this, so instrumented tests are not needed.
  *
- * 没有断言 M3 ColorScheme 的 47 个 slot —— 那些是从这些原色派生的映射，
- * 断言原色更稳（DRY），M3 slot 之间的映射在 Theme.kt 里集中维护。
+ * The tests do not assert the 47 slots of the M3 ColorScheme. Those slots are mappings derived from
+ * these base colors, and asserting the base colors is more stable (DRY). The mapping among the M3
+ * slots is maintained centrally in Theme.kt.
  */
 class ThemeTokensTest {
 
-    // ── 浅色：精确匹配 :root ────────────────────────────────
+    // ── Light tokens exactly match :root ────────────────────────────────
     @Test
     fun lightBg_isDesignSpecFAFAFA() {
         assertThat(BgLight).isEqualTo(Color(0xFFFAFAFA))
@@ -52,7 +53,7 @@ class ThemeTokensTest {
         assertThat(ProgressTrackLight).isEqualTo(Color(0xFFE8E8ED))
     }
 
-    // ── 深色：精确匹配 [data-theme="dark"] ──────────────────
+    // ── Dark tokens exactly match [data-theme="dark"] ──────────────────
     @Test
     fun darkBg_isPureBlack() {
         assertThat(BgDark).isEqualTo(Color(0xFF000000))
@@ -85,7 +86,7 @@ class ThemeTokensTest {
 
     @Test
     fun darkChipBg_isDesignSpec2C2C2E() {
-        // 设计稿 --chip-bg in dark = #2C2C2E（与 surface-elevated 同色）
+        // The design mock sets --chip-bg in dark to #2C2C2E, the same color as surface-elevated.
         assertThat(ChipBgDark).isEqualTo(Color(0xFF2C2C2E))
     }
 
@@ -94,9 +95,10 @@ class ThemeTokensTest {
         assertThat(ProgressTrackDark).isEqualTo(Color(0xFF38383A))
     }
 
-    // ── 配色系统：近似纯黑白灰，无显著彩色 ──────────────────
-    // 设计稿的 "secondary" 灰（#86868B / #98989F）有 ±5/255 的微小色差（≈ Apple 系统灰的
-    // 蓝紫偏移），不是严格 R=G=B。容差 0.03 防误杀，同时仍能抓出明显彩色（>0.1）。
+    // ── Palette is near pure black, white, and gray, with no strong chroma ──────────────────
+    // The "secondary" grays in the design mock (#86868B / #98989F) have a tiny ±5/255 channel
+    // spread, roughly the blue-purple shift of Apple system grays, so they are not strictly
+    // R=G=B. The 0.03 tolerance avoids false failures while still catching obvious color (>0.1).
     @Test
     fun allLightTokens_areGrayscale_noChroma() {
         val tokens = listOf(
@@ -121,20 +123,20 @@ class ThemeTokensTest {
         }
     }
 
-    // ── 深浅反转：text / bg 关系正确 ───────────────────────
+    // ── Light and dark themes invert the text and bg relation correctly ───────────────────────
     @Test
     fun lightTheme_textIsDarkOnLightBg() {
-        // 浅色主题：文字比背景暗（亮度差大，保证可读性）
+        // In the light theme the text is darker than the background. The large brightness gap keeps it readable.
         assertThat(TextPrimaryLight.red).isLessThan(BgLight.red)
     }
 
     @Test
     fun darkTheme_textIsLightOnDarkBg() {
-        // 深色主题：文字比背景亮
+        // In the dark theme the text is lighter than the background.
         assertThat(TextPrimaryDark.red).isGreaterThan(BgDark.red)
     }
 
-    // ── Separator alpha ≈ 0.06 / 0.12（CSS rgba 值）─────────
+    // ── Separator alpha ≈ 0.06 / 0.12, taken from the CSS rgba values ─────────
     @Test
     fun lightSeparator_isRgbaBlack006() {
         // rgba(0,0,0,0.06) → alpha = 0.06 * 255 ≈ 15 → hex 0x0F
@@ -161,12 +163,13 @@ class ThemeTokensTest {
         assertThat(SeparatorStrongDark.alpha).isWithin(0.01f).of(0.15f)
     }
 
-    // ── 字体规范：Charis SIL 家族是 bundled 字体，不是系统默认 ────
+    // ── Font spec. The Charis SIL family is a bundled font, not the system default ────
     @Test
     fun charisSilFontFamily_isNotSystemDefault() {
-        // FontFamily.Default / SansSerif 是单例；Charis SIL 是 FontFamily(Font...) 构造的，
-        // 引用必不同。这验证 R.font.charis_sil_* 资源成功被 FontFamily 引用（如果 res/font 缺失，
-        // CharisSilFontFamily 会变成 unresolved FontFamily(Font(0)) 或构造失败）。
+        // FontFamily.Default and FontFamily.SansSerif are singletons, while Charis SIL is built with
+        // the FontFamily(Font...) constructor, so the references are never the same. This verifies
+        // that the FontFamily references the R.font.charis_sil_* resources. If res/font were missing,
+        // CharisSilFontFamily would become an unresolved FontFamily(Font(0)) or the constructor would fail.
         assertThat(CharisSilFontFamily).isNotSameInstanceAs(FontFamily.Default)
         assertThat(CharisSilFontFamily).isNotSameInstanceAs(FontFamily.SansSerif)
     }

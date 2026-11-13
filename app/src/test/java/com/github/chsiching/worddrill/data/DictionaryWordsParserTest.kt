@@ -5,8 +5,8 @@ import org.json.JSONException
 import org.junit.Test
 
 /**
- * Ticket #19：[DictionaryWordsParser] 的纯 JVM 单测（副接缝：JSON 反序列化逻辑）。
- * 与 [PresetWordsParserTest] 同模式：用小段 JSON 验证解析正确性。
+ * Ticket #19: pure JVM tests for [DictionaryWordsParser] (secondary seam: the JSON deserialization logic).
+ * Same pattern as [PresetWordsParserTest]: small JSON snippets verify the parse is correct.
  */
 class DictionaryWordsParserTest {
 
@@ -30,7 +30,7 @@ class DictionaryWordsParserTest {
     @Test
     fun parse_readsAllEntries() {
         val parsed = DictionaryWordsParser.parse(sample)
-        // 同一 word 的多词性 = 多行 entries，按原样保留
+        // Multiple parts of speech for the same word become multiple entry rows, kept as-is.
         assertThat(parsed.words).hasSize(3)
     }
 
@@ -51,7 +51,7 @@ class DictionaryWordsParserTest {
         assertThat(apples.map { it.pos }).containsExactly("n.", "v.")
     }
 
-    // ---- phonetic 可空（与 PresetWordsParser 同坑）----
+    // ---- phonetic is nullable (same pitfall as PresetWordsParser) ----
 
     @Test
     fun parse_readsPhonetic_whenPresent() {
@@ -62,7 +62,7 @@ class DictionaryWordsParserTest {
     @Test
     fun parse_phoneticIsNull_whenAbsent() {
         val parsed = DictionaryWordsParser.parse(sample)
-        // run 没有 phonetic 字段 → null
+        // "run" has no phonetic field, so it parses to null.
         assertThat(parsed.words.first { it.word == "run" }.phonetic).isNull()
     }
 
@@ -79,7 +79,7 @@ class DictionaryWordsParserTest {
 
     @Test
     fun parse_phoneticIsNull_whenJsonNull() {
-        // 回归防护：JSON null 必须解析为 Kotlin null，而非字符串 "null"
+        // Regression guard: JSON null must parse to Kotlin null, not the string "null".
         val json = """
             {"source":"x","words":[
               {"word":"a","phonetic":null,"pos":"n.","meaning":"甲"}

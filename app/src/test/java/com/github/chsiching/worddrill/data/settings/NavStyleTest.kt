@@ -4,9 +4,10 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
- * [NavStyle.fromStorageName] 的纯函数 JVM 单测（Ticket #16）。
+ * Pure-function JVM tests for [NavStyle.fromStorageName] (Ticket #16).
  *
- * 与 [ThemeMode] 一致：未知/损坏值安全回退到默认 [NavStyle.PILL]，不抛异常。
+ * Same as [ThemeMode]: unknown or corrupt values fall back safely to the default
+ * [NavStyle.PILL] instead of throwing.
  */
 class NavStyleTest {
 
@@ -29,6 +30,6 @@ class NavStyleTest {
     fun fromStorageName_defaultsToPill_whenUnknown() {
         assertThat(NavStyle.fromStorageName("garbage")).isEqualTo(NavStyle.PILL)
         assertThat(NavStyle.fromStorageName("")).isEqualTo(NavStyle.PILL)
-        assertThat(NavStyle.fromStorageName("pill")).isEqualTo(NavStyle.PILL) // 大小写敏感
+        assertThat(NavStyle.fromStorageName("pill")).isEqualTo(NavStyle.PILL) // case-sensitive
     }
 }

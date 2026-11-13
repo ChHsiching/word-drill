@@ -4,12 +4,12 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
- * Ticket #21：词性缩写 + 中文释义解析（纯函数，JVM 单测）。
+ * Ticket #21: parsing part-of-speech abbreviations plus Chinese meanings (pure function, JVM tests).
  *
- * 列4 文本按"缩写+点+释义"模式切段。固定缩写表：
+ * Column 4 text splits into segments by the "abbreviation + period + meaning" pattern. Fixed abbreviation table:
  *   n. v. vt. vi. aux.v. adj. a. adv. ad. prep. conj. pron. art. num. int. interj. abbr.
  *
- * 主接缝：核心算法在这里覆盖；FileWordImporter 用本解析器只走"端到端"路径。
+ * Primary seam: the core algorithm is covered here. FileWordImporter only exercises the "end-to-end" path through this parser.
  */
 class PosMeaningParserTest {
 
@@ -32,7 +32,7 @@ class PosMeaningParserTest {
 
     @Test
     fun multiplePos_returnsMultipleSenses() {
-        // 规格 example："a.平坦的；平淡的 n.公寓；平面"
+        // The spec's example input, parsed below.
         val senses = PosMeaningParser.parse("a.平坦的；平淡的 n.公寓；平面")
         assertThat(senses).containsExactly(
             "a." to "平坦的；平淡的",
@@ -42,7 +42,7 @@ class PosMeaningParserTest {
 
     @Test
     fun multiCharAbbrev_auxV_isRecognized() {
-        // aux.v. 是多字符缩写，要避免被错切成 "aux." + "v...."
+        // aux.v. is a multi-character abbreviation and must not be mis-split into "aux." + "v....".
         val senses = PosMeaningParser.parse("vt.做 vi.行动 aux.v.做")
         assertThat(senses).containsExactly(
             "vt." to "做",
@@ -53,7 +53,7 @@ class PosMeaningParserTest {
 
     @Test
     fun allKnownAbbreviations_recognized() {
-        // 全部 17 个固定缩写各出一段
+        // All 17 fixed abbreviations each produce one segment.
         val text = listOf(
             "n.", "v.", "vt.", "vi.", "aux.v.", "adj.", "a.", "adv.", "ad.",
             "prep.", "conj.", "pron.", "art.", "num.", "int.", "interj.", "abbr.",
@@ -83,7 +83,7 @@ class PosMeaningParserTest {
 
     @Test
     fun tabSeparator_handled() {
-        // 列4 内部用 tab 分段（某些 xlsx 导出工具默认）
+        // Column 4 internally uses tabs to separate segments (the default in some xlsx export tools).
         val senses = PosMeaningParser.parse("n.苹果\tv.吃")
         assertThat(senses).containsExactly(
             "n." to "苹果",
@@ -93,14 +93,14 @@ class PosMeaningParserTest {
 
     @Test
     fun semicolonInMeaning_doesNotSplit() {
-        // 中文分号是释义内部的（如同义词分隔），不应切段
+        // The Chinese semicolon is internal to the meaning (like a synonym separator) and must not split the segment.
         assertThat(PosMeaningParser.parse("n.苹果；水果"))
             .containsExactly("n." to "苹果；水果")
     }
 
     @Test
     fun noAbbreviation_defaultsToNoun() {
-        // 单段无缩写（纯中文）→ 保守默认为 n.，避免整词丢释义
+        // A single segment with no abbreviation (pure Chinese) conservatively defaults to n., so the word does not lose its meaning.
         assertThat(PosMeaningParser.parse("苹果"))
             .containsExactly("n." to "苹果")
     }
@@ -113,30 +113,30 @@ class PosMeaningParserTest {
 
     @Test
     fun onlyAbbreviationNoMeaning_skipped() {
-        // 只有 "n." 没释义 —— 视为不完整，不产出 sense（导入流程走 skipped 分支）
+        // Only "n." with no meaning counts as incomplete and produces no sense. The import flow takes the skipped branch.
         assertThat(PosMeaningParser.parse("n.")).isEmpty()
     }
 
     @Test
     fun leadingTextBeforeFirstAbbrev_defaultedToNoun() {
-        // 例："水果 苹果"（无缩写开头）→ 一段 (n., "水果 苹果")？还是两段？
-        // 选保守：整段当 n.，因为 "水果" 不在缩写表，不应被当 pos。
-        // 这里只测：无缩写 → 全段归 n.
+        // Example input below: two Chinese words with no leading abbreviation. One segment (n., whole string)? Or two?
+        // The conservative choice: treat the whole segment as n., because the leading word is not in the abbreviation table and must not be treated as a pos.
+        // This test only checks: no abbreviation means the whole segment goes to n.
         val senses = PosMeaningParser.parse("水果 苹果")
         assertThat(senses).containsExactly("n." to "水果 苹果")
     }
 
     @Test
     fun meaningWithASCIIPeriod_notMisinterpretedAsAbbrev() {
-        // "etc." 之类不在缩写表，不应被当 pos；"n.看 etc." 中 "etc." 是释义的一部分
+        // "etc." and the like are not in the abbreviation table and must not be treated as a pos. In the input below, "etc." is part of the meaning.
         val senses = PosMeaningParser.parse("n.看 etc. 等")
         assertThat(senses).containsExactly("n." to "看 etc. 等")
     }
 
     @Test
     fun chineseFullWidthPeriod_handled() {
-        // 部分文件用全角句号 "．" 或 "。" 替代 "."
-        // issue 字面用半角 ".", 这里只验证半角正确（全角是后续 follow-up）
+        // Some files use the full-width periods "．" or "。" instead of "."
+        // The issue text uses the half-width ".", so this test only verifies the half-width form (full-width is a later follow-up)
         assertThat(PosMeaningParser.parse("n.苹果"))
             .containsExactly("n." to "苹果")
     }

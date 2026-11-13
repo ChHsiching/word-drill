@@ -10,11 +10,13 @@ import org.json.JSONException
 import org.junit.Test
 
 /**
- * DatabaseJsonSerializer 的纯 JVM 单测（副接缝：导出/导入的 JSON 序列化逻辑）。
- * 规格把序列化/反序列化列为副接缝，必须不依赖 Android 文件系统 —— 这里只喂内存数据
- * 与 JSON 字符串，验证 serialize/deserialize 往返与边界。
+ * Pure JVM tests for DatabaseJsonSerializer (secondary seam: the JSON serialization logic for export/import).
+ * The spec lists serialization/deserialization as a secondary seam, and it must not depend on the Android file
+ * system, so these tests only feed in-memory data and JSON strings and verify the serialize/deserialize round
+ * trip and its edge cases.
  *
- * 覆盖：往返等价、空库、含昵称/不含昵称、孤立的 swipe_log（引用已删词书）保留、损坏 JSON 回退。
+ * Covers: round-trip equality, the empty database, with/without nickname, orphan swipe_log rows
+ * (referencing a deleted book) kept, and corrupt JSON fallback.
  */
 class DatabaseJsonSerializerTest {
 
@@ -40,9 +42,9 @@ class DatabaseJsonSerializerTest {
             BookWord(bookId = 2, wordId = 10),
         ),
         swipeLogs = listOf(
-            // bookId=2 的词书导入后仍在；正常引用
+            // The book with bookId=2 still exists after import; a normal reference.
             SwipeLog(logId = 1000, bookId = 2, wordId = 10, timestamp = 1_700_000_000_000L),
-            // 孤立日志：bookId=999 在导出快照里不存在（模拟词书已删但日志保留用于累计统计）
+            // Orphan log: bookId=999 does not exist in the exported snapshot (simulates a deleted book whose logs are kept for cumulative statistics).
             SwipeLog(logId = 1001, bookId = 999, wordId = 10, timestamp = 1_700_000_001_000L),
         ),
     )
@@ -56,7 +58,7 @@ class DatabaseJsonSerializerTest {
 
     @Test
     fun roundTrip_preservesOrphanSwipeLogs() {
-        // 孤立日志必须保留（累计统计不可丢）—— 用原始 ID 恢复策略保证
+        // Orphan logs must be kept, since cumulative statistics cannot lose them. The restore-with-original-IDs strategy guarantees this.
         val json = DatabaseJsonSerializer.serialize(snapshot)
         val restored = DatabaseJsonSerializer.deserialize(json)
         assertThat(restored.swipeLogs.map { it.bookId }).contains(999L)
@@ -74,7 +76,7 @@ class DatabaseJsonSerializerTest {
     fun serialize_omitsNickname_whenNull() {
         val noNick = snapshot.copy(nickname = null)
         val json = DatabaseJsonSerializer.serialize(noNick)
-        // nickname 字段不出现在 JSON 里（null 不写）
+        // The nickname field does not appear in the JSON, because null is not written.
         assertThat(json.contains("nickname")).isFalse()
     }
 
@@ -90,7 +92,7 @@ class DatabaseJsonSerializerTest {
 
     @Test
     fun deserialize_stripsNicknameWhitespace_toEmpty() {
-        // 空白昵称视为"无昵称"（避免导出文件里出现空白标签）
+        // A blank nickname counts as "no nickname" (avoids a blank label in the exported file).
         val json = """{"version":1,"nickname":"   ","books":[],"words":[],"senses":[],"bookWords":[],"swipeLogs":[]}"""
         val restored = DatabaseJsonSerializer.deserialize(json)
         assertThat(restored.nickname).isNull()
@@ -113,7 +115,7 @@ class DatabaseJsonSerializerTest {
         DatabaseJsonSerializer.deserialize("""{"version":1}""")
     }
 
-    // ---- Ticket #14：word.phonetic 往返（导出/导入不丢音标）----
+    // ---- Ticket #14: word.phonetic round trip (the transcription survives export/import) ----
 
     @Test
     fun roundTrip_preservesPhonetic() {
@@ -127,13 +129,13 @@ class DatabaseJsonSerializerTest {
             DatabaseJsonSerializer.serialize(withPhonetic)
         )
         assertThat(restored.words.first { it.text == "apple" }.phonetic).isEqualTo("/ˈæpl/")
-        // 无音标的词保持 null
+        // A word without a transcription stays null.
         assertThat(restored.words.first { it.text == "run" }.phonetic).isNull()
     }
 
     @Test
     fun deserialize_phonetic_defaultsNull_whenMissing() {
-        // 兼容 Ticket #14 之前的导出文件（words 里没有 phonetic 字段）
+        // Compatible with export files from before Ticket #14 (words has no phonetic field).
         val json = """
             {"version":1,"books":[],"words":[
               {"wordId":1,"text":"legacy"}
@@ -149,14 +151,14 @@ class DatabaseJsonSerializerTest {
             words = listOf(Word(wordId = 10, text = "apple", phonetic = null))
         )
         val json = DatabaseJsonSerializer.serialize(noPhonetic)
-        // null phonetic 不出现在导出 JSON 里（避免空标签）
-        // 匹配 "phonetic" 作为键名出现（注意不要误匹配到 "phonetic" 的值）
+        // A null phonetic does not appear in the exported JSON (avoids an empty tag).
+        // Match "phonetic" appearing as a key name (careful not to match a value that contains "phonetic").
         assertThat(json.contains("\"phonetic\"")).isFalse()
     }
 
     @Test
     fun deserialize_phonetic_isNull_whenJsonNullLiteral() {
-        // ⚠️ 回归防护：显式 "phonetic": null 必须解析为 Kotlin null（PresetWordsParser 同款坑）。
+        // ⚠️ Regression guard: an explicit "phonetic": null must parse to Kotlin null (same pitfall as PresetWordsParser).
         val json = """
             {"version":1,"books":[],"words":[
               {"wordId":1,"text":"x","phonetic":null}
@@ -166,7 +168,7 @@ class DatabaseJsonSerializerTest {
         assertThat(restored.words.single().phonetic).isNull()
     }
 
-    // ---- Ticket #20：book_word.skipped 往返（跳过状态导出/导入不丢）----
+    // ---- Ticket #20: book_word.skipped round trip (the skipped flag survives export/import) ----
 
     @Test
     fun roundTrip_preservesSkippedFlag() {
@@ -185,7 +187,7 @@ class DatabaseJsonSerializerTest {
 
     @Test
     fun deserialize_skipped_defaultsFalse_whenMissing() {
-        // 兼容 Ticket #20 之前的导出文件（bookWords 里没有 skipped 字段）
+        // Compatible with export files from before Ticket #20 (bookWords has no skipped field).
         val json = """
             {"version":1,"books":[],"words":[],"senses":[],
              "bookWords":[{"bookId":1,"wordId":10}],

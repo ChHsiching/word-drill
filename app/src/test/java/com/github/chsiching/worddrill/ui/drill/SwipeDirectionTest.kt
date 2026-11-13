@@ -4,61 +4,61 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
- * 向右滑（前进）计数逻辑的纯函数单测。规格验收：
- * - 向右滑切下一张 → 计数 +1（应记录 swipe_log）
- * - 向左滑切上一张 → 不计数
- * - 到头（已停在边界，页码不变）→ 不计数
+ * Unit tests for the pure function behind right-swipe (forward) counting. Spec acceptance:
+ * - Swiping right to the next card counts +1 (a swipe_log row must be recorded)
+ * - Swiping left to the previous card does not count
+ * - Reaching the edge (already parked at a boundary, page unchanged) does not count
  *
- * 拆成纯函数便于 JVM 单测（无 Android 依赖、无 Pager 手势耦合）。
- * 用从 0 起的页码语义：page 索引向右（前进）递增。
+ * The logic is a pure function so JVM tests can cover it, with no Android dependency and no Pager gesture coupling.
+ * Pages are 0-based: the page index increases on a right (forward) swipe.
  */
 class SwipeDirectionTest {
 
-    // ---- 向右滑（前进）：页码递增 → 计数 ----
+    // ---- Right swipe (forward): page increases, count it ----
 
     @Test
     fun forwardSwipe_increasesPage_logsSwipe() {
-        // 0 → 1：向右滑到下一张，应计数
+        // 0 to 1: right swipe to the next card, must count
         assertThat(shouldLogSwipe(previousPage = 0, currentPage = 1)).isTrue()
     }
 
     @Test
     fun forwardSwipe_multipleSteps_logsSwipe() {
-        // 跳页前进也算（极端快滑），只要 page 增加就是前进方向
+        // Skipping pages forward also counts (an extreme fast fling). Any page increase is the forward direction.
         assertThat(shouldLogSwipe(previousPage = 2, currentPage = 5)).isTrue()
     }
 
-    // ---- 向左滑（回看）：页码递减 → 不计数 ----
+    // ---- Left swipe (looking back): page decreases, do not count ----
 
     @Test
     fun backwardSwipe_decreasesPage_doesNotLog() {
-        // 2 → 1：向左滑回看上一张，不计数
+        // 2 to 1: left swipe back to the previous card, do not count
         assertThat(shouldLogSwipe(previousPage = 2, currentPage = 1)).isFalse()
     }
 
     @Test
     fun backwardSwipe_toStart_doesNotLog() {
-        // 1 → 0：向左滑到第一张，仍属回看方向，不计数
+        // 1 to 0: left swipe to the first card, still the looking-back direction, do not count
         assertThat(shouldLogSwipe(previousPage = 1, currentPage = 0)).isFalse()
     }
 
-    // ---- 到头 / 无位移：页码不变 → 不计数（含停在第一张/最后一张继续滑）----
+    // ---- At the edge / no movement: page unchanged, do not count (includes swiping again while parked on the first or last card) ----
 
     @Test
     fun noMovement_samePage_doesNotLog() {
-        // 页码未变（停在边界继续滑、或 settled 重复回调）：不计数
+        // Page unchanged (still swiping at a boundary, or repeated settled callbacks): do not count
         assertThat(shouldLogSwipe(previousPage = 0, currentPage = 0)).isFalse()
     }
 
     @Test
     fun stuckAtFirst_samePage_doesNotLog() {
-        // 已在第一张(0)还往前滑，Pager 阻挡页码不变：不计数
+        // Already on the first card (0) and swiping forward, the Pager blocks it and the page stays unchanged: do not count
         assertThat(shouldLogSwipe(previousPage = 0, currentPage = 0)).isFalse()
     }
 
     @Test
     fun stuckAtLast_samePage_doesNotLog() {
-        // 已在最后一张(N)还往后滑，Pager 阻挡页码不变：不计数
+        // Already on the last card (N) and swiping on, the Pager blocks it and the page stays unchanged: do not count
         assertThat(shouldLogSwipe(previousPage = 9, currentPage = 9)).isFalse()
     }
 }

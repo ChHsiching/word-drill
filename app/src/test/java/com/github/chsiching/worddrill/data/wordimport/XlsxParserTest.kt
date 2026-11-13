@@ -11,24 +11,24 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 /**
- * Ticket #21：xlsx 解析（手写 OOXML，零依赖）。
+ * Ticket #21: xlsx parsing (hand-written OOXML, zero dependencies).
  *
- * 测试通过内存构造最小合法 .xlsx（ZIP + OOXML）验证解析器。
- * 不放 sample.xlsx 二进制到 resources —— 手工构造便于审查结构、避免二进制 blob。
+ * The tests build a minimal valid .xlsx in memory (ZIP + OOXML) to verify the parser.
+ * No sample.xlsx binary goes into resources. Building it by hand makes the structure reviewable and avoids a binary blob.
  *
- * OOXML 结构要点（仅解析需要的部分）：
- * - `xl/sharedStrings.xml`：共享字符串表，`<si><t>字符串</t></si>` 列表
- * - `xl/worksheets/sheet1.xml`：`<sheetData>` 内多个 `<row>`，每行多个 `<c r="A1" t="s"><v>0</v></c>`
- *   - `t="s"`：cell 值是 sharedStrings 的索引（`<v>` 里是数字）
- *   - `t` 缺省（或 `t="n"`）：cell 值是 inline 数字（`<v>` 里直接是值）
- *   - `t="inlineStr"`：cell 含 `<is><t>字符串</t></is>`，不走 sharedStrings
- * - `r="A1"`：A=col 1，1=row 1。解析器据此算 cell 的列位置
+ * OOXML structure points (only the parts the parser reads):
+ * - `xl/sharedStrings.xml`: the shared string table, a list of `<si><t>string</t></si>`
+ * - `xl/worksheets/sheet1.xml`: multiple `<row>` elements inside `<sheetData>`, each row with multiple `<c r="A1" t="s"><v>0</v></c>`
+ *   - `t="s"`: the cell value is an index into sharedStrings (`<v>` holds a number)
+ *   - `t` omitted (or `t="n"`): the cell value is an inline number (`<v>` holds the value directly)
+ *   - `t="inlineStr"`: the cell contains `<is><t>string</t></is>` and bypasses sharedStrings
+ * - `r="A1"`: A is column 1, 1 is row 1. The parser derives each cell's column position from this
  *
- * 列结构（issue #21，所有格式统一）：
- * - col A（col 0）：序号（忽略）
- * - col B（col 1）：单词
- * - col C（col 2）：音标
- * - col D（col 3）：词性+释义
+ * Column layout (issue #21, unified across all formats):
+ * - col A (col 0): index (ignored)
+ * - col B (col 1): word
+ * - col C (col 2): phonetic
+ * - col D (col 3): pos+meaning
  */
 @RunWith(JUnit4::class)
 class XlsxParserTest {
@@ -64,13 +64,13 @@ class XlsxParserTest {
         val rows = XlsxParser.parse(ByteArrayInputStream(xlsx))
         assertThat(rows).hasSize(2)
         assertThat(rows[0]).isEqualTo(ImportRow("apple", "/p1/", "n.苹果"))
-        // 空 cell（C2 缺失）→ phonetic 为 null
+        // Empty cell (C2 missing) gives a null phonetic.
         assertThat(rows[1]).isEqualTo(ImportRow("run", null, "vi.跑"))
     }
 
     @Test
     fun emptyCells_yieldsNullFields() {
-        // 行内只有 word，音标 / 释义 cell 整个不存在
+        // The row has only the word; the phonetic and meaning cells are entirely absent.
         val xlsx = buildXlsx(
             sharedStrings = listOf("1", "ghost"),
             rows = listOf(
@@ -83,7 +83,7 @@ class XlsxParserTest {
 
     @Test
     fun inlineStringCell_supported() {
-        // t="inlineStr" 模式：cell 内含 <is><t>...</t></is>
+        // t="inlineStr" mode: the cell contains <is><t>...</t></is>.
         val xlsx = buildXlsx(
             sharedStrings = emptyList(),
             rows = listOf(
@@ -122,7 +122,7 @@ class XlsxParserTest {
 
     @Test
     fun outOfOrderColumns_sortedByColumnRef() {
-        // 列以任意顺序出现，靠 r="A1/B1/C1/D1" 排序而非出现顺序
+        // Columns may appear in any order; sorting relies on r="A1/B1/C1/D1", not the order of appearance.
         val xlsx = buildXlsx(
             sharedStrings = listOf("1", "apple", "/p/", "n.苹果"),
             rows = listOf(
@@ -137,7 +137,7 @@ class XlsxParserTest {
 
     @Test
     fun skipsRowsAfterFirstSheet() {
-        // 多 sheet 的 xlsx：本解析器只读 sheet1.xml，其他 sheet 数据应忽略
+        // A multi-sheet xlsx: this parser reads only sheet1.xml, and data from other sheets must be ignored.
         val xlsx = buildXlsx(
             sharedStrings = listOf("1", "sheet1word", "2", "sheet2word"),
             extraEntries = mapOf(
@@ -153,22 +153,22 @@ class XlsxParserTest {
         assertThat(rows.map { it.word }).containsExactly("sheet1word")
     }
 
-    // ---- helpers：内存构造最小 .xlsx ----
+    // ---- helpers: build a minimal .xlsx in memory ----
 
-    /** 单个 cell 的 XML 片段。type "s" / "n" 走 <v>，"inlineStr" 走 <is><t>。 */
+    /** XML fragment for one cell. Types "s" / "n" use <v>, "inlineStr" uses <is><t>. */
     private fun cell(ref: String, type: String, value: String): String = when (type) {
         "inlineStr" -> error("use cellInline for inlineStr")
         else -> """<c r="$ref" t="$type"><v>$value</v></c>"""
     }
 
-    /** inlineStr cell。 */
+    /** An inlineStr cell. */
     private fun cellInline(ref: String, value: String): String =
         """<c r="$ref" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>"""
 
-    /** 数值 cell（无 type，默认 number）。 */
+    /** A numeric cell (no type, defaults to number). */
     private fun cell(ref: String): String = """<c r="$ref"/>"""
 
-    /** 一行。 */
+    /** One row. */
     private fun row(cells: List<String>): String =
         """<row r="1">${cells.joinToString("")}</row>"""
 
@@ -187,9 +187,9 @@ class XlsxParserTest {
     }
 
     /**
-     * 构造最小 .xlsx：必需 entries + 可选额外 entries（如 sheet2）。
-     * 注：合规 .xlsx 还需 [Content_Types].xml + xl/workbook.xml + rels，
-     * 但本解析器只读 sharedStrings + sheet1，构造时省略合规元数据不影响解析测试。
+     * Builds a minimal .xlsx: the required entries plus optional extra entries (such as sheet2).
+     * Note: a compliant .xlsx also needs [Content_Types].xml + xl/workbook.xml + rels,
+     * but this parser reads only sharedStrings + sheet1, so omitting the compliance metadata in the build does not affect the parsing tests.
      */
     private fun buildXlsx(
         sharedStrings: List<String>,
