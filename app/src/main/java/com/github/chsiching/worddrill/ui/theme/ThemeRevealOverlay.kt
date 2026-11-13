@@ -31,19 +31,22 @@ import kotlinx.coroutines.withContext
 import kotlin.math.hypot
 
 /**
- * Circular Reveal 主题切换（审核反馈 5 v6 — View 截图方案）。
+ * Circular Reveal theme switch (review feedback 5 v6, View snapshot approach).
  *
- * 效果：新主题（背景+文字+卡片+完整 UI）从 icon 中心呈圆形扩散到全屏。
+ * Effect: the new theme (background + text + cards + the full UI) expands as a circle
+ * from the icon center to fill the screen.
  *
- * 方案：用 Android View.draw(Canvas) 同步截图旧主题（不走 suspend toImageBitmap，
- * 避免时序问题），切主题后用截图 overlay 被 clip 圆从 icon 扩展揭示新主题。
+ * Approach: capture the old theme synchronously with Android View.draw(Canvas) (skipping the
+ * suspend toImageBitmap path to avoid timing problems); after the theme switch, an overlay
+ * holding the snapshot is clipped by an expanding circle to reveal the new theme.
  *
- * 流程：
- * 1. trigger(center, targetColor, onApplied) 被调
- * 2. 同步截图当前 View（旧主题）→ ImageBitmap
- * 3. 立即切主题（底层变新主题，被截图盖住看不见）
- * 4. 动画：截图被 clip 成扩展圆，圆内揭示新主题底层，圆外是旧截图
- * 5. 动画结束，移除 overlay
+ * Flow:
+ * 1. trigger(center, targetColor, onApplied) is called
+ * 2. The current View is synchronously snapshotted (old theme) into an ImageBitmap
+ * 3. The theme switches immediately (the layer below becomes the new theme, hidden by the snapshot)
+ * 4. Animate: the snapshot is clipped to an expanding circle; inside the circle the new theme
+ *    shows through, outside is the old snapshot
+ * 5. When the animation ends, the overlay is removed
  */
 @Composable
 fun ThemeRevealContent(
@@ -63,17 +66,19 @@ fun ThemeRevealContent(
             revealCenter = center
             animating = true
             scope.launch(Dispatchers.Main) {
-                // 1. 同步截图当前 View（旧主题）
+                // 1. Synchronously snapshot the current View (old theme)
                 val bmp = captureView(view)
                 snapshot = bmp?.asImageBitmap()
-                // 2. 切主题：写 DataStore + 更新 renderedTheme
-                //    底层立即变新主题，但被截图 overlay 盖住看不见
+                // 2. Switch the theme: write DataStore + update renderedTheme.
+                //    The layer below becomes the new theme immediately, but is hidden by the snapshot overlay
                 onApplied()
                 onThemeApplied()
-                // 3. 动画：圆从 icon 扩展，圆内揭示新主题底层，圆外是旧截图
+                // 3. Animate: the circle expands from the icon; inside the circle the new theme
+                //    shows through, outside is the old snapshot
                 revealProgress.snapTo(0f)
                 revealProgress.animateTo(1f, animationSpec = tween(800))
-                // 4. 动画结束，移除 overlay（此时底层已是新主题，无缝）
+                // 4. When the animation ends, remove the overlay (the layer below is already
+                //    the new theme, so the transition is seamless)
                 snapshot = null
                 animating = false
             }
@@ -85,7 +90,8 @@ fun ThemeRevealContent(
     CompositionLocalProvider(LocalThemeRevealTrigger provides trigger) {
         Box(modifier = Modifier.fillMaxSize()) {
             content()
-            // overlay：旧主题截图，圆内揭示新主题（截图被 clip 扩展圆「吃掉」）
+            // Overlay: old-theme snapshot; the new theme is revealed inside the circle
+            // (the snapshot is clipped away by the expanding circle)
             snapshot?.let { snap ->
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val center = revealCenter
@@ -96,7 +102,7 @@ fun ThemeRevealContent(
                         hypot(size.width - center.x, size.height - center.y),
                     )
                     val radius = maxRadius * progress
-                    // 画旧截图，只在圆**外**显示（Difference = 全屏减去圆）
+                    // Draw the old snapshot, visible only **outside** the circle (Difference = full screen minus the circle)
                     clipPath(
                         Path().apply {
                             addOval(Rect(center = center, radius = radius))
@@ -112,8 +118,9 @@ fun ThemeRevealContent(
 }
 
 /**
- * 同步截图 View 到 Bitmap。用 View.draw(Canvas)，不依赖 suspend API。
- * 在主线程调（View.draw 必须主线程）。返回 null 表示截图失败（宽高 0）。
+ * Synchronously snapshots a View into a Bitmap. Uses View.draw(Canvas), no suspend API.
+ * Call on the main thread (View.draw must run on the main thread). Returns null when the
+ * snapshot fails (width or height 0).
  */
 private fun captureView(view: View): Bitmap? {
     val w = view.width
@@ -126,12 +133,12 @@ private fun captureView(view: View): Bitmap? {
 }
 
 /**
- * 触发 reveal。
- * - [Offset]：圆心（icon 屏幕坐标）
- * - [() -> Unit]：截图后立即调（写 DataStore + 更新 renderedTheme）
+ * Triggers the reveal.
+ * - [Offset]: circle center (icon screen coordinates)
+ * - [() -> Unit]: called right after the snapshot (write DataStore + update renderedTheme)
  */
 typealias ThemeRevealTrigger = (center: Offset, onApplied: () -> Unit) -> Unit
 
 val LocalThemeRevealTrigger = compositionLocalOf<ThemeRevealTrigger> {
-    { _, onApplied -> onApplied() } // 默认无 reveal：直接切
+    { _, onApplied -> onApplied() } // Default without reveal: switch directly
 }

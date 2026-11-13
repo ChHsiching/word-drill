@@ -7,16 +7,17 @@ import androidx.compose.runtime.CompositionLocalProvider
 import com.github.chsiching.worddrill.data.settings.ThemeMode
 
 /**
- * 应用主题（Ticket #9 + #15）。
+ * App theme (Ticket #9 + #15).
  *
- * - [themeMode]：[ThemeMode.LIGHT] / [ThemeMode.DARK] / [ThemeMode.SYSTEM]（跟随系统）。
- * - **关闭动态取色**（Material You）：设计稿要求纯黑白灰，不能被系统壁纸染色。
- * - 配色 token 见 [Color.kt]；扩展语义 token 通过 [LocalWordDrillColors] 提供。
- * - 字体规范见 [Type.kt]。
+ * - [themeMode]: [ThemeMode.LIGHT] / [ThemeMode.DARK] / [ThemeMode.SYSTEM] (follows the system).
+ * - **Dynamic color is disabled** (Material You): the design spec requires pure black/white/gray
+ *   and must not be tinted by the system wallpaper.
+ * - Color tokens live in [Color.kt]; extended semantic tokens are provided via [LocalWordDrillColors].
+ * - The typography spec lives in [Type.kt].
  *
- * 调用方（[com.github.chsiching.worddrill.MainActivity]）订阅
+ * The caller ([com.github.chsiching.worddrill.MainActivity]) subscribes to
  * [com.github.chsiching.worddrill.data.settings.SettingsRepository.themePreference]
- * 并把结果传入此处；切换后全局配色立即生效。
+ * and passes the result here; after a switch the global palette takes effect immediately.
  */
 @Composable
 fun WordDrillTheme(

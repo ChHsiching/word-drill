@@ -36,13 +36,13 @@ class MainActivity : Hilt_MainActivity() {
     lateinit var settings: SettingsRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Ticket #24：必须在 super.onCreate 前安装 SplashScreen（compat 库要求）。
-        // splash 主题把系统 icon 设为透明 drawable，启动后系统切回 Theme.WordDrill。
+        // Ticket #24: the SplashScreen must be installed before super.onCreate (required by the compat library).
+        // The splash theme sets the system icon to a transparent drawable; after startup the system switches back to Theme.WordDrill.
         //
-        // setKeepOnScreenCondition：冷启动期间 Compose 首帧组合 + WordDrillRoot 子树
-        // （Hilt/Room/NavHost）初始化需要 ~1-2s，此期间系统 splash 持续显示纯背景色，
-        // 避免出现「splash 消失 → overlay 空白 → 动画才开始」的割裂空白期。
-        // 动画首帧绘制后（animReady 置 true）系统 splash 交棒给 overlay。
+        // setKeepOnScreenCondition: during cold start, Compose first-frame composition + the WordDrillRoot subtree
+        // (Hilt/Room/NavHost) initialization takes ~1-2s; during that period the system splash keeps showing a solid background color,
+        // avoiding a jarring blank gap of "splash disappears -> overlay blank -> animation only then starts".
+        // Once the animation's first frame is drawn (animReady set to true), the system splash hands off to the overlay.
         val animReady = AtomicBoolean(false)
         val splashScreen = installSplashScreen()
         splashScreen.setKeepOnScreenCondition { !animReady.get() }
@@ -55,12 +55,12 @@ class MainActivity : Hilt_MainActivity() {
         )
         setContent {
             val themeMode by themeState.collectAsStateWithLifecycle()
-            // renderedTheme 跟踪 themeMode（DataStore 异步刷新后两者同步）。
-            // reveal 动画期间 DataStore 写完 → themeMode 变 → renderedTheme 跟着变 → 底层切。
-            // 截图 overlay 盖住旧主题，动画揭示新主题底层。
+            // renderedTheme tracks themeMode (the two sync up after DataStore's async refresh).
+            // During the reveal animation: DataStore write completes -> themeMode changes -> renderedTheme follows -> the underlying layer switches.
+            // The snapshot overlay covers the old theme, and the animation reveals the new theme underneath.
             var renderedTheme by remember { mutableStateOf(themeMode) }
 
-            // themeMode 变了就同步到 renderedTheme（DataStore 写完后 themeMode 更新，这里跟上）
+            // When themeMode changes, sync it to renderedTheme (themeMode updates after the DataStore write; this keeps up)
             androidx.compose.runtime.LaunchedEffect(themeMode) {
                 renderedTheme = themeMode
             }
@@ -79,8 +79,8 @@ class MainActivity : Hilt_MainActivity() {
                 ThemeRevealContent(
                     onThemeApplied = {},
                 ) {
-                    // Ticket #24 启动动画 overlay：动画期间盖住主内容，
-                    // 完成后揭示底层（主题已稳定）。
+                    // Ticket #24 splash animation overlay: covers the main content during the animation,
+                    // and reveals the layer underneath once finished (the theme has stabilized).
                     var splashDone by remember { mutableStateOf(false) }
                     Box(Modifier.fillMaxSize()) {
                         WordDrillRoot()

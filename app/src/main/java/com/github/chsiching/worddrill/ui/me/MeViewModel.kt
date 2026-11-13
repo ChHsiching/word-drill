@@ -18,13 +18,15 @@ import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 /**
- * 「我的」Tab 三项统计（Ticket #8）：
- * - [todayCount]：今日刷卡数（按当日 0 点筛选 swipe_log）
- * - [totalCount]：累计刷卡数（全表）
- * - [bookName] / [brushed] / [total] / [percent]：当前词书进度（已刷 X / 总 Y + 百分比）
+ * The three stats of the "Me" tab (Ticket #8):
+ * - [todayCount]: cards drilled today (swipe_log filtered from today's start of day)
+ * - [totalCount]: lifetime cards drilled (whole table)
+ * - [bookName] / [brushed] / [total] / [percent]: current book progress (X brushed / Y
+ *   total + percent)
  *
- * 全部响应式 Flow 驱动：刷卡后切到本 Tab 数字立即更新（规格验收）。
- * 当前词书切换（「库」Tab）后，进度对应新词书（规格验收）。
+ * All driven by reactive Flows: after drilling, switching to this tab updates the numbers
+ * immediately (spec acceptance). After switching the current book (Library tab), the
+ * progress matches the new book (spec acceptance).
  */
 data class MeStatsUiState(
     val todayCount: Int = 0,
@@ -36,15 +38,19 @@ data class MeStatsUiState(
 )
 
 /**
- * 「我的」Tab 的 ViewModel（Ticket #8）。
+ * ViewModel of the "Me" tab (Ticket #8).
  *
- * 响应式聚合：observe [SettingsRepository.currentBookId] → 当 bookId 变化时
- * 用 [flatMapLatest] 切到新词书的进度 Flow；今日/累计统计独立 observe。
- * 三者 [combine] 成单一 [MeStatsUiState]，StateFlow 暴露给 Composable。
+ * Reactive aggregation: observe [SettingsRepository.currentBookId]; when bookId changes,
+ * [flatMapLatest] switches to the new book's progress Flow. Today/total stats are observed
+ * independently. The three are [combine]d into a single [MeStatsUiState] exposed to the
+ * Composable as a StateFlow.
  *
- * - distinctUntilChanged（坑 F）：bookId 在相同值上不重复重订阅进度 Flow。
- * - 今日起点在 ViewModel 构造时算一次：跨午夜长期挂起场景未覆盖（规格只要求
- *   "刷卡后切回本 Tab 立即更新"；次日重开 App 会重算，满足日常使用）。
+ * - distinctUntilChanged (pitfall F): a repeated bookId does not re-subscribe the progress
+ *   Flow.
+ * - Today's start point is computed once at ViewModel construction: the long-lived
+ *   suspended-across-midnight case is not covered (the spec only requires "switching back
+ *   to this tab after drilling updates immediately"; reopening the app the next day
+ *   recomputes, which covers daily use).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -54,16 +60,17 @@ class MeViewModel @Inject constructor(
     private val settings: SettingsRepository,
 ) : ViewModel() {
 
-    /** 当前词书进度（书名 + 已刷 + 总数）。bookId 变化时切到新词书的 Flow。 */
+    /** Current book progress (name + brushed + total). Switches to the new book's Flow when bookId changes. */
     private val bookProgress = settings.currentBookId
         .distinctUntilChanged()
         .flatMapLatest { bookId ->
             if (bookId == null) {
-                // 无当前词书（首次启动未设）：空名 + 0/0 进度
+                // No current book (unset on first launch): empty name + 0/0 progress
                 flowOf(BookProgress())
             } else {
-                // 书名一次性异步加载（flow 块跟随 flatMapLatest 取消，
-                // 避免旧 bookId 的赋值覆盖新 bookId）；数量 observe 响应式刷新。
+                // Book name loads once asynchronously (the flow block is cancelled with
+                // flatMapLatest, so an old bookId's assignment cannot clobber the new one);
+                // counts are observed reactively.
                 combine(
                     flow { emit(BookProgress(bookName = bookDao.getById(bookId)?.name ?: "")) },
                     bookDao.observeWordCountInBook(bookId),
@@ -92,7 +99,7 @@ class MeViewModel @Inject constructor(
     )
 }
 
-/** 当前词书进度的中间聚合（书名 + 已刷 + 总数）。 */
+/** Intermediate aggregate for current book progress (name + brushed + total). */
 private data class BookProgress(
     val bookName: String = "",
     val brushed: Int = 0,

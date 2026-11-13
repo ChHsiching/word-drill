@@ -13,12 +13,12 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * 应用入口。@HiltAndroidApp 触发 Hilt 的代码生成，生成 ApplicationComponent。
- * 所有后续 ViewModel / Repository 的依赖注入都挂在这个根组件上。
+ * Application entry point. @HiltAndroidApp triggers Hilt's code generation, producing the ApplicationComponent.
+ * All subsequent ViewModel / Repository dependency injection hangs off this root component.
  *
- * 注意：本项目未启用 Hilt Gradle Plugin（它要求 AGP 9，与规格的 AGP 8.13.x 冲突）。
- * 因此按 Dagger 官方文档，@HiltAndroidApp 需显式指定 base class，
- * 且被注解的类要 extend Hilt 生成的 Hilt_<类名>。
+ * Note: this project does not enable the Hilt Gradle Plugin (it requires AGP 9, which conflicts with the specified AGP 8.13.x).
+ * Therefore, per the official Dagger docs, @HiltAndroidApp must explicitly specify the base class,
+ * and the annotated class must extend the Hilt-generated Hilt_<ClassName>.
  */
 @HiltAndroidApp(Application::class)
 class WordDrillApp : Hilt_WordDrillApp() {
@@ -31,18 +31,18 @@ class WordDrillApp : Hilt_WordDrillApp() {
 
     override fun onCreate() {
         super.onCreate()
-        // Ticket #21：PdfBox-Android 的 native 库（libpdfbox.so）需在用前 init。
-        // 文件导入 PDF 时 [com.github.chsiching.worddrill.data.wordimport.PdfTableParser]
-        // 依赖它；这里在 Application 启动时一次性初始化，幂等（PDFBoxResourceLoader 内部已防重）。
+        // Ticket #21: PdfBox-Android's native library (libpdfbox.so) must be initialized before use.
+        // PDF file import relies on it via [com.github.chsiching.worddrill.data.wordimport.PdfTableParser];
+        // initialized once here at Application startup, idempotent (PDFBoxResourceLoader already guards against re-init internally).
         PDFBoxResourceLoader.init(this)
 
-        // 首启在后台幂等导入预置词库；已导入则立即返回，无重复开销。
+        // On first launch, idempotently import the preset word books in the background; if already imported, return immediately with no duplicated cost.
         appScope.launch { presetImportOrchestrator.ensurePresetImported() }
-        // Ticket #19：首启后台幂等导入内置词典（ECDICT 10 万词，只读参考数据）。
-        // 与预置词库导入并行；dictionary 失败不影响用户词书使用。
+        // Ticket #19: on first launch, idempotently import the built-in dictionary in the background (ECDICT, 100k words, read-only reference data).
+        // Runs in parallel with the preset word book import; a dictionary failure does not affect user word books.
         appScope.launch { dictionaryImportOrchestrator.ensureDictionaryImported() }
-        // Ticket #20：首启幂等创建预置「复习」词书（跳过的词汇入此处，默认空）。
-        // 独立协程，与词库/词典导入并行；建书本身只一行 INSERT，开销可忽略。
+        // Ticket #20: on first launch, idempotently create the preset "Review" word book (skipped words go here; empty by default).
+        // Separate coroutine, parallel to the word book/dictionary imports; creating the book itself is a single INSERT, negligible cost.
         appScope.launch { reviewBookInitializer.ensureReviewBookCreated() }
     }
 }

@@ -68,24 +68,28 @@ import com.github.chsiching.worddrill.ui.recyclebin.RecycleBinScreen
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 import kotlin.math.roundToInt
 
-/** 「库」Tab 二级页路由（Ticket #7）：navigate("library/$bookId") 与 composable route 共用。 */
+/** Secondary-page route of the "Library" tab (Ticket #7): shared by navigate("library/$bookId") and the composable route. */
 private const val WORD_LIST_ROUTE = "library/{bookId}"
 
-/** 回收站页面路由（Ticket #22）：从「我的」Tab 通用组进入。 */
+/** Recycle bin route (Ticket #22): entered from the general group on the "Me" tab. */
 private const val RECYCLE_BIN_ROUTE = "recycle_bin"
 
 /**
- * 应用根 Composable（Ticket #16 重写）：自定义底部导航 + NavHost。
+ * App root composable (Ticket #16 rewrite): custom bottom navigation + NavHost.
  *
- * 替换 Material3 [androidx.compose.material3.NavigationBar]：
- * - 浮动胶囊（默认）：居中悬浮，圆角 100px，黑色滑动指示器，选中项文字反白
- * - 底部栏：全宽贴底，选中项亮度高亮（无黑块）
- * - 切换风格：先 fade out（0.2s opacity only）→ 切 class → fade in；指示器不飘移
- * - 简约导航：隐藏文字标签，padding 收缩
- * - 锁定态（仅 Drill Tab）：导航栏 opacity 淡出消失（不用位移）
- * - 切 Tab 自动解锁
+ * Replaces Material3 [androidx.compose.material3.NavigationBar]:
+ * - Floating pill (default): centered and floating, 100px corner radius, black sliding
+ *   indicator, selected item text inverted to white
+ * - Bottom bar: full width flush to the bottom, selected item highlighted by brightness
+ *   (no black block)
+ * - Style switch: fade out first (0.2s opacity only), then switch the class, then fade in;
+ *   the indicator does not drift
+ * - Compact navigation: text labels hidden, padding shrunk
+ * - Locked state (Drill tab only): the nav bar fades out via opacity (no translation)
+ * - Switching tabs unlocks automatically
  *
- * lock 状态 hoisted 在此：Drill Tab 的锁定按钮 toggle 本地 state，切 Tab reset。
+ * The lock state is hoisted here: the Drill tab's lock button toggles local state; a tab
+ * switch resets it.
  */
 @Composable
 fun WordDrillRoot(modifier: Modifier = Modifier) {
@@ -99,12 +103,12 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
     val compactNav by settingsViewModel.compactNav.collectAsStateWithLifecycle()
     val hidePhonetic by settingsViewModel.hidePhonetic.collectAsStateWithLifecycle()
 
-    // lock 状态 hoisted：切 Tab 自动解锁
+    // Lock state hoisted here: switching tabs unlocks automatically
     var drillLocked by remember { mutableStateOf(false) }
 
     val navigateTo: (String) -> Unit = { route ->
         if (route != currentRoute) {
-            // 切 Tab 自动解锁
+            // Switching tabs unlocks automatically
             if (currentRoute == TopDestination.Drill.route) drillLocked = false
             navController.navigate(route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
@@ -122,9 +126,10 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
         NavHost(
             navController = navController,
             startDestination = TopDestination.Drill.route,
-            // edge-to-edge：内容顶部留状态栏空间（Bug 1：否则顶部文字与状态栏重叠）。
-            // 底部不在这里加 padding —— 浮动导航栏自己 navigationBarsPadding 避小白条，
-            // 内容区各 Screen 自己在 LazyColumn/Column 上加 bottom padding 让出导航高度。
+            // edge-to-edge: content leaves status-bar space at the top (Bug 1: otherwise the
+            // top text overlaps the status bar). No bottom padding here; the floating nav
+            // bar applies its own navigationBarsPadding to avoid the gesture bar, and each
+            // screen adds bottom padding to its LazyColumn/Column to make room for the nav height.
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding(),
@@ -155,7 +160,7 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
             }
         }
 
-        // 导航栏浮在内容上方
+        // The nav bar floats above the content
         BottomNavOverlay(
             currentRoute = currentRoute,
             navStyle = navStyle,
@@ -168,15 +173,19 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
 }
 
 /**
- * 浮在内容区上的导航栏：根据 [navStyle] 渲染浮动胶囊或全宽底部栏。
+ * Nav bar floating over the content area: renders the floating pill or the full-width
+ * bottom bar according to [navStyle].
  *
- * 风格切换（审核反馈 2A）：pill 和 bar **同时存在**于同一 BottomCenter 对齐点，
- * 用 alpha 交叉淡入淡出（0.3s tween）。两者位置一致 → 不会乱跳；只是透明度
- * 在 0↔1 之间平滑过渡。锁定时整体 opacity 淡出（叠加在风格 alpha 上）。
+ * Style switch (review feedback 2A): pill and bar **both exist** at the same BottomCenter
+ * alignment point, cross-fading via alpha (0.3s tween). Both share the same position, so
+ * nothing jumps around; only the alpha smoothly transitions between 0 and 1. When locked,
+ * the whole thing fades out via opacity (layered on top of the style alpha).
  *
- * 为什么不用 AnimatedContent：AnimatedContent 切换会先移除旧 Composable 再加新的，
- * 期间位置会跳（pill 居中悬浮 vs bar 全宽贴底，两者宽度/位置不同），用户明确不要乱跳。
- * 同位叠加 + alpha 交叉淡入淡出是唯一不乱跳的方案（apple-design §3 interruptibility）。
+ * Why not AnimatedContent: an AnimatedContent switch removes the old composable first and
+ * then adds the new one, and the position jumps in between (the pill floats centered while
+ * the bar is full-width flush to the bottom; the two differ in width and position), and the
+ * user explicitly asked for no jumping. Same-position overlay + alpha cross-fade is the
+ * only approach that does not jump (apple-design §3 interruptibility).
  */
 @Composable
 private fun BottomNavOverlay(
@@ -187,7 +196,7 @@ private fun BottomNavOverlay(
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // pill 的目标 alpha：当前是 pill 且未隐藏时为 1，否则 0
+    // Pill target alpha: 1 when currently pill and not hidden, otherwise 0
     val pillAlpha by animateFloatAsState(
         targetValue = if (navStyle == NavStyle.PILL && !hidden) 1f else 0f,
         animationSpec = spring(
@@ -196,7 +205,7 @@ private fun BottomNavOverlay(
         ),
         label = "pillAlpha",
     )
-    // bar 的目标 alpha：当前是 bar 且未隐藏时为 1，否则 0
+    // Bar target alpha: 1 when currently bar and not hidden, otherwise 0
     val barAlpha by animateFloatAsState(
         targetValue = if (navStyle == NavStyle.BAR && !hidden) 1f else 0f,
         animationSpec = spring(
@@ -208,11 +217,13 @@ private fun BottomNavOverlay(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            // 隐藏时（锁定）禁用点击，避免淡出过程误触
+            // Disable clicks when hidden (locked), to avoid accidental taps during the fade-out
             .then(if (hidden) Modifier.clickable(enabled = false) {} else Modifier),
     ) {
-        // 两个 nav 同时存在，叠加渲染。alpha=0 时仍占位但不可见、不响应点击
-        // （graphicsLayer 把 alpha=0 的视为「视觉不可见」，但为保险给 clickable 加 enabled 判断）
+        // Both navs exist at once, rendered on top of each other. At alpha=0 they still take
+        // up space but are invisible and do not respond to clicks
+        // (graphicsLayer treats alpha=0 as visually invisible, but the clickable enabled
+        // check is added for safety)
         if (pillAlpha > 0.01f) {
             PillNav(
                 currentRoute = currentRoute,
@@ -225,7 +236,7 @@ private fun BottomNavOverlay(
                     .padding(horizontal = 24.dp)
                     .graphicsLayer {
                         this.alpha = pillAlpha
-                        // 完全透明时不响应点击（hitTest 短路）
+                        // Fully transparent: no click response (hit test short-circuits)
                         if (pillAlpha < 0.5f) this.alpha = pillAlpha
                     }
                     .then(if (pillAlpha < 0.5f) Modifier.clickable(enabled = false) {} else Modifier),
@@ -246,11 +257,14 @@ private fun BottomNavOverlay(
 }
 
 /**
- * 浮动胶囊：圆角 100px，毛玻璃半透明（Surface alpha），黑色滑动指示器，选中项文字反白。
+ * Floating pill: 100px corner radius, frosted-glass translucency (Surface alpha), black
+ * sliding indicator, selected item text inverted to white.
  *
- * 指示器实现：在 Row 上用 [drawBehind] 直接画黑色圆角矩形，位置 = selectedIndex × itemWidth。
- * itemWidth 在 onGloballyPositioned 里测量（Row 总宽 / 3），spring 动画由 animateFloatAsState 驱动。
- * 这比自定义 Layout 简单可靠（不依赖 measurables 顺序）。
+ * Indicator implementation: [drawBehind] on the Row draws a black rounded rectangle
+ * directly; position = selectedIndex × itemWidth. itemWidth is measured in
+ * onGloballyPositioned (total Row width / 3); the spring animation is driven by
+ * animateFloatAsState. This is simpler and more reliable than a custom Layout (no
+ * dependency on measurables order).
  */
 @Composable
 private fun PillNav(
@@ -259,8 +273,10 @@ private fun PillNav(
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // 选中 Tab 索引：用 selectedTabIndexForRoute 把当前 route（含二级页）映射到所属顶层 Tab。
-    // null = 当前 route 不属于任何顶层 Tab（不应发生，但防御性处理）：指示器不画，避免错误高亮。
+    // Selected tab index: selectedTabIndexForRoute maps the current route (including
+    // secondary pages) to its owning top-level tab. null means the current route belongs to
+    // no top-level tab (should not happen, but handled defensively): the indicator is not
+    // drawn, avoiding a wrong highlight.
     val selectedIndex = selectedTabIndexForRoute(currentRoute)
     val indicatorColor = MaterialTheme.colorScheme.onSurface
 
@@ -268,8 +284,9 @@ private fun PillNav(
     val itemWidth = if (rowWidth > 0f) rowWidth / topDestinations.size else 0f
 
     val animatedX by animateFloatAsState(
-        // selectedIndex 为 null（当前 route 不属于任何顶层 Tab）时，指示器移到 Row 左外
-        // （-itemWidth）+ drawBehind 不绘制，避免错误高亮。
+        // When selectedIndex is null (current route belongs to no top-level tab), the
+        // indicator moves outside the Row to the left (-itemWidth) and drawBehind does not
+        // draw it, avoiding a wrong highlight.
         targetValue = (selectedIndex ?: -1) * itemWidth,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
@@ -290,10 +307,12 @@ private fun PillNav(
                 .padding(6.dp)
                 .onGloballyPositioned { rowWidth = it.size.width.toFloat() }
                 .drawBehind {
-                    // 画黑色指示器：高度 = Row 高度，圆角半径 = 高度/2（两端完整半圆）。
-                    // 简约状态（compactNav）Row 矮 → 指示器自然呈圆形，合理，不动。
-                    // 非简约状态的高度缩减通过 NavItem 的 padding 实现（见下方），不改这里。
-                    // selectedIndex 为 null 时不画（当前 route 不属于任何顶层 Tab）。
+                    // Draw the black indicator: height = Row height, corner radius =
+                    // height/2 (full semicircles at both ends). In compact mode (compactNav)
+                    // the Row is shorter, so the indicator naturally becomes a circle; that
+                    // is reasonable and left alone. Height reduction in non-compact mode is
+                    // done via NavItem padding (see below), not changed here. Not drawn when
+                    // selectedIndex is null (current route belongs to no top-level tab).
                     if (selectedIndex != null && itemWidth > 0f) {
                         drawRoundRect(
                             color = indicatorColor,
@@ -310,7 +329,7 @@ private fun PillNav(
                     selected = index == selectedIndex,
                     compactNav = compactNav,
                     onNavigate = { onNavigate(dest.route) },
-                    // 等宽：每个 item 用固定宽度，保证指示器等分
+                    // Equal width: each item uses a fixed width so the indicator divides evenly
                     modifier = Modifier,
                 )
             }
@@ -319,7 +338,8 @@ private fun PillNav(
 }
 
 /**
- * 底部栏：全宽贴底，选中项亮度高亮（无黑块）。
+ * Bottom bar: full width flush to the bottom, selected item highlighted by brightness
+ * (no black block).
  */
 @Composable
 private fun BarNav(
@@ -328,9 +348,10 @@ private fun BarNav(
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // edge-to-edge：Surface 背景延伸到屏幕底（覆盖小白条区域），内部 Row 用
-    // navigationBarsPadding 让图标/文字避小白条。这样小白条画在 bar 背景之上，
-    // 不会有「bar 上移、下方露出一段背景色」的难看效果（Bug 2 修复）。
+    // edge-to-edge: the Surface background extends to the bottom of the screen (covering
+    // the gesture-bar area); the inner Row uses navigationBarsPadding so icons/text avoid
+    // the gesture bar. The gesture bar is then drawn over the bar background, avoiding the
+    // ugly "bar shifted up with a strip of background color exposed below" look (Bug 2 fix).
     Surface(
         color = MaterialTheme.colorScheme.surface,
         modifier = modifier.fillMaxWidth(),
@@ -342,8 +363,8 @@ private fun BarNav(
                 .navigationBarsPadding()
                 .padding(top = 6.dp),
         ) {
-            // 用 selectedTabIndexForRoute 与 PillNav 一致地判断选中态
-            // （二级页 library/{bookId} → Library, recycle_bin → Me）。
+            // Use selectedTabIndexForRoute so selection matches PillNav
+            // (secondary pages: library/{bookId} maps to Library, recycle_bin maps to Me).
             val selectedIndex = selectedTabIndexForRoute(currentRoute)
             topDestinations.forEachIndexed { index, dest ->
                 val selected = index == selectedIndex
@@ -376,13 +397,15 @@ private fun NavItem(
                 indication = null,
                 onClick = onNavigate,
             )
-            // 简约 ↔ 非简约过渡（审核反馈）：用 animateContentSize 让 Column 高度变化
-            // （标签出现/消失导致的高度差）平滑过渡。tween 200ms FastOutSlowIn —— 干脆不晃，
-            // 固定时长比 spring 可预测（spring MediumLow 太软像在晃）。
+            // Compact vs non-compact transition (review feedback): animateContentSize
+            // smooths the Column height change (the height delta from the label appearing
+            // or disappearing). tween 200ms FastOutSlowIn: crisp without wobble; a fixed
+            // duration is more predictable than a spring (spring MediumLow is too soft and
+            // feels wobbly).
             .animateContentSize(
                 animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
             )
-            // 非简约 vertical=4dp（指示器胶囊形），简约 vertical=8dp（指示器圆形，不动）
+            // Non-compact vertical=4dp (pill-shaped indicator), compact vertical=8dp (circular indicator, unchanged)
             .padding(horizontal = if (compactNav) 18.dp else 22.dp, vertical = if (compactNav) 8.dp else 4.dp),
     ) {
         Icon(

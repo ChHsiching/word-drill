@@ -13,16 +13,20 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * 「我的」Tab 的软件设置 ViewModel（Ticket #9 + #16）。
+ * Software-settings ViewModel of the "Me" tab (Ticket #9 + #16).
  *
- * 与 [MeViewModel]（统计聚合）分开：设置与统计是两个关注点，各自独立 observe Flow，
- * 避免设置变更触发统计的 combine 重订阅。
+ * Separate from [MeViewModel] (stats aggregation): settings and stats are two concerns;
+ * each observes its own Flow, so a settings change does not re-subscribe the stats
+ * combine.
  *
- * 主题：[themeMode] 订阅 [SettingsRepository.themePreference]，切换时落库，
- * [com.github.chsiching.worddrill.MainActivity] 同样订阅该 Flow → 全局配色立即生效。
+ * Theme: [themeMode] subscribes to [SettingsRepository.themePreference]; a switch is
+ * persisted, and [com.github.chsiching.worddrill.MainActivity] observes the same Flow, so
+ * the global palette takes effect immediately.
  *
- * Ticket #16 新增 UI 设置：隐藏音标 / 导航栏风格 / 简约导航。三者同样持久化到 DataStore，
- * 由 [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot] 订阅并驱动导航栏与卡片渲染。
+ * Ticket #16 adds UI settings: hide phonetics / nav bar style / compact navigation. All
+ * three are also persisted to DataStore and observed by
+ * [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot] to drive the nav bar and
+ * card rendering.
  */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -53,14 +57,14 @@ class SettingsViewModel @Inject constructor(
         initialValue = false,
     )
 
-    /** 用户选了新主题 → 落库，重启保持。 */
+    /** User picked a new theme: persist it so it survives restart. */
     fun setTheme(mode: ThemeMode) {
         viewModelScope.launch { settings.setTheme(mode) }
     }
 
     /**
-     * 在 [ThemeMode] 三态之间循环切换（审核反馈 4：主题行点击循环，不再弹对话框）。
-     * 顺序：LIGHT → DARK → SYSTEM → LIGHT …
+     * Cycles through the three [ThemeMode] states (review feedback 4: tapping the theme
+     * row cycles; no more dialog). Order: LIGHT, DARK, SYSTEM, back to LIGHT...
      */
     fun cycleTheme() {
         val next = when (themeMode.value) {
@@ -79,7 +83,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setNavStyle(style) }
     }
 
-    /** 在 [NavStyle.PILL] / [NavStyle.BAR] 之间循环切换。 */
+    /** Cycles between [NavStyle.PILL] and [NavStyle.BAR]. */
     fun cycleNavStyle() {
         val next = if (navStyle.value == NavStyle.PILL) NavStyle.BAR else NavStyle.PILL
         setNavStyle(next)

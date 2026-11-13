@@ -14,16 +14,22 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * 回收站页面（Ticket #22）：列出 deleted=1 的词书和词书-词条关联，支持恢复 / 永久删除。
+ * Recycle bin page (Ticket #22): lists deleted=1 books and book-word links, supporting
+ * restore and permanent delete.
  *
- * 两类条目：
- * - **词书**（[books]）：整本词书被软删（[Book.deleted]=1）。恢复 = 整本书回列表；
- *   永久删除 = 真 DELETE book（CASCADE 清其下 book_word 关联）。
- * - **词条关联**（[entries]）：某词书的某词条关联被软删（[com.github.chsiching.worddrill.data.local.entity.BookWord.deleted]=1）。
- *   恢复 = 该词回原词书；永久删除 = 真 DELETE 该关联行。
+ * Two kinds of items:
+ * - **Books** ([books]): a whole book soft-deleted ([Book.deleted]=1). Restore = the whole
+ *   book returns to the list; permanent delete = a real DELETE of the book (CASCADE clears
+ *   its book_word links).
+ * - **Word links** ([entries]): a word link of some book soft-deleted
+ *   ([com.github.chsiching.worddrill.data.local.entity.BookWord.deleted]=1).
+ *   Restore = the word returns to its original book; permanent delete = a real DELETE of
+ *   that link row.
  *
- * 词书永久删除会 CASCADE 清掉其下所有关联（含软删的），所以词书段和词条段不会出现
- * 「词书已永久删但词条还在回收站」的不一致 —— INNER JOIN book/word 保证孤儿条目不展示。
+ * Permanently deleting a book CASCADEs away all its links (including soft-deleted ones),
+ * so the book section and the word section can never disagree with "book purged but its
+ * words still in the recycle bin"; the INNER JOIN on book/word keeps orphan entries from
+ * showing.
  */
 @HiltViewModel
 class RecycleBinViewModel @Inject constructor(
@@ -44,26 +50,26 @@ class RecycleBinViewModel @Inject constructor(
             initialValue = emptyList(),
         )
 
-    // ---- 词书恢复 / 永久删除 ----
+    // ---- book restore / permanent delete ----
 
-    /** 恢复词书：deleted 置 0，词书回到词库列表。 */
+    /** Restores a book: deleted set to 0, the book returns to the library list. */
     fun restoreBook(bookId: Long) {
         viewModelScope.launch { bookDao.restoreBook(bookId) }
     }
 
-    /** 永久删除词书：真 DELETE（CASCADE 清关联，调用前应由 UI 弹二次确认）。 */
+    /** Permanently deletes a book: real DELETE (CASCADE clears links; the UI should confirm before calling). */
     fun purgeBook(bookId: Long) {
         viewModelScope.launch { bookDao.purgeBook(bookId) }
     }
 
-    // ---- 词条关联恢复 / 永久删除 ----
+    // ---- word-link restore / permanent delete ----
 
-    /** 恢复词条关联：deleted 置 0，词回到原词书列表。 */
+    /** Restores a word link: deleted set to 0, the word returns to its original book list. */
     fun restoreEntry(bookId: Long, wordId: Long) {
         viewModelScope.launch { bookDao.setDeleted(bookId, wordId, deleted = false) }
     }
 
-    /** 永久删除词条关联：真 DELETE 关联行（不可恢复，调用前应由 UI 弹二次确认）。 */
+    /** Permanently deletes a word link: real DELETE of the link row (irreversible; the UI should confirm before calling). */
     fun purgeEntry(bookId: Long, wordId: Long) {
         viewModelScope.launch { bookDao.purgeDeleted(bookId, wordId) }
     }

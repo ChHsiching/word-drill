@@ -31,35 +31,39 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
 /**
- * Ticket #25 — E 风格弹窗（参考 designs/worddrill-dialogs/dialog-5-full.html 的 DialogE）。
+ * Ticket #25 E-style dialog (modeled on DialogE in designs/worddrill-dialogs/dialog-5-full.html).
  *
- * 替代 Material3 [androidx.compose.material3.AlertDialog]，改用 Compose 原生 [Dialog] +
- * 自定义 [Surface] 容器，圆角 18 + 阴影，按 Apple 风格排版。
+ * Replaces Material3 [androidx.compose.material3.AlertDialog] with the Compose-native [Dialog]
+ * plus a custom [Surface] container, 18dp corners + shadow, Apple-style layout.
  *
- * 设计稿关键尺寸（与现有 token 对齐）：
- * - 容器圆角 18dp；padding 20/18/14（顶/横/底）；按钮区 padding 0/16/16
- * - 标题 17sp / 600 / 居中 / letterSpacing -0.3px
- * - 消息 13sp / secondary / 居中 / line-height 1.5
- * - 按钮 pill：圆角 12，padding 12，水平排列 gap 8；主按钮实心 onSurface、
- *   取消 chipBg + secondary、destructive 浅红底 + iOS 红（[DestructiveFg]）
+ * Key dimensions from the design spec (aligned with existing tokens):
+ * - Container corner radius 18dp; padding 20/18/14 (top/sides/bottom); button area padding 0/16/16
+ * - Title 17sp / 600 / centered / letterSpacing -0.3px
+ * - Message 13sp / secondary / centered / line-height 1.5
+ * - Button pill: corner radius 12, padding 12, horizontal row with gap 8; primary button solid
+ *   onSurface, cancel chipBg + secondary, destructive light red fill + iOS red ([DestructiveFg])
  *
- * 与设计稿的已知偏差（Compose 平台限制，非实现疏漏）：
- * - **scrim 不做 backdrop blur**：设计稿 CSS `backdrop-filter: blur(3px)` 模糊背后内容，
- *   但 [Dialog] 在独立 Window 渲染，scrim 由系统画 flat 色，无法对背后内容做模糊。
- *   要真 backdrop blur 需对宿主 Activity 套 RenderEffect（性能/复杂度大，超出弹窗职责），
- *   本实现保留系统默认 scrim dim（实测深色态背景 → 纯黑，浅色态 → 半透黑）。
- * - **单层阴影**：设计稿要 close(0 4px 16px) + ambient(0 24px 48px) 两层，但 Compose
- *   [Modifier.shadow] 只支持一层 elevation + spot/ambient 双色通道。用 24dp elevation
- *   做近似（视觉上是大范围柔和阴影），不做两层叠加。
+ * Known deviations from the design spec (Compose platform limits, not implementation slips):
+ * - **No backdrop blur on the scrim**: the design spec's CSS `backdrop-filter: blur(3px)` blurs
+ *   the content behind, but [Dialog] renders in its own Window and the system paints the scrim
+ *   as a flat color, so the content behind cannot be blurred. Real backdrop blur would require
+ *   a RenderEffect on the host Activity (a big cost in performance and complexity, beyond a
+ *   dialog's job), so this implementation keeps the system default scrim dim (measured: the
+ *   dark-theme scrim is pure black, the light-theme one translucent black).
+ * - **Single-layer shadow**: the design spec wants two layers, close(0 4px 16px) +
+ *   ambient(0 24px 48px), but Compose [Modifier.shadow] supports only one elevation plus the
+ *   spot/ambient color channels. 24dp elevation approximates it (visually a wide soft shadow);
+ *   no two-layer stacking.
  *
- * 调用方只填 [title] / [message] / [content] / [buttons] 三段之一 + 按钮列表，
- * 所有 11 个弹窗的视觉都收敛到这一个 composable。
+ * Callers fill in one of the three sections [title] / [message] / [content] plus a button
+ * list; the visuals of all 11 dialogs converge into this one composable.
  *
- * @param onDismissRequest scrim 点击 / 返回键时调用
- * @param title 顶部标题（17sp / 600 / 居中）
- * @param message 标题下方说明文字（13sp / secondary / 居中）；与 [content] 二选一或都给
- * @param content 自定义主体（输入框、文件选择等）；与 [message] 可同时存在
- * @param buttons 底部按钮区（[DialogButton] 列表，水平排列，gap 8dp）
+ * @param onDismissRequest called on scrim tap / back key
+ * @param title top title (17sp / 600 / centered)
+ * @param message explanatory text below the title (13sp / secondary / centered); pick either
+ *   this or [content], or supply both
+ * @param content custom body (input fields, file pickers, etc.); can coexist with [message]
+ * @param buttons bottom button area ([DialogButton] list, horizontal, gap 8dp)
  */
 @Composable
 fun WordDrillDialog(
@@ -73,15 +77,17 @@ fun WordDrillDialog(
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(
-            // 设计稿容器宽度 ~230dp（手机屏 320dp 居中）。关掉平台默认宽度，
-            // 用 widthIn 限宽 + fillMaxWidth 撑满 padding 后的最大可用宽度。
+            // Design spec container width ~230dp (centered on a 320dp phone screen). Platform
+            // default width is off; widthIn caps the width and fillMaxWidth stretches to the
+            // max available width after padding.
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = true,
         ),
     ) {
         Surface(
-            // 圆角 18 + 单层柔和阴影（24dp elevation，spot/ambient 双通道 0.10 alpha）。
-            // 设计稿要 close+ambient 两层，但 Modifier.shadow 只支持一层；详见文件头注释。
+            // Corner radius 18 + a single soft shadow (24dp elevation, spot/ambient channels
+            // both at 0.10 alpha). The design spec wants close+ambient two layers, but
+            // Modifier.shadow supports only one; see the file-header comment.
             modifier = modifier
                 .widthIn(max = 320.dp)
                 .shadow(
@@ -134,14 +140,15 @@ fun WordDrillDialog(
 }
 
 /**
- * E 风格弹窗按钮（pill 色块，[WordDrillDialog] 专用）。
+ * E-style dialog button (pill block, for [WordDrillDialog] only).
  *
- * 必须放在 [RowScope]（[WordDrillDialog] 的按钮区）里：`Modifier.weight(1f)` 让按钮等宽铺满。
+ * Must sit inside a [RowScope] (the button area of [WordDrillDialog]): `Modifier.weight(1f)`
+ * makes the buttons equal width and fill the row.
  *
- * 三种样式对应设计稿：
- * - [DialogButtonStyle.Primary]：实心 onSurface，反色文字，600（确认/导出/导入/关闭/确定）
- * - [DialogButtonStyle.Cancel]：chipBg 背景 + secondary 文字，500（取消/关闭非破坏）
- * - [DialogButtonStyle.Destructive]：[DestructiveBg] 浅红底 + [DestructiveFg] 红字，500
+ * Three styles matching the design spec:
+ * - [DialogButtonStyle.Primary]: solid onSurface, inverted text, 600 (confirm/export/import/close/OK)
+ * - [DialogButtonStyle.Cancel]: chipBg background + secondary text, 500 (cancel/non-destructive close)
+ * - [DialogButtonStyle.Destructive]: [DestructiveBg] light red fill + [DestructiveFg] red text, 500
  */
 @Composable
 fun RowScope.DialogButton(
@@ -181,17 +188,19 @@ fun RowScope.DialogButton(
     }
 }
 
-/** E 风格弹窗按钮样式（决定底色 + 文字色 + 字重）。 */
+/** E-style dialog button style (decides fill + text color + weight). */
 enum class DialogButtonStyle { Primary, Cancel, Destructive }
 
 /**
- * E 风格弹窗输入框（[WordDrillDialog] 专用 TextField，匹配设计稿）。
+ * E-style dialog text field (TextField for [WordDrillDialog], matching the design spec).
  *
- * 设计稿规范：
- * - chipBg 填充 + 10dp 圆角；normal 态 border 透明（视觉上无边），focus 态 border 变 primary
- * - 15sp 字号；error 态 border 变 [DestructiveFg]
+ * Design spec:
+ * - chipBg fill + 10dp corner radius; normal-state border transparent (visually borderless),
+ *   focus-state border becomes primary
+ * - 15sp font size; error-state border becomes [DestructiveFg]
  *
- * 这是 [OutlinedTextField] 的颜色定制包装，不动其他行为（保留 IME、剪贴板、screen reader 等）。
+ * This is a color-customized wrapper around [OutlinedTextField]; other behavior is untouched
+ * (IME, clipboard, screen reader, etc. are preserved).
  */
 @Composable
 fun DialogTextField(
@@ -234,7 +243,7 @@ fun DialogTextField(
             focusedSupportingTextColor = colors.primary,
             unfocusedSupportingTextColor = colors.onSurfaceVariant,
             errorSupportingTextColor = DestructiveFg,
-            // normal 态 border 透明（视觉上无边），focus → primary，error → 红
+            // normal-state border transparent (visually borderless); focus becomes primary, error becomes red
             focusedBorderColor = colors.primary,
             unfocusedBorderColor = Color.Transparent,
             disabledBorderColor = Color.Transparent,

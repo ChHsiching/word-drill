@@ -24,10 +24,13 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * 「库」Tab 对话框状态：未打开 / 新建 / 重命名 / 删除确认 / 从文件导入 / 导入完成。
+ * Dialog states of the "Library" tab: none / create / rename / delete confirm / import
+ * from file / import done.
  *
- * - [Import]：选文件 + 输入词书名 → 提交（working=true 表示正在写库）
- * - [ImportDone]：导入完成（带 [ImportSummary]），由 Composable 展示后 dismiss
+ * - [Import]: pick a file + enter a book name, then submit (working=true means the
+ *   database write is in progress)
+ * - [ImportDone]: import finished (carrying [ImportSummary]); the Composable shows it and
+ *   then dismisses
  */
 sealed interface LibraryDialog {
     data object None : LibraryDialog
@@ -47,8 +50,9 @@ sealed interface LibraryDialog {
 }
 
 /**
- * 「库」Tab 的 UI 状态：词书列表（含词条数）+ 当前选中 + 对话框态。
- * books 与 currentBookId 合并成一个 Flow，任一变化列表整体重渲染。
+ * UI state of the "Library" tab: book list (with word counts) + current selection + dialog
+ * state. books and currentBookId are merged into one Flow; any change re-renders the whole
+ * list.
  */
 data class LibraryUiState(
     val books: List<BookWithCount> = emptyList(),
@@ -57,14 +61,18 @@ data class LibraryUiState(
 )
 
 /**
- * 「库」Tab 的 ViewModel。
+ * ViewModel of the "Library" tab.
  *
- * - 列表由 [BookDao.observeAll] 驱动（预置在前、按 name 升序）
- * - 当前选中由 [SettingsRepository.currentBookId] 标记，切换写入 DataStore
- *   → 「刷」Tab 监听同源 Flow 自动重载（规格：「刷」Tab 刷卡内容立即切换）
- * - 新建：显式查重（不靠 @Insert REPLACE 去重，交接链坑 C）
- * - 删除：二次确认后走 [BookDao.deleteCustom]（预置由 SQL 的 isPreset=0 兜底）
- * - 文件导入（#21）：SAF 选 Uri + 输入词书名 → [FileWordImporter.import] → ImportDone
+ * - The list is driven by [BookDao.observeAll] (presets first, ascending by name)
+ * - The current selection is tracked via [SettingsRepository.currentBookId]; a switch
+ *   writes to DataStore, and the "Drill" tab observes the same-source Flow and reloads
+ *   automatically (spec: the "Drill" tab's card content switches immediately)
+ * - Create: explicit duplicate check (no relying on @Insert REPLACE dedup; handoff-chain
+ *   pitfall C)
+ * - Delete: double confirmation then [BookDao.deleteCustom] (presets are guarded by the
+ *   SQL isPreset=0 condition)
+ * - File import (#21): SAF picks a Uri + book name entry, then [FileWordImporter.import],
+ *   then ImportDone
  */
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
@@ -88,18 +96,18 @@ class LibraryViewModel @Inject constructor(
         initialValue = LibraryUiState(),
     )
 
-    // ---- 切换当前词书 ----
+    // ---- switch current book ----
 
-    /** 设为当前词书：写 DataStore，「刷」Tab 监听同源 Flow 立即重载。 */
+    /** Sets the current book: writes DataStore; the "Drill" tab observes the same-source Flow and reloads immediately. */
     fun selectBook(bookId: Long) {
         viewModelScope.launch { settings.setCurrentBookId(bookId) }
     }
 
-    // ---- 新建 ----
+    // ---- create ----
 
     fun openCreateDialog() { _dialog.value = LibraryDialog.Create() }
 
-    /** 实时校验输入（对话框内 TextField onValueChange 调用）。重命名排除自身。 */
+    /** Validates input as it changes (called by the dialog TextField's onValueChange). Rename excludes the book itself. */
     fun onNameInput(name: String) {
         val all = uiState.value.books
         val current = (_dialog.value as? LibraryDialog.Rename)?.bookId
@@ -109,47 +117,47 @@ class LibraryViewModel @Inject constructor(
             is LibraryDialog.Create -> d.copy(name = name, error = error)
             is LibraryDialog.Rename -> d.copy(name = name, error = error)
             is LibraryDialog.Import -> d.copy(name = name, error = error)
-            is LibraryDialog.Delete -> d // 删除确认对话框无输入框，不响应名称输入
+            is LibraryDialog.Delete -> d // delete-confirm dialog has no input field; ignore name input
             LibraryDialog.None, is LibraryDialog.ImportDone -> d
         }
     }
 
-    /** 提交新建：通过校验才写库；预置/自定义重名一律拒绝。 */
+    /** Submits creation: writes only after validation passes; duplicates rejected for both preset and custom books. */
     fun submitCreate() {
         val d = _dialog.value as? LibraryDialog.Create ?: return
-        if (d.error != null) return // validateBookName 已在 trim 后校验，通过即非空
+        if (d.error != null) return // validateBookName already checks after trim; passing means non-empty
         viewModelScope.launch {
             bookDao.insert(Book(name = d.name.trim(), isPreset = false))
             _dialog.value = LibraryDialog.None
         }
     }
 
-    // ---- 重命名 ----
+    // ---- rename ----
 
     fun openRenameDialog(bookId: Long) {
         val book = uiState.value.books.firstOrNull { it.bookId == bookId } ?: return
         _dialog.value = LibraryDialog.Rename(bookId = bookId, name = book.name)
     }
 
-    /** 提交重命名：排除自身后查重；通过校验才写库。DAO 层对预置词书兜底拒绝（返回 0）。 */
+    /** Submits rename: duplicate check excludes the book itself; writes only after validation passes. The DAO layer rejects preset books as a fallback (returns 0). */
     fun submitRename() {
         val d = _dialog.value as? LibraryDialog.Rename ?: return
-        if (d.error != null) return // validateBookName 已在 trim 后校验，通过即非空
+        if (d.error != null) return // validateBookName already checks after trim; passing means non-empty
         viewModelScope.launch {
             bookDao.rename(d.bookId, d.name.trim())
             _dialog.value = LibraryDialog.None
         }
     }
 
-    // ---- 删除（仅自定义，带二次确认 #18）----
+    // ---- delete (custom books only, double confirmation #18) ----
 
-    /** 打开删除确认对话框（书名用于对话框文案）。 */
+    /** Opens the delete-confirmation dialog (the book name is used in the dialog text). */
     fun openDeleteDialog(bookId: Long) {
         val book = uiState.value.books.firstOrNull { it.bookId == bookId } ?: return
         _dialog.value = LibraryDialog.Delete(bookId = bookId, name = book.name)
     }
 
-    /** 确认删除：DAO 层已用 isPreset=0 兜底，预置词书不会被删。 */
+    /** Confirms deletion: the DAO layer guards with isPreset=0, so preset books are never deleted. */
     fun submitDelete() {
         val d = _dialog.value as? LibraryDialog.Delete ?: return
         viewModelScope.launch {
@@ -158,17 +166,17 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    // ---- 文件导入（Ticket #21）----
+    // ---- file import (Ticket #21) ----
 
     fun openImportDialog() { _dialog.value = LibraryDialog.Import() }
 
-    /** SAF 回调：用户选完文件后由 Composable 传入 Uri + 文件名（取自 Cursor DISPLAY_NAME）。 */
+    /** SAF callback: after the user picks a file, the Composable passes in the Uri + filename (read from Cursor DISPLAY_NAME). */
     fun onFileSelected(uri: Uri, filename: String) {
         val d = _dialog.value as? LibraryDialog.Import ?: return
         _dialog.value = d.copy(uri = uri, filename = filename, failureMessage = null, failureDetail = null)
     }
 
-    /** 提交导入：通过校验（名称 + 必须选文件）才走 [FileWordImporter.import]。 */
+    /** Submits import: runs [FileWordImporter.import] only after validation (name + a file must be picked). */
     fun submitImport() {
         val d = _dialog.value as? LibraryDialog.Import ?: return
         if (d.error != null) return

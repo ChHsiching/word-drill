@@ -55,19 +55,25 @@ import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 
 /**
- * 「库」Tab（Ticket #6 + #16 重写 + #21 文件导入）：词书列表 + 切换/新建/重命名/删除/导入。
+ * "Library" tab (Ticket #6 + #16 rewrite + #21 file import): book list + switch/create/
+ * rename/delete/import.
  *
- * 设计稿（#16）：去掉 CenterAlignedTopAppBar，改大标题；纯文字列表（无前置 icon）；
- * 选中态用浅灰背景（chipBg）+ check + 文字加粗；原地选中不跳转。
+ * Design spec (#16): dropped CenterAlignedTopAppBar for a large title; plain-text list (no
+ * leading icon); selected state uses a light gray background (chipBg) + check + bold text;
+ * selection happens in place with no navigation.
  *
- * 保留 Ticket #6/#11 的能力：
- * - 点行主体 → 设为当前词书（写 DataStore，「刷」Tab 监听同源 Flow 立即重载）
- * - 点行尾 chevron → 进入词书内词条列表（[WordListScreen]）
- * - 自定义词书：重命名/删除入口（保留原 TextButton，与既有交互一致）
+ * Keeps the Ticket #6/#11 abilities:
+ * - Tap the row body: set as current book (writes DataStore; the "Drill" tab observes the
+ *   same-source Flow and reloads immediately)
+ * - Tap the trailing chevron: open the book's word list ([WordListScreen])
+ * - Custom books: rename/delete entries (kept as TextButtons, matching the existing
+ *   interaction)
  *
- * Ticket #21 新增：「+ 新建词书」按钮下方加「从文件导入」按钮，弹 SAF + 输入词书名。
+ * Ticket #21 addition: an "import from file" button below the "+ create book" button,
+ * opening SAF + a book-name input.
  *
- * 预置词书不显示重命名/删除（isPreset 判定，DAO 层 rename/deleteCustom 也有 isPreset=0 兜底）。
+ * Preset books do not show rename/delete (isPreset check; the DAO layer's
+ * rename/deleteCustom also guards with isPreset=0).
  */
 @Composable
 fun LibraryScreen(
@@ -166,8 +172,9 @@ fun LibraryScreen(
 }
 
 /**
- * 词书行：纯文字（书名 + 副标题）+ 选中态 chipBg 背景 + check。
- * 点行主体 = 设为当前；尾 chevron = 进词条列表；自定义词书的重命名/删除 TextButton。
+ * Book row: plain text (name + subtitle) + chipBg background and check in the selected
+ * state. Row body tap = set as current; trailing chevron = open the word list; custom
+ * books get rename/delete TextButtons.
  */
 @Composable
 private fun BookRow(
@@ -214,7 +221,7 @@ private fun BookRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp),
                 )
-                // 自定义词书的重命名/删除入口（TextButton，贴副标题下方，与既有交互一致）
+                // Rename/delete entries for custom books (TextButtons under the subtitle, matching the existing interaction)
                 if (!book.isPreset) {
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         TextButton(onClick = onRename, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
@@ -226,7 +233,7 @@ private fun BookRow(
                     }
                 }
             }
-            // 选中态 check（secondary 色，无反色）
+            // Selected-state check (secondary color, no inversion)
             if (isCurrent) {
                 Icon(
                     imageVector = Icons.Outlined.Check,
@@ -235,7 +242,7 @@ private fun BookRow(
                     modifier = Modifier.size(18.dp),
                 )
             }
-            // 尾 chevron —— 进词条列表
+            // Trailing chevron: opens the word list
             IconButton(onClick = onOpen) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
@@ -247,7 +254,7 @@ private fun BookRow(
     }
 }
 
-/** 新建词书按钮：chipBg 背景，圆角 14，Plus 图标 + 文案居中。 */
+/** Create-book button: chipBg background, corner radius 14, Plus icon + centered label. */
 @Composable
 private fun AddBookButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
@@ -279,8 +286,9 @@ private fun AddBookButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 /**
- * 从文件导入按钮（Ticket #21）：与 [AddBookButton] 同位置风格，但用 OutlinedButton
- * 区分主次（"新建"是主入口，"导入"是次入口）。
+ * Import-from-file button (Ticket #21): same placement and style family as
+ * [AddBookButton], but an OutlinedButton to set it apart (create is the primary entry,
+ * import the secondary one).
  */
 @Composable
 private fun ImportBookButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -338,13 +346,14 @@ private fun BookNameDialog(
 }
 
 /**
- * 文件导入对话框（Ticket #21）。
+ * File import dialog (Ticket #21).
  *
- * - 顶部说明文案（支持的格式 + 列结构）
- * - 「选择文件」按钮触发 SAF（OpenDocument，mime 过滤 xlsx/txt/csv/pdf/任意）
- * - 已选文件名展示
- * - 词书名输入框（沿用 BookNameValidation 校验）
- * - 确定按钮：选了文件 + 名称通过校验 + 非 working 才可点
+ * - Explaining text at the top (supported formats + column structure)
+ * - "Pick file" button triggers SAF (OpenDocument, mime filter xlsx/txt/csv/pdf/any)
+ * - Shows the picked filename
+ * - Book-name input (reuses BookNameValidation)
+ * - Confirm button: clickable only when a file is picked, the name passes validation, and
+ *   not working
  */
 @Composable
 private fun ImportBookDialog(
@@ -359,7 +368,7 @@ private fun ImportBookDialog(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri: Uri? ->
         if (uri != null) {
-            // 从 Uri Cursor 取 DISPLAY_NAME；取不到时 fallback 到 uri.lastPathSegment
+            // Read DISPLAY_NAME from the Uri Cursor; fall back to uri.lastPathSegment when unavailable
             val filename = queryFilename(context, uri)
             onPickFile(uri, filename)
         }
@@ -446,7 +455,7 @@ private fun ImportBookDialog(
     )
 }
 
-/** 从 SAF Uri 查文件名（DISPLAY_NAME 列）。取不到时 fallback 到 lastPathSegment。 */
+/** Looks up the filename from a SAF Uri (DISPLAY_NAME column). Falls back to lastPathSegment when unavailable. */
 private fun queryFilename(context: android.content.Context, uri: Uri): String {
     return runCatching {
         context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
@@ -457,7 +466,7 @@ private fun queryFilename(context: android.content.Context, uri: Uri): String {
 }
 
 /**
- * 导入完成对话框（Ticket #21）。展示 [ImportSummary]，用户点确定关闭。
+ * Import-done dialog (Ticket #21). Shows [ImportSummary]; the user closes it with OK.
  */
 @Composable
 private fun ImportDoneDialog(
@@ -479,9 +488,10 @@ private fun ImportDoneDialog(
 }
 
 /**
- * 删除词书二次确认对话框（Ticket #18）。
- * 取消是安全选项（默认）；删除用 destructive 浅红底按钮提示破坏性。DAO 层 isPreset=0 兜底，
- * UI 层已对预置词书隐藏删除入口，这里只处理自定义词书。
+ * Delete-book double-confirmation dialog (Ticket #18).
+ * Cancel is the safe option (default); delete uses a destructive light-red button to signal
+ * the risk. The DAO layer guards with isPreset=0, and the UI already hides the delete entry
+ * for preset books, so only custom books reach here.
  */
 @Composable
 private fun DeleteBookDialog(

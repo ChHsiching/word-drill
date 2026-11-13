@@ -40,7 +40,7 @@ import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
 import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 
-/** 待永久删除的目标（ sealed 区分词书 / 词条，用于确认对话框文案）。 */
+/** Target pending permanent deletion (sealed to tell books and word entries apart, used for the confirm-dialog text). */
 private sealed interface PurgeTarget {
     val displayName: String
     data class BookItem(val bookId: Long, override val displayName: String) : PurgeTarget
@@ -48,14 +48,16 @@ private sealed interface PurgeTarget {
 }
 
 /**
- * 回收站页面（Ticket #22）：列出软删的词书和词条关联，支持恢复 / 永久删除。
+ * Recycle bin page (Ticket #22): lists soft-deleted books and word links, supporting
+ * restore and permanent delete.
  *
- * 两段列表：先是「词书」段（整本被软删），后是「词条」段（某词书的某词条被软删）。
- * 每项有「恢复」/「永久删除」两个 TextButton；永久删除二次确认（error 色，不可撤销）。
- * 空态：两类都为空时居中显示「回收站为空」。
+ * Two list sections: "Books" first (whole books soft-deleted), then "Words" (a word of
+ * some book soft-deleted). Each item has Restore and Permanent delete TextButtons;
+ * permanent delete asks for confirmation (error color, irreversible). Empty state: when
+ * both are empty, "recycle bin is empty" shows centered.
  *
- * 与 [com.github.chsiching.worddrill.ui.library.WordListScreen] 同风格
- * （内联头部 + 行底分隔线）。
+ * Same style as [com.github.chsiching.worddrill.ui.library.WordListScreen]
+ * (inline header + row-bottom divider).
  */
 @Composable
 fun RecycleBinScreen(
@@ -69,7 +71,7 @@ fun RecycleBinScreen(
     val isEmpty = books.isEmpty() && entries.isEmpty()
 
     Column(modifier = modifier.fillMaxSize()) {
-        // 内联头部：back + 标题
+        // Inline header: back + title
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -240,9 +242,11 @@ private fun RowSeparator() {
 }
 
 /**
- * 永久删除二次确认对话框（Ticket #22）。
- * 与 [com.github.chsiching.worddrill.ui.library.WordListScreen] 的 DeleteWordDialog 同模式，
- * 但提示「不可撤销」（永久删除 = 真 DELETE，无法恢复），destructive 浅红底按钮。
+ * Permanent-delete double-confirmation dialog (Ticket #22).
+ * Same pattern as DeleteWordDialog in
+ * [com.github.chsiching.worddrill.ui.library.WordListScreen], but the text says
+ * "irreversible" (permanent delete = real DELETE, cannot be restored), with a destructive
+ * light-red button.
  */
 @Composable
 private fun PurgeConfirmDialog(

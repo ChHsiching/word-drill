@@ -28,26 +28,32 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Ticket #24 — App 启动动画 overlay。
+ * Ticket #24 app launch animation overlay.
  *
- * 设计稿：`designs/worddrill-icon/icon-03b-animation.html`（可播放 5 阶段原型）。
- * 坐标系沿用设计稿 SVG viewBox `0 0 80 80`，Canvas 内部按 (iconPx / 80) 缩放；
- * 图标显示尺寸 160dp（设计稿 110px 在 280px 手机壳内 ≈ 屏宽 39%，1080px@420dpi 屏 ≈ 160dp）。
+ * Design spec: `designs/worddrill-icon/icon-03b-animation.html` (playable 5-phase prototype).
+ * The coordinate system follows the design SVG viewBox `0 0 80 80`; the Canvas internally
+ * scales by (iconPx / 80). Icon display size is 160dp (the design's 110px is about 39% of
+ * screen width inside the 280px phone frame; a 1080px @ 420dpi screen works out to about
+ * 160dp).
  *
- * 5 个元素各持一对 [Animatable]：[ElementState.alpha] 与 [ElementState.translateX]（设计单位）。
- * 动画驱动在 [LaunchedEffect] 里用 [kotlinx.coroutines.launch] 并行，按设计稿时序：
+ * The 5 elements each hold a pair of [Animatable]s: [ElementState.alpha] and
+ * [ElementState.translateX] (design units). Animation drivers run in parallel inside
+ * [LaunchedEffect] with [kotlinx.coroutines.launch], following the design timing:
  *
- * - Phase 1 (0ms)：后卡 alpha 0→1、translateX +60→0（spring）
- * - Phase 2 (200ms)：前卡 alpha 0→1、translateX −60→0（spring）
- * - Phase 3 (600/700/800ms)：线1/3 从 +40、线2 从 −40 飞入（spring）
- * - Phase 4 (1100–1500ms)：停顿（无动作）
- * - Phase 5 (1500ms 起)：交错淡出（stagger）线1→线2→线3→后卡→前卡，每个 500ms tween、
- *   启动间隔 100ms（不等上一个结束，并行重叠），总时长 4×100 + 500 = 900ms
+ * - Phase 1 (0ms): back card alpha 0 to 1, translateX +60 to 0 (spring)
+ * - Phase 2 (200ms): front card alpha 0 to 1, translateX -60 to 0 (spring)
+ * - Phase 3 (600/700/800ms): line1/line3 fly in from +40, line2 from -40 (spring)
+ * - Phase 4 (1100-1500ms): pause (no action)
+ * - Phase 5 (from 1500ms): staggered fade-out of line1, line2, line3, back card, front
+ *   card; each a 500ms tween with a 100ms start interval (no waiting for the previous one
+ *   to finish; they overlap in parallel); total duration 4x100 + 500 = 900ms
  *
- * Reduced motion（`Settings.Global.ANIMATOR_DURATION_SCALE == 0`）时跳过动画，直接 [onFinished]。
+ * With reduced motion (`Settings.Global.ANIMATOR_DURATION_SCALE == 0`) the animation is
+ * skipped and [onFinished] fires directly.
  *
- * 调用方（MainActivity）：主内容始终在底层 composition，本 overlay 盖住顶层；
- * 动画完成调用 [onFinished]，调用方移除 overlay 揭示底层 UI。
+ * Caller (MainActivity): the main content is always in the composition underneath; this
+ * overlay covers the top. When the animation completes it calls [onFinished], and the
+ * caller removes the overlay to reveal the UI underneath.
  */
 @Composable
 fun AnimatedSplashOverlay(
@@ -67,9 +73,10 @@ fun AnimatedSplashOverlay(
     }
 
     if (reduceMotion) {
-        // Reduce motion：不渲染 overlay，直接揭示底层。
-        // 必须同时调 onReady（释放系统 splash keep 条件）和 onFinished（移除 overlay），
-        // 否则 setKeepOnScreenCondition 永远不释放，系统 splash 卡住。
+        // Reduce motion: do not render the overlay; reveal the layer underneath directly.
+        // Must call both onReady (release the system splash keep condition) and onFinished
+        // (remove the overlay), otherwise setKeepOnScreenCondition never releases and the
+        // system splash is stuck.
         LaunchedEffect(Unit) {
             onReady()
             onFinished()
@@ -78,8 +85,9 @@ fun AnimatedSplashOverlay(
     }
 
     LaunchedEffect(Unit) {
-        // composition 完成 + 帧时钟就绪 → 通知释放系统 splash。
-        // 此时 overlay 已在 composition 中，下一帧即开始绘制动画。
+        // Composition done + frame clock ready: notify to release the system splash.
+        // The overlay is already in the composition at this point; the animation starts
+        // drawing on the next frame.
         onReady()
         elements.values.forEach { it.alpha.snapTo(0f) }
         elements.forEach { (e, st) -> st.translateX.snapTo(e.flyInOffset) }
@@ -89,14 +97,14 @@ fun AnimatedSplashOverlay(
             stiffness = Spring.StiffnessMediumLow,
         )
 
-        // Phase 1: 后卡轮廓飞入（0ms）
+        // Phase 1: back card outline flies in (0ms)
         launch {
             elements[Element.BACK_CARD]!!.let { b ->
                 launch { b.alpha.animateTo(1f, springIn) }
                 b.translateX.animateTo(0f, springIn)
             }
         }
-        // Phase 2: 前卡实心飞入（200ms）
+        // Phase 2: solid front card flies in (200ms)
         launch {
             delay(200)
             elements[Element.FRONT_CARD]!!.let { f ->
@@ -104,7 +112,7 @@ fun AnimatedSplashOverlay(
                 f.translateX.animateTo(0f, springIn)
             }
         }
-        // Phase 3: 三条线交错飞入（600/700/800ms）
+        // Phase 3: three lines fly in staggered (600/700/800ms)
         launch {
             delay(600)
             elements[Element.LINE1]!!.let { l ->
@@ -127,10 +135,11 @@ fun AnimatedSplashOverlay(
             }
         }
 
-        // Phase 5: 交错淡出（stagger，非流水线）。
-        // 顺序：线1→线2→线3→后卡→前卡。每个元素**不等上一个结束**就启动，
-        // 启动间隔 100ms（紧凑、不拖沓），单个淡出 spring（critically damped，与飞入一致）。
-        // 多个元素同时处于不同淡出进度 → 视觉上有层次感。
+        // Phase 5: staggered fade-out (stagger, not a pipeline).
+        // Order: line1, line2, line3, back card, front card. Each element starts **without
+        // waiting for the previous one to finish**, with a 100ms start interval (compact,
+        // not sluggish); each fade-out is a spring (critically damped, same as fly-in).
+        // Several elements sit mid fade-out at different progresses, giving a layered look.
         val fadeOutOrder = listOf(
             Element.LINE1, Element.LINE2, Element.LINE3,
             Element.BACK_CARD, Element.FRONT_CARD,
@@ -143,8 +152,9 @@ fun AnimatedSplashOverlay(
             }
         }
 
-        // 全部淡出完成后揭示底层：最后一项（前卡）起始 1500 + 4*100 = 1900ms，
-        // spring 在 StiffnessMediumLow 下约 500ms 内稳定 → 等 2500ms 足够。
+        // Reveal the layer underneath after all fade-outs finish: the last item (front
+        // card) starts at 1500 + 4*100 = 1900ms, and the spring settles within about 500ms
+        // at StiffnessMediumLow, so waiting 2500ms is enough.
         delay(2500L)
         onFinished()
     }
@@ -159,21 +169,24 @@ fun AnimatedSplashOverlay(
             .background(bg),
         contentAlignment = Alignment.Center,
     ) {
-        // 设计稿：手机壳 280×500 内 icon 110px ≈ 屏宽 39%。
-        // 典型 1080px @ 420dpi（2.625x）屏 ≈ 421px = ~160dp。
+        // Design spec: icon 110px inside the 280x500 phone frame is about 39% of screen width.
+        // A typical 1080px @ 420dpi (2.625x) screen works out to about 421px = ~160dp.
         Canvas(modifier = Modifier.size(160.dp)) {
-            // 110dp 渲染像素 ÷ 80 设计单位 = 比例
+            // 110dp rendered pixels divided by 80 design units = scale
             val s = size.minDimension / 80f
-            // 用 scale 把整个绘图域缩放到设计空间：所有坐标（path / line / translate）
-            // 都用设计稿 80 单位坐标书写，scale 统一放大到实际像素。
-            // 关键：path 的坐标不能用 ×s 手算（Path 在 DrawScope 外构造，无法注入 s），
-            // 必须靠 scale 作用域整体放大，path 才会跟着变。
+            // scale maps the whole drawing domain from design space: every coordinate
+            // (path / line / translate) is written in the design's 80-unit coordinates, and
+            // scale enlarges them uniformly to real pixels.
+            // Key point: path coordinates cannot be pre-multiplied by s (Path is built
+            // outside the DrawScope, so s cannot be injected); the scale scope must enlarge
+            // everything as a whole so the path follows.
             //
-            // 内容垂直居中修正：设计内容 y [14,72] 中心 = 43，而 80 单位画布中心 = 40，
-            // 差 3 单位。先 translate(0, -3f) 让内容中心对齐画布中心，再 scale。
+            // Vertical centering correction: the design content spans y [14,72] with center
+            // 43, while the 80-unit canvas center is 40, a 3-unit difference. First
+            // translate(0, -3f) aligns the content center with the canvas center, then scale.
             translate(left = 0f, top = -3f * s) {
                 scale(s, pivot = Offset.Zero) {
-                // 后卡
+                // back card
                 elements[Element.BACK_CARD]?.let { st ->
                     val a = st.alpha.value
                     if (a > 0f) {
@@ -187,7 +200,7 @@ fun AnimatedSplashOverlay(
                         }
                     }
                 }
-                // 前卡
+                // front card
                 elements[Element.FRONT_CARD]?.let { st ->
                     val a = st.alpha.value
                     if (a > 0f) {
@@ -200,7 +213,7 @@ fun AnimatedSplashOverlay(
                         }
                     }
                 }
-                // 三条线（设计空间坐标）
+                // three lines (design-space coordinates)
                 fun drawTextLine(st: ElementState?, x1: Float, y1: Float, x2: Float, y2: Float) {
                     if (st == null) return
                     val a = st.alpha.value
@@ -225,7 +238,7 @@ fun AnimatedSplashOverlay(
     }
 }
 
-/** 构造设计 80 空间坐标的圆角矩形 [Path]（参数都是设计单位）。 */
+/** Builds a rounded-rectangle [Path] in the design's 80-unit space (all parameters are design units). */
 private fun roundRectPath(x: Float, y: Float, w: Float, h: Float, r: Float): Path = Path().apply {
     addRoundRect(
         androidx.compose.ui.geometry.RoundRect(
@@ -235,25 +248,26 @@ private fun roundRectPath(x: Float, y: Float, w: Float, h: Float, r: Float): Pat
     )
 }
 
-/** 5 个元素：[flyInOffset] 是设计空间单位（±40/±60）。 */
+/** 5 elements: [flyInOffset] is in design-space units (±40/±60). */
 private enum class Element(val flyInOffset: Float) {
-    BACK_CARD(60f),    // 后卡轮廓：右侧飞入
-    FRONT_CARD(-60f),  // 前卡实心：左侧飞入
-    LINE1(40f),        // 线1：右侧飞入
-    LINE2(-40f),       // 线2：左侧飞入
-    LINE3(40f),        // 线3：右侧飞入
+    BACK_CARD(60f),    // back card outline: flies in from the right
+    FRONT_CARD(-60f),  // solid front card: flies in from the left
+    LINE1(40f),        // line 1: flies in from the right
+    LINE2(-40f),       // line 2: flies in from the left
+    LINE3(40f),        // line 3: flies in from the right
 }
 
-/** 持有单个元素的 alpha / translateX 两个 [Animatable]，便于按枚举索引定位。 */
+/** Holds an element's alpha / translateX pair of [Animatable]s, addressable by enum key. */
 private class ElementState(
     val alpha: Animatable<Float, *>,
     val translateX: Animatable<Float, *>,
 )
 
 /**
- * 读取系统「移除动画」信号（Settings.Global.ANIMATOR_DURATION_SCALE == 0）。
- * 用户在「开发者选项 → 移除动画」或「无障碍 → 移除动画」开启后此值为 0。
- * 这是 Android 平台事实标准的 reduce motion 入口（与 prefers-reduced-motion 等价）。
+ * Reads the system "remove animations" signal (Settings.Global.ANIMATOR_DURATION_SCALE == 0).
+ * The value is 0 after the user enables Developer options, Remove animations, or
+ * Accessibility, Remove animations. This is Android's de facto reduce-motion entry point
+ * (equivalent to prefers-reduced-motion).
  */
 @Composable
 private fun rememberReduceMotion(): Boolean {

@@ -15,33 +15,34 @@ import androidx.compose.ui.unit.sp
 import com.github.chsiching.worddrill.R
 
 // ═══════════════════════════════════════════════════════════
-// Ticket #15 — 字体规范（来源：designs/worddrill-ui/screens.jsx 的 inline style）
+// Ticket #15 typography spec (source: inline styles in designs/worddrill-ui/screens.jsx)
 //
-// 设计稿把字体规范拆成三类：
-// 1. 英文：系统无衬线（SF Pro / Roboto），600 字重大标题、斜体词性
-// 2. 音标：Charis SIL（衬线，bundled in res/font/）
-// 3. 中文：设备原生中文字体（PingFang SC / Noto Sans SC），由系统 fallback
+// The design spec splits typography into three groups:
+// 1. English: system sans-serif (SF Pro / Roboto), 600-weight headlines, italic part of speech
+// 2. Phonetics: Charis SIL (serif, bundled in res/font/)
+// 3. Chinese: the device's native Chinese font (PingFang SC / Noto Sans SC), via system fallback
 //
-// Material3 [Typography] 只覆盖标准 slot（displaySmall/titleMedium/bodyLarge…），
-// 不够装设计稿的专属 TextStyles（音标 / 词性 / 中文释义）。后者通过
-// [WordDrillTypography] 扩展，由 [LocalWordDrillTypography] 暴露，使用方式：
+// Material3 [Typography] only covers the standard slots (displaySmall/titleMedium/bodyLarge...),
+// which cannot hold the design spec's dedicated TextStyles (phonetics / part of speech /
+// Chinese meaning). Those are added through [WordDrillTypography] and exposed via
+// [LocalWordDrillTypography]. Usage:
 //   MaterialTheme.wordDrillTypography.phonetic
 // ═══════════════════════════════════════════════════════════
 
-/** Charis SIL 字体族（音标专用，bundled）。Regular + Italic 已够用（音标不会用粗体）。 */
+/** Charis SIL font family (for phonetics, bundled). Regular + Italic are enough (phonetics never use bold). */
 val CharisSilFontFamily = FontFamily(
     Font(R.font.charis_sil_regular),
     Font(R.font.charis_sil_italic, style = FontStyle.Italic),
 )
 
 /**
- * 扩展字体 token：超出 Material3 [Typography] 标准槽位的专属 [TextStyle]。
+ * Extended typography tokens: dedicated [TextStyle]s beyond the standard Material3 [Typography] slots.
  *
- * - [word]：英文单词大标题（44px / 600 / 负字距）
- * - [phonetic]：音标（Charis SIL / 17px）
- * - [partOfSpeech]：词性（斜体 / 15px / tertiary 灰）
- * - [meaning]：中文释义（22px / 系统原生中文字体 —— fontFamily=null 走 PingFang SC / Noto Sans SC fallback）
- * - [statNumber]：统计大数字（tabular nums，等宽对齐）
+ * - [word]: large English word headline (44px / 600 / negative letter spacing)
+ * - [phonetic]: phonetic transcription (Charis SIL / 17px)
+ * - [partOfSpeech]: part of speech (italic / 15px / tertiary gray)
+ * - [meaning]: Chinese meaning (22px / system native Chinese font; fontFamily=null falls back to PingFang SC / Noto Sans SC)
+ * - [statNumber]: large stat number (tabular nums, monospaced alignment)
  */
 data class WordDrillTypography(
     val word: TextStyle,
@@ -59,8 +60,9 @@ private val DefaultLineHeightStyle = LineHeightStyle(
 
 @Composable
 fun provideWordDrillTypography(): WordDrillTypography {
-    // 注意：颜色统一在调用点用 MaterialTheme.colorScheme.* 注入，
-    // 这里只定义字号/字重/字距/字体族（颜色是 Composable 取的，不便在这里锁死）。
+    // Note: colors are injected at call sites via MaterialTheme.colorScheme.*.
+    // Only font size / weight / letter spacing / family are defined here (colors are
+    // resolved by Composables, so they are not pinned down here).
     return WordDrillTypography(
         word = TextStyle(
             fontWeight = FontWeight.SemiBold,
@@ -85,8 +87,9 @@ fun provideWordDrillTypography(): WordDrillTypography {
             lineHeightStyle = DefaultLineHeightStyle,
         ),
         meaning = TextStyle(
-            // fontFamily = null（默认）：系统 sans-serif + CJK fallback（PingFang SC / Noto Sans SC）。
-            // 设计稿用 '"PingFang SC", -apple-system, ..., sans-serif' —— Android 上系统默认已覆盖。
+            // fontFamily = null (default): system sans-serif + CJK fallback (PingFang SC / Noto Sans SC).
+            // The design spec uses '"PingFang SC", -apple-system, ..., sans-serif'; on Android the
+            // system default already covers this.
             fontWeight = FontWeight.Normal,
             fontSize = 22.sp,
             lineHeight = 30.sp,
@@ -112,15 +115,16 @@ val LocalWordDrillTypography = staticCompositionLocalOf<WordDrillTypography> {
     error("WordDrillTypography not provided. Wrap content in WordDrillTheme.")
 }
 
-/** 取当前主题的扩展字体 token（word / phonetic / partOfSpeech / meaning / statNumber）。 */
+/** Extended typography tokens for the current theme (word / phonetic / partOfSpeech / meaning / statNumber). */
 val MaterialTheme.wordDrillTypography: WordDrillTypography
     @Composable
     @ReadOnlyComposable
     get() = LocalWordDrillTypography.current
 
-// ── Material3 标准槽位 ───────────────────────────────────────
-// 现有 Composable 通过 MaterialTheme.typography.* 引用 M3 标准槽位，
-// 沿用默认值即可（系统无衬线字体）；本 ticket 只新增扩展 token，不重写标准槽位。
+// ── Material3 standard slots ────────────────────────────────
+// Existing Composables reference the M3 standard slots via MaterialTheme.typography.*,
+// so the defaults (system sans-serif) are kept; this ticket only adds the extended
+// tokens and does not rewrite the standard slots.
 
-/** M3 标准槽位（沿用默认，系统无衬线）。13c 可能按需覆盖。 */
+/** M3 standard slots (defaults kept, system sans-serif). 13c may override as needed. */
 val AppTypography = Typography()

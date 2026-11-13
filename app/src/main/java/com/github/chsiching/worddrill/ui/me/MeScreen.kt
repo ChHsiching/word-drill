@@ -65,14 +65,18 @@ import com.github.chsiching.worddrill.ui.theme.wordDrillTypography
 import kotlinx.coroutines.delay
 
 /**
- * 「我的」Tab（Ticket #8 + #9 + #10 + #16 重写）：统计卡片 + 分组设置 + 数据导出/导入。
+ * "Me" tab (Ticket #8 + #9 + #10 + #16 rewrite): stats card + grouped settings + data
+ * export/import.
  *
- * 设计稿（#16）：
- * - 大标题「我的」
- * - 统计卡片：今日大数字（56sp）+ 当前词书进度条（spring 宽度过渡）+ 累计（24sp）
- * - 设置分三组：显示（隐藏音标）/ 导航（导航栏风格 + 简约导航）/ 通用（主题 + 导出 + 导入 + 关于）
- * - toggle 用 [Toggle]（黑色配色，spring knob 动画），非 Material3 绿色 Switch
- * - 底部 padding 120dp（避免被浮动导航遮挡）
+ * Design spec (#16):
+ * - Large "Me" title
+ * - Stats card: today's big number (56sp) + current book progress bar (spring width
+ *   transition) + lifetime count (24sp)
+ * - Settings in three groups: Display (hide phonetics) / Navigation (nav bar style +
+ *   compact navigation) / General (theme + export + import + about)
+ * - Toggles use [Toggle] (black palette, spring knob animation), not the Material3 green
+ *   Switch
+ * - Bottom padding 120dp (keeps content clear of the floating nav)
  */
 @Composable
 fun MeScreen(
@@ -96,7 +100,7 @@ fun MeScreen(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 120.dp),
     ) {
-        // 大标题 + 右上角主题切换 icon（审核反馈 5）
+        // Large title + theme-switch icon at the top right (review feedback 5)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -113,13 +117,13 @@ fun MeScreen(
             ThemeToggleIcon(
                 themeMode = themeMode,
                 onToggle = { targetMode ->
-                    // 三态循环的目标主题（SYSTEM → LIGHT → DARK → SYSTEM）
+                    // Target theme of the three-state cycle (SYSTEM, LIGHT, DARK, back to SYSTEM)
                     settingsViewModel.setTheme(targetMode)
                 },
             )
         }
 
-        // 统计卡片
+        // Stats card
         StatsCard(
             state = state,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp),
@@ -127,7 +131,7 @@ fun MeScreen(
 
         Spacer(Modifier.size(24.dp))
 
-        // 显示组
+        // Display group
         SettingsGroup(label = stringResource(R.string.me_group_display)) {
             ToggleRow(
                 label = stringResource(R.string.me_setting_hide_phonetic),
@@ -138,7 +142,7 @@ fun MeScreen(
 
         Spacer(Modifier.size(16.dp))
 
-        // 导航组
+        // Navigation group
         SettingsGroup(label = stringResource(R.string.me_group_navigation)) {
             NavStyleRow(
                 current = navStyle,
@@ -154,7 +158,7 @@ fun MeScreen(
 
         Spacer(Modifier.size(16.dp))
 
-        // 通用组（审核反馈 5：主题切换移到右上角 icon，不再在通用组里占一行）
+        // General group (review feedback 5: theme switching moved to the top-right icon; no longer a row in this group)
         SettingsGroup(label = stringResource(R.string.me_group_general)) {
             DataSection(
                 status = exportStatus,
@@ -176,7 +180,7 @@ fun MeScreen(
 }
 
 /**
- * 统计卡片：今日大数字（56sp）+ 进度条（spring 宽度）+ 累计（24sp）。
+ * Stats card: today's big number (56sp) + progress bar (spring width) + lifetime count (24sp).
  */
 @Composable
 private fun StatsCard(state: MeStatsUiState, modifier: Modifier = Modifier) {
@@ -191,7 +195,7 @@ private fun StatsCard(state: MeStatsUiState, modifier: Modifier = Modifier) {
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // 今日 —— 最大数字
+            // Today: the biggest number
             Text(
                 text = state.todayCount.toString(),
                 style = typography.statNumberLarge.copy(color = colors.onSurface),
@@ -203,7 +207,7 @@ private fun StatsCard(state: MeStatsUiState, modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(top = 4.dp),
             )
 
-            // 进度条 —— 当前词书
+            // Progress bar: current book
             ProgressBar(
                 bookName = if (state.bookName.isEmpty()) stringResource(R.string.me_no_current_book) else state.bookName,
                 done = state.brushed,
@@ -212,14 +216,14 @@ private fun StatsCard(state: MeStatsUiState, modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(top = 28.dp),
             )
 
-            // 累计 —— 次级统计（顶部分隔线 + 大数字 + 标签）
+            // Lifetime count: secondary stat (top divider + big number + label)
             Box(
                 modifier = Modifier
                     .padding(top = 24.dp)
                     .fillMaxWidth(),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                // 顶部分隔线（先画，下方 Column 覆盖中间留出文字）
+                // Top divider (drawn first; the Column below covers the middle to leave room for text)
                 Box(
                     modifier = Modifier
                         .height(1.dp)
@@ -248,7 +252,7 @@ private fun StatsCard(state: MeStatsUiState, modifier: Modifier = Modifier) {
     }
 }
 
-/** 进度条：书名 + X/Y + 条 + 百分比，spring 宽度过渡。 */
+/** Progress bar: book name + X/Y + bar + percent, spring width transition. */
 @Composable
 private fun ProgressBar(
     bookName: String,
@@ -258,7 +262,7 @@ private fun ProgressBar(
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
-    // spring 宽度过渡：spec 0.5s spring。
+    // Spring width transition: spec calls for a 0.5s spring.
     val animatedFraction by animateFloatAsState(
         targetValue = (percent / 100f).coerceIn(0f, 1f),
         animationSpec = spring(
@@ -310,7 +314,7 @@ private fun ProgressBar(
     }
 }
 
-/** 设置分组：标题 + surface 卡片容器。 */
+/** Settings group: title + surface card container. */
 @Composable
 private fun SettingsGroup(label: String, content: @Composable () -> Unit) {
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -329,7 +333,7 @@ private fun SettingsGroup(label: String, content: @Composable () -> Unit) {
     }
 }
 
-/** 组内分隔线（0.5px separator，左右各留 16dp）。 */
+/** In-group divider (0.5px separator, 16dp inset on each side). */
 @Composable
 private fun InGroupSeparator() {
     Box(
@@ -341,7 +345,7 @@ private fun InGroupSeparator() {
     )
 }
 
-/** Toggle 设置行：左侧文案，右侧 Toggle。 */
+/** Toggle settings row: label on the left, Toggle on the right. */
 @Composable
 private fun ToggleRow(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
     Row(
@@ -360,7 +364,7 @@ private fun ToggleRow(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
     }
 }
 
-/** 导航栏风格行：点击循环 浮动胶囊 ↔ 底部栏，右侧当前值 + chevron。 */
+/** Nav bar style row: tap cycles floating pill and bottom bar; current value + chevron on the right. */
 @Composable
 private fun NavStyleRow(current: NavStyle, onClick: () -> Unit) {
     Row(
@@ -392,24 +396,27 @@ private fun NavStyleRow(current: NavStyle, onClick: () -> Unit) {
     }
 }
 
-/** 主题行：点击弹选择对话框。 */
+/** Theme row: tap opens a selection dialog. */
 /**
- * 右上角主题切换 icon（审核反馈 5）。
+ * Top-right theme-switch icon (review feedback 5).
  *
- * - 当前浅色 → 显示太阳 icon（点击切到下一态）
- * - 当前深色 → 显示月亮 icon
- * - 点击触发 [LocalThemeRevealTrigger]，以 icon 中心为圆心做 circular reveal 扩散
- * - SYSTEM 态：按系统当前深浅决定显示太阳还是月亮
+ * - Currently light: sun icon (tap switches to the next state)
+ * - Currently dark: moon icon
+ * - Tap triggers [LocalThemeRevealTrigger] for a circular reveal expanding from the icon
+ *   center
+ * - SYSTEM state: sun or moon depending on the system's current dark/light setting
  */
 /**
- * 右上角主题切换 icon（审核反馈 5）。
+ * Top-right theme-switch icon (review feedback 5).
  *
- * 点击：本地算「当前是否深色 → 目标 = 反过来」，传给 [LocalThemeRevealTrigger]
- * 触发 circular reveal；同时写 DataStore（cycleTheme）持久化。
+ * Tap: compute locally "currently dark? target = the opposite", pass it to
+ * [LocalThemeRevealTrigger] to fire the circular reveal; also write DataStore
+ * (cycleTheme) to persist.
  */
 /**
- * 主题三态循环：SYSTEM → LIGHT → DARK → SYSTEM。
- * 纯函数，便于本地预算目标（reveal 需要点击瞬间知道目标）。
+ * Theme three-state cycle: SYSTEM, LIGHT, DARK, back to SYSTEM.
+ * Pure function, so the target can be computed locally (the reveal must know the target
+ * the instant it is tapped).
  */
 private fun nextThemeMode(current: ThemeMode): ThemeMode = when (current) {
     ThemeMode.SYSTEM -> ThemeMode.LIGHT
@@ -423,7 +430,7 @@ private fun ThemeToggleIcon(
     onToggle: (targetMode: ThemeMode) -> Unit,
 ) {
     val trigger = LocalThemeRevealTrigger.current
-    // 三态各有 icon：LIGHT=太阳，DARK=月亮，SYSTEM=自动（A 带圈）
+    // One icon per state: LIGHT=sun, DARK=moon, SYSTEM=auto (circled A)
     val iconVector = when (themeMode) {
         ThemeMode.LIGHT -> Icons.Outlined.LightMode
         ThemeMode.DARK -> Icons.Outlined.DarkMode
@@ -462,7 +469,7 @@ private fun ThemeToggleIcon(
 }
 
 /**
- * 数据导出/导入区（Ticket #10）：嵌在通用组里，两项各一行。
+ * Data export/import section (Ticket #10): embedded in the General group, one row each.
  */
 @Composable
 private fun DataSection(
@@ -582,7 +589,7 @@ private fun DataRow(label: String, onClick: () -> Unit, enabled: Boolean = true)
     }
 }
 
-/** 关于行：右侧版本号。 */
+/** About row: version number on the right. */
 @Composable
 private fun AboutRow(onClick: () -> Unit) {
     Row(
@@ -606,7 +613,7 @@ private fun AboutRow(onClick: () -> Unit) {
     }
 }
 
-/** 导出/导入状态行。 */
+/** Export/import status line. */
 @Composable
 private fun StatusLine(status: ExportImportStatus, onClear: () -> Unit) {
     when (status) {

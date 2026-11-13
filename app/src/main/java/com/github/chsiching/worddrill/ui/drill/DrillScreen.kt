@@ -53,22 +53,27 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 /**
- * 「刷」Tab：全屏单卡片浏览（Ticket #5 + #16 重写）。
+ * "Drill" tab: full-screen single-card browsing (Ticket #5 + #16 rewrite).
  *
- * 顶部条（#16）：词书名（左） ↔ 跳过 + 锁定按钮（右）对称布局。
- * 锁定态下隐藏跳过按钮；锁定按钮图标变体 + 反色背景。
- * 切 Tab 自动解锁由 [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot] 负责
- * （切 Tab 时 reset locked = false）。
+ * Top bar (#16): book name (left) and skip + lock buttons (right) in a symmetric layout.
+ * The skip button hides in the locked state; the lock button swaps icon variant and
+ * inverts its background. Auto-unlock on tab switch is handled by
+ * [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot] (locked resets to false on
+ * a tab switch).
  *
- * 卡片（#16）：单词 → 音标（若有，Charis SIL，可被「隐藏音标」设置关闭）→ 分割线
- * → 义项列表（词性斜体 + 中文同行，一行一义项）。
+ * Card (#16): word, then phonetics (if present, Charis SIL, can be turned off by the
+ * "hide phonetics" setting), then a divider, then the sense list (italic part of speech
+ * on the same line as the Chinese, one sense per row).
  *
- * 计数：[DrillViewModel.onPageSettled]，沿用 Ticket #5 的纯函数 [shouldLogSwipe]。
+ * Counting: [DrillViewModel.onPageSettled], reusing the Ticket #5 pure function
+ * [shouldLogSwipe].
  *
- * @param locked 顶部锁定态（hoisted at [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot]，
- *   锁定时导航栏淡出、隐藏跳过、禁用 Pager 滑动）
- * @param onToggleLock 锁定按钮点击回调
- * @param hidePhonetic 「隐藏音标」设置生效时为 true，卡片不渲染音标行
+ * @param locked top-bar locked state (hoisted at
+ *   [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot]; when locked the nav bar
+ *   fades out, skip hides, Pager swiping is disabled)
+ * @param onToggleLock lock button click callback
+ * @param hidePhonetic true when the "hide phonetics" setting is active; the card omits the
+ *   phonetics line
  */
 @Composable
 fun DrillScreen(
@@ -133,9 +138,10 @@ internal fun DrillPager(
             onToggleLock = onToggleLock,
             isReviewBook = isReviewBook,
             onAction = { page ->
-                // issue #1：复习词书用「恢复」(onRestore)，普通词书用「跳过」(onSkip)。
-                // 两者的卡片消失行为一致（恢复/跳过后词都从当前列表移除），
-                // pager 停在同 index 指向下一张。
+                // issue #1: the review book uses "Restore" (onRestore), regular books use
+                // "Skip" (onSkip). Both remove the card the same way (the word leaves the
+                // current list after restore/skip), and the pager stays at the same index
+                // pointing at the next card.
                 if (isReviewBook) onRestore(page) else onSkip(page)
             },
             currentPage = pagerState.currentPage,
@@ -144,9 +150,10 @@ internal fun DrillPager(
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
-            // 审核反馈 3：锁定不禁用卡片滑动。锁定只隐藏导航栏 + 跳过按钮（见 WordDrillRoot
-            // 的 BottomNavOverlay.hidden 和 DrillTopBar 的 AnimatedVisibility），
-            // 用户锁定后仍可左右滑卡片浏览。
+            // Review feedback 3: locking does not disable card swiping. Locking only hides
+            // the nav bar + skip button (see BottomNavOverlay.hidden in WordDrillRoot and
+            // the AnimatedVisibility in DrillTopBar); the user can still swipe through
+            // cards while locked.
         ) { pageIndex ->
             WordCard(
                 word = cards[pageIndex],
@@ -157,14 +164,18 @@ internal fun DrillPager(
 }
 
 /**
- * 顶部条：词书名（左） · 计数器（中） · 跳过+锁定（右）。
+ * Top bar: book name (left), counter (center), skip + lock (right).
  *
- * 三段布局：[词书名 weight 1f][Spacer weight 1f][按钮 intrinsic]。
- * 词书名最多占左半（剩余空间的一半），Spacer 占中间留给计数器叠加层，按钮按 intrinsic
- * 宽度贴最右。这样长名字只会换行在左半区，绝不侵入计数器水平区域，更不会挤压按钮。
- * 短名字时 Text 不撑满 weight，左对齐视觉不变；计数器由叠加层 Text 绝对居中。
+ * Three-part layout: [book name weight 1f][Spacer weight 1f][buttons intrinsic].
+ * The book name takes at most the left half (half of the remaining space), the Spacer
+ * fills the middle for the counter overlay, and the buttons hug the far right at their
+ * intrinsic width. A long name therefore wraps within the left half only; it never
+ * encroaches on the counter's horizontal area and never squeezes the buttons. With a
+ * short name the Text does not fill its weight, so the left-aligned look is unchanged;
+ * the counter is absolutely centered by the overlay Text.
  *
- * 锁定态隐藏跳过（AnimatedVisibility fade），锁定按钮反色背景 + LockOpen 图标。
+ * The locked state hides skip (AnimatedVisibility fade); the lock button gets an inverted
+ * background + LockOpen icon.
  */
 @Composable
 private fun DrillTopBar(
@@ -177,8 +188,9 @@ private fun DrillTopBar(
     onAction: (currentPage: Int) -> Unit,
     currentPage: Int,
 ) {
-    // issue #1：复习词书按钮文案「恢复」，普通词书「跳过」。onAction 在 DrillPager 内
-    // 已按 isReviewBook 分发到 onRestore/onSkip，这里只负责无参闭包 + 文案切换。
+    // issue #1: the review book button label is "Restore", regular books "Skip". onAction
+    // inside DrillPager already dispatches to onRestore/onSkip by isReviewBook; this spot
+    // only handles the no-arg closure + label switch.
     val actionLabel = if (isReviewBook) R.string.drill_restore else R.string.drill_skip
     Box(
         modifier = Modifier
@@ -186,15 +198,17 @@ private fun DrillTopBar(
             .padding(horizontal = 28.dp),
         contentAlignment = Alignment.Center,
     ) {
-        // 底层：词书名（weight 1f，最多左半） + Spacer（weight 1f，留给计数器） + 按钮（intrinsic，贴右）
+        // Base layer: book name (weight 1f, at most the left half) + Spacer (weight 1f, reserved for the counter) + buttons (intrinsic, flush right)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 词书名（左）：weight(1f) 让它和 Spacer 均分扣掉按钮宽度后的剩余空间，
-            // 即词书名最多占 (总宽 - 按钮宽) / 2，止于屏幕中线左侧，不会侵入计数器。
-            // softWrap 默认开启，超长自动换行不截断。
+            // Book name (left): weight(1f) splits the space left after the button width
+            // evenly with the Spacer, so the book name takes at most (total width - button
+            // width) / 2, stopping left of the screen centerline and never encroaching on
+            // the counter. softWrap is on by default; overlong names wrap instead of being
+            // cut off.
             Text(
                 text = bookName,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -202,12 +216,13 @@ private fun DrillTopBar(
                 letterSpacing = 1.sp,
                 modifier = Modifier.weight(1f),
             )
-            // 中间留白：weight(1f) 占位给计数器叠加层，确保词书名右边界 < 屏幕中线
+            // Middle spacer: weight(1f) reserves space for the counter overlay, keeping the book name's right edge left of the screen centerline
             Spacer(Modifier.weight(1f))
-            // 跳过/恢复 + 锁定（右）
-            // 审核反馈 4：锁定时不隐藏跳过按钮（锁定只隐藏导航栏，跳过仍可用）。
+            // Skip/restore + lock (right)
+            // Review feedback 4: do not hide the skip button when locked (locking only hides the nav bar; skip stays available).
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // #17 审核反馈 #5：跳过按钮无 ripple 方框，按下时 alpha 0.4→1.0 反馈。
+                // #17 review feedback #5: the skip button has no ripple box; press feedback
+                // comes from animating alpha between 0.4 and 1.0.
                 val actionInteraction = remember { MutableInteractionSource() }
                 val actionPressed by actionInteraction.collectIsPressedAsState()
                 val actionAlpha by animateFloatAsState(
@@ -232,7 +247,7 @@ private fun DrillTopBar(
                 LockButton(locked = locked, onClick = onToggleLock)
             }
         }
-        // 叠加层：计数器绝对居中（不被左右宽度差影响）
+        // Overlay: the counter is absolutely centered (unaffected by differing left/right widths)
         Text(
             text = "${index + 1} / $total",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -242,10 +257,11 @@ private fun DrillTopBar(
 }
 
 /**
- * 锁定按钮：默认透明 + tertiary 图标；锁定态反色背景（onSurface）+ background 图标。
+ * Lock button: transparent + tertiary icon by default; inverted background (onSurface) +
+ * background-colored icon in the locked state.
  *
- * #17 审核反馈 #6：无 ripple 方框。按下时图标 scale 0.9 反馈（pointer-down 即反馈，
- * 不等 release）。
+ * #17 review feedback #6: no ripple box. Press feedback scales the icon to 0.9
+ * (feedback on pointer-down, no waiting for release).
  */
 @Composable
 private fun LockButton(locked: Boolean, onClick: () -> Unit) {
@@ -285,11 +301,12 @@ private fun LockButton(locked: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * 单张卡片：单词 → 音标 → 分割线 → 义项列表。
- * 卡片切换的 spring 入场由 HorizontalPager 的页面重组自然驱动（每页 Composable 独立实例）。
+ * Single card: word, phonetics, divider, sense list.
+ * The spring entrance on card switch is driven naturally by HorizontalPager's page
+ * recomposition (each page composable is an independent instance).
  *
- * 审核反馈：去掉「已是第一张 / 已是最后一张」提示 —— 顶部计数器「X / Y」已表达位置，
- * 卡片内再重复提示冗余。
+ * Review feedback: dropped the "first card / last card" hints; the top counter "X / Y"
+ * already states the position, and repeating it inside the card is redundant.
  */
 @Composable
 private fun WordCard(
@@ -308,19 +325,20 @@ private fun WordCard(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(0.dp),
-            // 审核反馈 2：卡片原垂直居中显得太靠下，改靠上偏移约屏幕 12%
-            // （给一个合理的顶部呼吸空间，不顶到顶条，也不沉到中间）。
+            // Review feedback 2: centering the card vertically sat too low; shifted up by
+            // about 12% of the screen (reasonable breathing room at the top, not touching
+            // the top bar and not sinking to the middle).
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 80.dp),
         ) {
-            // 英文单词 —— 44sp SemiBold
+            // English word: 44sp SemiBold
             Text(
                 text = word.word.text,
                 style = typography.word.copy(color = colors.onSurface),
                 textAlign = TextAlign.Center,
             )
-            // 音标 —— Charis SIL，受 hidePhonetic 控制
+            // Phonetics: Charis SIL, controlled by hidePhonetic
             if (!word.word.phonetic.isNullOrBlank() && !hidePhonetic) {
                 Text(
                     text = word.word.phonetic,
@@ -328,7 +346,7 @@ private fun WordCard(
                     modifier = Modifier.padding(top = 10.dp),
                 )
             }
-            // 分割线 —— 32×1 separatorStrong
+            // Divider: 32x1 separatorStrong
             Box(
                 modifier = Modifier
                     .padding(vertical = 20.dp)
@@ -336,7 +354,7 @@ private fun WordCard(
                     .height(1.dp)
                     .background(MaterialTheme.wordDrillColors.separatorStrong),
             )
-            // 义项列表 —— 一行一义项：词性斜体 + 中文同行
+            // Sense list: one sense per row, italic part of speech on the same line as the Chinese
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,

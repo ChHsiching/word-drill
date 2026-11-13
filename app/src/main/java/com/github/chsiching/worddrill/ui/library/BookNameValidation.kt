@@ -3,17 +3,19 @@ package com.github.chsiching.worddrill.ui.library
 import com.github.chsiching.worddrill.R
 
 /**
- * 新建/重命名词书的名称校验（纯函数，无 Android 运行时依赖）。
+ * Name validation for creating/renaming a book (pure function, no Android runtime dependency).
  *
- * 规则（与 [androidx.room.OnConflictStrategy] 无关，需显式查重）：
- * - 先 trim：写库时也会 trim，校验必须在同一基准上，否则 "CET-4 " 会绕过查重
- * - 空白名（trim 后为空）→ 报错
- * - 与已有词书重名（大小写敏感，与 SQLite 默认一致）→ 报错
+ * Rules (unrelated to [androidx.room.OnConflictStrategy]; the duplicate check must be explicit):
+ * - Trim first: the write path also trims, so validation must use the same baseline,
+ *   otherwise "CET-4 " bypasses the duplicate check
+ * - Blank name (empty after trim): error
+ * - Duplicate of an existing book name (case-sensitive, matching the SQLite default): error
  *
- * @param name 用户输入的名称（未 trim）。
- * @param existingNames 当前已存在的词书名集合（大小写敏感比对）。
- * @return 错误文案的资源 id（R.string.*）；null 表示通过校验、可提交。由 Composable 层用
- *   `stringResource(...)` 解析（不把中文写死在校验函数里，Ticket #12）。
+ * @param name the user-entered name (not trimmed).
+ * @param existingNames names of existing books (compared case-sensitively).
+ * @return Resource id of the error text (R.string.*); null means validation passed and the
+ *   input can be submitted. The Composable layer resolves it with `stringResource(...)`
+ *   (no hardcoded Chinese inside the validation function, Ticket #12).
  */
 internal fun validateBookName(name: String, existingNames: List<String>): Int? {
     val trimmed = name.trim()

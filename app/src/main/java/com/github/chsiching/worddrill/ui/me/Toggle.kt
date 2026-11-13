@@ -8,15 +8,17 @@ import androidx.compose.ui.Modifier
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 
 /**
- * Toggle 开关（Ticket #16 + 审核反馈 3 重写）。
+ * Toggle switch (Ticket #16 + review feedback 3 rewrite).
  *
- * 审核反馈 3：原手画 Toggle（Box + offset knob）有位置偏移 + 方形按下效果，别扭。
- * 改用 Material3 [Switch]（系统原生组件，正确的动画 + 按下手势），只覆盖配色到
- * 纯黑白灰（spec 要求非 Material 默认绿色）：
- * - checked：thumb 白 / track onSurface（黑）
- * - unchecked：thumb surface / track chipBg / border transparent
+ * Review feedback 3: the original hand-drawn toggle (Box + offset knob) had position drift
+ * and a square press effect, which felt off. Replaced with Material3 [Switch] (a system
+ * component with correct animation + press gesture); only the colors are overridden to
+ * pure black/white/gray (the spec requires no Material default green):
+ * - checked: white thumb / onSurface (black) track
+ * - unchecked: surface thumb / chipBg track / transparent border
  *
- * 保持顶层定义（非嵌套于 Composable 内），避免重组丢动画态。
+ * Kept as a top-level definition (not nested inside a Composable) to avoid losing
+ * animation state on recomposition.
  */
 @Composable
 fun Toggle(
