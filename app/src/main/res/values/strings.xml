@@ -1,13 +1,13 @@
 <resources>
     <string name="app_name">WordDrill</string>
-    <!-- 底部导航三 Tab：严格按规格单字风格 -->
+    <!-- Bottom navigation three tabs: strictly single-character labels per the spec -->
     <string name="tab_drill">刷</string>
     <string name="tab_library">库</string>
     <string name="tab_me">我的</string>
-    <!-- 「刷」Tab 卡片浏览 -->
+    <!-- Drill tab: card browsing -->
     <string name="drill_empty">这个词书是空的</string>
     <string name="drill_loading">加载中…</string>
-    <!-- 「库」Tab 词书列表 -->
+    <!-- Library tab: book list -->
     <string name="library_title">词书</string>
     <string name="library_preset_badge">预置</string>
     <string name="library_custom_badge">自定义</string>
@@ -18,11 +18,11 @@
     <string name="library_name_hint">词书名称</string>
     <string name="library_cancel">取消</string>
     <string name="library_confirm">确定</string>
-    <!-- Ticket #18：删除词书二次确认（Ticket #22 起改为软删，可从回收站恢复） -->
+    <!-- Ticket #18: delete-book confirmation (soft delete since Ticket #22, restorable from the recycle bin) -->
     <string name="library_delete_title">删除词书</string>
     <string name="library_delete_message">确定删除「%1$s」？可从回收站恢复。</string>
     <string name="library_delete_confirm">删除</string>
-    <!-- 「库」Tab 词书内词条列表（Ticket #7）-->
+    <!-- Library tab: word list inside a book (Ticket #7) -->
     <string name="word_list_add">新增词条</string>
     <string name="word_list_edit">编辑释义</string>
     <string name="word_list_remove">从词书移除</string>
@@ -30,12 +30,12 @@
     <string name="word_list_pos_hint">词性</string>
     <string name="word_list_meaning_hint">释义</string>
     <string name="word_list_preset_readonly">预置词书不可编辑</string>
-    <!-- Ticket #22：删除词条二次确认（软删进回收站，可恢复） -->
+    <!-- Ticket #22: delete-entry confirmation (soft delete into the recycle bin, restorable) -->
     <string name="word_list_delete">删除</string>
     <string name="word_list_delete_title">删除词条</string>
     <string name="word_list_delete_message">确定删除「%1$s」？可从回收站恢复。</string>
     <string name="word_list_delete_confirm">删除</string>
-    <!-- Ticket #22：回收站 -->
+    <!-- Ticket #22: recycle bin -->
     <string name="recycle_bin_title">回收站</string>
     <string name="recycle_bin_section_books">词书</string>
     <string name="recycle_bin_section_entries">词条</string>
@@ -48,19 +48,19 @@
     <string name="recycle_bin_purge_confirm">永久删除</string>
     <string name="recycle_bin_empty">回收站为空</string>
     <string name="me_setting_recycle_bin">回收站</string>
-    <!-- 输入校验错误文案（Ticket #12：不硬编码到 Kotlin，走 R.string）-->
+    <!-- Input validation error texts (Ticket #12: never hardcoded in Kotlin, always R.string) -->
     <string name="validation_word_empty">单词不能为空</string>
     <string name="validation_pos_empty">词性不能为空</string>
     <string name="validation_meaning_empty">释义不能为空</string>
     <string name="validation_book_name_empty">名称不能为空</string>
     <string name="validation_book_name_duplicate">已存在同名词书</string>
-    <!-- 「我的」Tab 统计（Ticket #8）-->
+    <!-- Me tab: stats (Ticket #8) -->
     <string name="me_today">今日刷卡</string>
     <string name="me_total">累计刷卡</string>
     <string name="me_progress">当前词书进度</string>
     <string name="me_no_current_book">未选择词书</string>
     <string name="me_progress_line">%1$s：%2$d / %3$d（%4$d%%）</string>
-    <!-- 「我的」Tab 软件设置（Ticket #9）-->
+    <!-- Me tab: app settings (Ticket #9) -->
     <string name="me_settings">软件设置</string>
     <string name="me_theme">主题</string>
     <string name="me_theme_light">浅色</string>
@@ -71,7 +71,7 @@
     <string name="me_about_app_name">WordDrill</string>
     <string name="me_about_version">版本 %1$s</string>
     <string name="me_about_close">关闭</string>
-    <!-- 「我的」Tab 数据导出/导入（Ticket #10）-->
+    <!-- Me tab: data export/import (Ticket #10) -->
     <string name="me_data">数据</string>
     <string name="me_export">导出</string>
     <string name="me_import">导入</string>
@@ -88,18 +88,18 @@
     <string name="me_export_failed">导出失败</string>
     <string name="me_import_failed">导入失败</string>
     <string name="me_working">处理中…</string>
-    <!-- Ticket #16：UI 重写新增文案 -->
-    <!-- 「刷」Tab：顶部条 -->
+    <!-- Ticket #16: strings added in the UI rewrite -->
+    <!-- Drill tab: top bar -->
     <string name="drill_skip">跳过</string>
     <string name="drill_lock">锁定</string>
     <string name="drill_unlock">解锁</string>
-    <!-- issue #1: 复习词书的恢复按钮（替代跳过，恢复 = 词回到所有原词书 + 从复习词书移除）-->
+    <!-- issue #1: restore button for the review book (replaces skip; restore = the word returns to all its original books and is removed from the review book) -->
     <string name="drill_restore">恢复</string>
     <string name="drill_swipe_hint">← 左右滑动切换 →</string>
-    <!-- 「库」Tab 重写 -->
+    <!-- Library tab rewrite -->
     <string name="library_large_title">词库</string>
     <string name="library_word_count_format">%1$d 词 · %2$s</string>
-    <!-- 「我的」Tab 重写：设置分组 -->
+    <!-- Me tab rewrite: settings groups -->
     <string name="me_group_display">显示</string>
     <string name="me_group_navigation">导航</string>
     <string name="me_group_general">通用</string>
@@ -111,7 +111,7 @@
     <string name="me_setting_export">导出数据</string>
     <string name="me_setting_import">导入数据</string>
     <string name="me_setting_about">关于</string>
-    <!-- Ticket #21：文件导入词书 -->
+    <!-- Ticket #21: import a book from a file -->
     <string name="library_import">从文件导入</string>
     <string name="library_import_title">从文件导入词书</string>
     <string name="library_import_message">支持 xlsx / txt / csv / pdf。列结构：序号、单词、音标、词性释义。词优先查内置词典补全释义。</string>
@@ -123,6 +123,6 @@
     <string name="library_import_failed">导入失败</string>
     <string name="library_import_failed_file_type">不支持的文件类型（仅支持 xlsx/txt/csv/pdf）</string>
     <string name="library_import_failed_open">无法打开所选文件</string>
-    <!-- Ticket #9：手动加词条词性从下拉选 + 输入单词后查词典带出释义 -->
+    <!-- Ticket #9: manual entry picks POS from a dropdown; typing a word looks it up in the dictionary to prefill meanings -->
     <string name="word_list_pos_dropdown_label">词性</string>
 </resources>

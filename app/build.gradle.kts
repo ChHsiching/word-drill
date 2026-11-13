@@ -39,12 +39,12 @@ android {
 
     buildFeatures {
         compose = true
-        // Ticket #9：关于页读取 BuildConfig.VERSION_NAME 显示版本号
+        // Ticket #9: the About page reads BuildConfig.VERSION_NAME to show the version
         buildConfig = true
     }
 }
 
-// Kotlin 2.4.x 的编译器选项通过 compilerOptions DSL 配置（kotlinOptions 已废弃）
+// Kotlin 2.4.x compiler options go through the compilerOptions DSL (kotlinOptions is deprecated)
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -57,7 +57,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
 
-    // Compose BOM 统一管理 Compose 库版本
+    // Compose BOM pins versions for all Compose libraries
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
@@ -79,24 +79,26 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
-    // DataStore（首启导入幂等标记 / 后续当前词书等设置）
+    // DataStore (first-run import idempotence flag, current book and other settings)
     implementation(libs.androidx.datastore.preferences)
 
-    // Ticket #24：AndroidX SplashScreen —— 把系统启动画面 icon 设为透明，
-    // 让自定义 Compose 启动动画无缝接管（API 31+ 系统强制 splash）。
+    // Ticket #24: AndroidX SplashScreen -- set the system splash icon to a transparent
+    // drawable so the custom Compose launch animation takes over seamlessly
+    // (API 31+ forces a system splash).
     implementation(libs.androidx.core.splashscreen)
 
-    // Ticket #21：PDF 表格提取。tabula-java 依赖 PDFBox 2.0.x（用 java.awt，Android 不存在）
-    // 且项目自 2021 无更新；改用 PdfBox-Android（PDFBox 2.0.27 的 Android 移植）。
+    // Ticket #21: PDF table extraction. tabula-java depends on PDFBox 2.0.x (which uses
+    // java.awt, absent on Android) and has been unmaintained since 2021; use PdfBox-Android
+    // instead (an Android port of PDFBox 2.0.27).
     implementation(libs.pdfbox.android)
 
-    // 测试
+    // Testing
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.truth)
-    // org.json 随 Android 运时提供；JVM 单测需显式引入以验证 JSON 解析逻辑
+    // org.json ships with the Android runtime; JVM unit tests need it explicitly to verify JSON parsing
     testImplementation("org.json:json:20240303")
-    // XmlPullParser 在 Android 上由框架提供；JVM 单测需 kxml2 + xmlpull 才能跑 OOXML 解析
+    // XmlPullParser is provided by the Android framework; JVM unit tests need kxml2 + xmlpull for OOXML parsing
     testImplementation(libs.kxml2)
     testImplementation(libs.xmlpull)
     androidTestImplementation(libs.junit)

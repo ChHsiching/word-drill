@@ -1,2 +1,2 @@
-# 默认 ProGuard 规则占位。当前未开启 minify。
-# Hilt / Room 的 keep 规则将在开启 minify 时按官方文档补充。
+# Default ProGuard rules placeholder. Minification is currently disabled.
+# Keep rules for Hilt / Room will be added per official docs once minify is enabled.

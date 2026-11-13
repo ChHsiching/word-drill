@@ -1,22 +1,26 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Ticket #24 — 系统 SplashScreen 主题。
-         颜色完全由 Compose WordDrillTheme 控制；这里只用透明系统栏（edge-to-edge）。
-         窗口背景设透明避免闪烁白色。
+    <!-- Ticket #24 — system SplashScreen theme.
+         Colors are fully controlled by Compose WordDrillTheme; this theme only sets
+         transparent system bars (edge-to-edge) and a transparent window background
+         to avoid white flashes.
 
-         关键：postSplashScreenTheme 指向自身（base application theme），
-         installSplashScreen() 在 super.onCreate 前调用；启动结束后系统切回此主题。 -->
+         Key: postSplashScreenTheme points at this theme itself (the base application theme);
+         installSplashScreen() is called before super.onCreate; the system switches back to
+         this theme once the splash ends. -->
     <style name="Theme.WordDrill" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 
-    <!-- Ticket #24 — 启动画面主题（API 31+ 系统强制）。
-         parent 必须是 Theme.SplashScreen，且 postSplashScreenTheme 指向正式主题。
-         windowSplashScreenBackground = 应用主背景色（无缝衔接）；
-         windowSplashScreenAnimatedIcon = 透明 drawable（与背景同色，视觉上无系统 logo），
-         让自定义 Compose 启动动画从首帧起就是用户看到的唯一动画。
-         android:windowBackground 也设为同色，避免 compat 库 parent 的默认渐变泄露。 -->
+    <!-- Ticket #24 — splash screen theme (forced by the system on API 31+).
+         parent must be Theme.SplashScreen and postSplashScreenTheme must point at the real theme.
+         windowSplashScreenBackground = the app's main background color (seamless handoff);
+         windowSplashScreenAnimatedIcon = a transparent drawable (same color as the background,
+         so no system logo is visible) — the custom Compose launch animation is the only
+         animation the user sees, from the first frame.
+         android:windowBackground is also set to that color, preventing the compat library
+         parent's default gradient from leaking through. -->
     <style name="Theme.WordDrill.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_invisible</item>

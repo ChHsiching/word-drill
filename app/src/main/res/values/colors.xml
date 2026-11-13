@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Ticket #24：icon 背景色跟随主题（浅色底用 #FAFAFA，与 BgLight 一致）。 -->
+    <!-- Ticket #24: icon background follows the theme (light theme uses #FAFAFA, same as BgLight). -->
     <color name="ic_launcher_background">#FAFAFA</color>
 </resources>

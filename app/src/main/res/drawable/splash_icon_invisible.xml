@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ticket #24 — 系统启动画面的 icon 占位，1×1px 透明 VectorDrawable。
-     windowSplashScreenAnimatedIcon 必须指向一个 drawable（系统不接受 null）；
-     设为完全透明后，系统 splash 视觉上等于纯背景色（ic_launcher_background），
-     从首帧起就让自定义 Compose 动画接管，消除「先大 logo 后动画」。 -->
+<!-- Ticket #24 — placeholder icon for the system splash screen: a 1×1px transparent VectorDrawable.
+     windowSplashScreenAnimatedIcon must point at a drawable (the system rejects null);
+     fully transparent, the system splash is visually just the background color
+     (ic_launcher_background), so the custom Compose animation owns every frame and the
+     "big logo first, then animation" effect is gone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="1dp"
     android:height="1dp"
