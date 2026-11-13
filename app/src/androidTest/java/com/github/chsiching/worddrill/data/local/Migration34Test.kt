@@ -11,7 +11,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Ticket #20: test for the v3 -> v4 migration (add the skipped column to the book_word table).
+ * Ticket #20: test for the v3-to-v4 migration (add the skipped column to the book_word table).
  *
  * Same pattern as [Migration23Test]: room-testing is not used (it needs schema export, and this project has
  * exportSchema=false, so that path is closed); instead, build a v3-shaped SQLite database by hand (manual CREATE TABLE
@@ -21,8 +21,8 @@ import org.junit.runner.RunWith
  *  - old link rows are not lost and skipped defaults to 0 (not skipped)
  *  - after the upgrade the column is writable (the UPDATE path of setSkipped)
  *
- * The full chain (v3 database -> Room reads and writes normally after the upgrade) is covered by the in-memory Room
- * in [WordDrillDatabaseTest] (it operates on book_word.skipped directly on the v4 schema).
+ * [WordDrillDatabaseTest] covers the full chain (Room reads and writes normally on the upgraded database);
+ * it operates on book_word.skipped directly on the v4 schema.
  */
 @RunWith(AndroidJUnit4::class)
 class Migration34Test {
@@ -250,7 +250,7 @@ class Migration34Test {
         v3Db.close()
         v3Helper.close()
 
-        // 2) Let Room open this v3 database file with all migrations registered, triggering the v3->v4 upgrade + schema validation.
+        // 2) Let Room open this v3 database file with all migrations registered, triggering the v3-to-v4 upgrade and schema validation.
         //    If the entity defaultValue disagrees with the migration DEFAULT, IllegalStateException is thrown here.
         val roomDb = androidx.room.Room.databaseBuilder(
             context,

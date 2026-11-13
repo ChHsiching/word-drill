@@ -748,7 +748,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun purgeDeleted_actuallyDeletesRow() = runTest {
-        // Permanent delete = a real DELETE of the link row (irreversible)
+        // Permanent delete means a real DELETE of the link row (irreversible)
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1"))
@@ -784,7 +784,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun deleteCustom_softDeletesInsteadOfPhysicalDelete() = runTest {
-        // Deleting a custom book = soft delete (deleted=1); the row stays and is recoverable
+        // Deleting a custom book means soft delete (deleted=1); the row stays and is recoverable
         val bookDao = db.bookDao()
         val id = bookDao.insert(Book(name = "mybook", isPreset = false))
         val affected = bookDao.deleteCustom(id)
@@ -880,7 +880,7 @@ class WordDrillDatabaseTest {
 
     @Test
     fun purgeBook_physicallyDeletesAndCascades() = runTest {
-        // Permanently deleting a book = a real DELETE of the book row; CASCADE clears its book_word links
+        // Permanently deleting a book means a real DELETE of the book row; CASCADE clears its book_word links
         val wordDao = db.wordDao()
         val bookDao = db.bookDao()
         val bookId = bookDao.insert(Book(name = "b1", isPreset = false))

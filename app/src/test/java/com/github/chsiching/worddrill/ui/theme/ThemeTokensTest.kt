@@ -139,7 +139,7 @@ class ThemeTokensTest {
     // ── Separator alpha ≈ 0.06 / 0.12, taken from the CSS rgba values ─────────
     @Test
     fun lightSeparator_isRgbaBlack006() {
-        // rgba(0,0,0,0.06) → alpha = 0.06 * 255 ≈ 15 → hex 0x0F
+        // rgba(0,0,0,0.06) gives alpha = 0.06 * 255, roughly 15, which is 0x0F in hex.
         assertThat(SeparatorLight.alpha).isWithin(0.01f).of(0.06f)
         assertThat(SeparatorLight.red).isEqualTo(0f)
         assertThat(SeparatorLight.green).isEqualTo(0f)

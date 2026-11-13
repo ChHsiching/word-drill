@@ -19,7 +19,7 @@ import org.junit.runner.RunWith
  * Since Ticket #5 the drill tab content is real card browsing (it no longer renders the placeholder label),
  * and since Ticket #6 the library tab content is the word book list (with the "word book" heading at the top).
  * So each of the three tab labels appears only in the navigation bar (1 node each).
- * Card rendering on the drill tab is covered by DrillScreenTest.
+ * DrillScreenTest covers card rendering on the drill tab.
  */
 @RunWith(AndroidJUnit4::class)
 class AppNavigationTest {

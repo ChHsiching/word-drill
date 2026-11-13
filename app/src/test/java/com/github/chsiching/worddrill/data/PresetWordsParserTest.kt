@@ -89,7 +89,7 @@ class PresetWordsParserTest {
 
     @Test
     fun parse_phoneticIsNull_whenJsonNull() {
-        // ⚠️ Regression guard: an explicit "phonetic": null in the JSON must parse to Kotlin null,
+        // Regression guard: an explicit "phonetic": null in the JSON must parse to Kotlin null,
         // not the string "null". Android's bundled org.json optString(key, "") returns the string
         // "null" when the value is JSON null, which wrote "null" into the database (hit on a real device).
         // (This JVM test uses org.json:json, whose behavior may differ. The real backstop is connectedAndroidTest

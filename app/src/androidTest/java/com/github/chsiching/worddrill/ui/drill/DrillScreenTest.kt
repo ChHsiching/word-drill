@@ -34,9 +34,9 @@ import org.junit.runner.RunWith
  * - The current word book name shows at the top (plain text)
  * - At the ends a hint text shows (first card reached / last card reached)
  *
- * The swipe counting decision logic (right swipe +1 / left swipe +0 / at the end +0) is covered
- * by the pure-function JVM unit test [SwipeDirectionTest]; the end-to-end "swipe then write swipe_log" path
- * was verified by hand on an emulator (MCP adb query on swipe_log: 2 right swipes = 2 rows, left swipes and hitting the end add nothing).
+ * [SwipeDirectionTest] (a pure-function JVM unit test) covers the swipe counting decision logic (a right swipe
+ * counts 1, a left swipe counts 0, and a swipe at the end counts 0); we verified the end-to-end "swipe then write
+ * swipe_log" path by hand on an emulator (MCP adb query on swipe_log: 2 right swipes = 2 rows, left swipes and hitting the end add nothing).
  *
  * The gesture internals of HorizontalPager are not tested (fragile and coupled to the implementation); only user-visible behavior is tested.
  */
@@ -218,7 +218,7 @@ class DrillScreenTest {
      * - the node for the lock button's contentDescription ("lock") still exists
      * - the counter "1 / 3" still shows
      *
-     * The visual wrapping was verified by hand on an emulator (screenshot); here we only verify node existence (not pushed out of the tree).
+     * We verified the visual wrapping by hand on an emulator (screenshot); here we only verify node existence (not pushed out of the tree).
      */
     @Test
     fun longBookName_doesNotPushOutRightSideButtons() {

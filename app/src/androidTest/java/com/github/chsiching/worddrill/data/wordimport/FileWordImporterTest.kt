@@ -19,17 +19,17 @@ import java.io.File
 /**
  * Ticket #21: end-to-end test for [FileWordImporter] (in-memory Room + a real ContentResolver file).
  *
- * The main seam is already covered by JVM unit tests ([PosMeaningParserTest] / [TextTableParserTest] / [XlsxParserTest]);
- * this test verifies the "parse -> dictionary lookup -> database write" orchestration (the 3 steps of the word-handling logic in issue #21).
+ * JVM unit tests ([PosMeaningParserTest] / [TextTableParserTest] / [XlsxParserTest]) already cover the main seam;
+ * this test verifies the parse, dictionary-lookup, and database-write orchestration (the 3 steps of the word-handling logic in issue #21).
  *
  * Coverage:
- * - Word in the dictionary -> use the dictionary's pos + meaning + phonetic
- * - Word not in the dictionary -> use file col3 + col4
- * - col3 + col4 both empty -> skipped
+ * - If the word is in the dictionary, the test expects the dictionary's pos, meaning, and phonetic
+ * - If the word is not in the dictionary, the test expects the file's col3 and col4
+ * - If col3 and col4 are both empty, the test expects the word to be skipped
  * - Silent dedup: a word repeated across books reuses the same row
  * - The completion summary is correct
  *
- * PDF is not covered (needs PdfBox-Android native plus a PDF test fixture); the PDF end-to-end path was verified by hand with MCP.
+ * PDF is not covered (needs PdfBox-Android native plus a PDF test fixture); we verified the PDF end-to-end path by hand with MCP.
  */
 @RunWith(AndroidJUnit4::class)
 class FileWordImporterTest {

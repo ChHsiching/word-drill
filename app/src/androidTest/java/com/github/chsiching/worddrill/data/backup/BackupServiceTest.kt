@@ -26,7 +26,7 @@ import org.junit.runner.RunWith
  * - After import, swipe stats, books, entries, senses, and links are all correct
  * - Full serialization round trip (export, serialize, deserialize, import)
  *
- * Complements [DatabaseJsonSerializerTest] (the JVM sub-seam): this test covers the table <-> snapshot mapping and transaction orchestration.
+ * Complements [DatabaseJsonSerializerTest] (the JVM sub-seam): this test covers the mapping between tables and snapshots and the transaction orchestration.
  */
 @RunWith(AndroidJUnit4::class)
 class BackupServiceTest {

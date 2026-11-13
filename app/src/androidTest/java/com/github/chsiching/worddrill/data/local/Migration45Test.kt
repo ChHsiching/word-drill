@@ -11,9 +11,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Ticket #22: test for the v4 -> v5 migration (add the deleted column to the book_word table).
+ * Ticket #22: test for the v4-to-v5 migration (add the deleted column to the book_word table).
  *
- * Same pattern as [Migration34Test] (v3->v4 added skipped): room-testing is not used (it needs schema export,
+ * Same pattern as [Migration34Test] (v3-to-v4 added skipped): room-testing is not used (it needs schema export,
  * and this project has exportSchema=false, so that path is closed); instead, build a v4-shaped SQLite database by hand
  * (manual CREATE TABLE mimicking the Room codegen schema, including the skipped column), run [WordDrillDatabase.MIGRATION_4_5.migrate],
  * then verify with PRAGMA:
@@ -21,8 +21,8 @@ import org.junit.runner.RunWith
  *  - old link rows are not lost and deleted defaults to 0 (not deleted)
  *  - after the upgrade the column is writable (the UPDATE path of setDeleted)
  *
- * The full chain (v4 database -> Room reads and writes normally after the upgrade) is covered by
- * [roomOpensAfterMigration_schemaValidationPasses] (on-disk database + Room schema validation).
+ * [roomOpensAfterMigration_schemaValidationPasses] covers the full chain (Room reads and writes normally on the upgraded database);
+ * it uses an on-disk database and Room schema validation.
  */
 @RunWith(AndroidJUnit4::class)
 class Migration45Test {
@@ -269,7 +269,7 @@ class Migration45Test {
         v4Db.close()
         v4Helper.close()
 
-        // 2) Let Room open this v4 database file with all migrations registered, triggering the v4->v5 upgrade + schema validation.
+        // 2) Let Room open this v4 database file with all migrations registered, triggering the v4-to-v5 upgrade and schema validation.
         //    If the entity defaultValue disagrees with the migration DEFAULT, IllegalStateException is thrown here.
         val roomDb = androidx.room.Room.databaseBuilder(
             context,

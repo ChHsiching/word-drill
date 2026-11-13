@@ -158,7 +158,7 @@ class DatabaseJsonSerializerTest {
 
     @Test
     fun deserialize_phonetic_isNull_whenJsonNullLiteral() {
-        // ⚠️ Regression guard: an explicit "phonetic": null must parse to Kotlin null (same pitfall as PresetWordsParser).
+        // Regression guard: an explicit "phonetic": null must parse to Kotlin null (same pitfall as PresetWordsParser).
         val json = """
             {"version":1,"books":[],"words":[
               {"wordId":1,"text":"x","phonetic":null}

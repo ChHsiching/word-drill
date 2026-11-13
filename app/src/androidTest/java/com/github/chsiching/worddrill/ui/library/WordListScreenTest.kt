@@ -34,7 +34,7 @@ import org.junit.runner.RunWith
  * - Add entry: type the text, tap confirm, and the new word appears after the list refreshes (the global word pool is reused)
  * - Edit sense: change the meaning, the list refreshes
  * - Remove from book: the list refreshes, the entry disappears
- * - Preset books are read-only: no "add entry" entry point is rendered
+ * - Preset books are read-only: the screen renders no "add entry" entry point.
  *
  * IME injection details of TextField are not tested (only user-visible behavior: type text, submit, list changes).
  */

@@ -119,8 +119,8 @@ class PosMeaningParserTest {
 
     @Test
     fun leadingTextBeforeFirstAbbrev_defaultedToNoun() {
-        // Example input below: two Chinese words with no leading abbreviation. One segment (n., whole string)? Or two?
-        // The conservative choice: treat the whole segment as n., because the leading word is not in the abbreviation table and must not be treated as a pos.
+        // Example input below: two Chinese words with no leading abbreviation. The input is ambiguous: it could be one segment (n., whole string) or two.
+        // The conservative choice is one segment, because the leading word is not in the abbreviation table and must not be treated as a pos.
         // This test only checks: no abbreviation means the whole segment goes to n.
         val senses = PosMeaningParser.parse("水果 苹果")
         assertThat(senses).containsExactly("n." to "水果 苹果")

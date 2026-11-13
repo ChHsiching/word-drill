@@ -104,7 +104,7 @@ class MeScreenTest {
     /**
      * Waits for the ViewModel to settle the upstream combine, then takes the first resolved value.
      * The initial value of stateIn(WhileSubscribed) is the empty MeStatsUiState() (bookName="");
-     * every test has already called setCurrentBookId, so the resolved state always has a non-empty bookName, which serves as the ready signal.
+     * every test has already called setCurrentBookId, so the resolved state always has a non-empty bookName, which is the ready signal.
      */
     private suspend fun stableState(viewModel: MeViewModel): MeStatsUiState =
         viewModel.uiState.first { it.bookName.isNotEmpty() }

@@ -11,7 +11,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Ticket #14: test for the v1 -> v2 migration (add the phonetic column to the word table).
+ * Ticket #14: test for the v1-to-v2 migration (add the phonetic column to the word table).
  *
  * room-testing is not used (it needs schema export, and this project has exportSchema=false, so that path is closed);
  * instead, build a v1-shaped SQLite database by hand (manual CREATE TABLE mimicking the Room-generated schema),
@@ -21,8 +21,8 @@ import org.junit.runner.RunWith
  *  - the phonetic column defaults to NULL (ALTER wrote no value into old rows)
  *
  * This is the minimal coverage of AGENTS.md §3 "surgical changes": test only this one cut, the migration.
- * The full chain (v1 database -> Room reads and writes normally after the upgrade) is covered by the in-memory Room
- * in [WordDrillDatabaseTest] (it directly inserts a Word with phonetic on the v2 schema).
+ * [WordDrillDatabaseTest] covers the full chain (Room reads and writes normally on the upgraded database);
+ * it directly inserts a Word with phonetic on the v2 schema.
  */
 @RunWith(AndroidJUnit4::class)
 class Migration12Test {

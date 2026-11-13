@@ -11,7 +11,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Ticket #19: test for the v2 -> v3 migration (add the dictionary table).
+ * Ticket #19: test for the v2-to-v3 migration (add the dictionary table).
  *
  * Same pattern as [Migration12Test]: room-testing is not used (it needs schema export, and this project has
  * exportSchema=false, so that path is closed); instead, build a v2-shaped SQLite database by hand (manual CREATE TABLE
@@ -22,8 +22,8 @@ import org.junit.runner.RunWith
  *  - old tables (word / sense, etc.) are untouched (existing user data is preserved)
  *
  * This is the minimal coverage of AGENTS.md §3 "surgical changes": test only this one cut, the migration.
- * The full chain (v2 database -> Room reads and writes normally after the upgrade) is covered by the in-memory Room
- * in [DictionaryDaoTest] (it operates on the dictionary table directly on the v3 schema).
+ * [DictionaryDaoTest] covers the full chain (Room reads and writes normally on the upgraded database);
+ * it operates on the dictionary table directly on the v3 schema.
  */
 @RunWith(AndroidJUnit4::class)
 class Migration23Test {
