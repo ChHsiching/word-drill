@@ -84,7 +84,7 @@ dependencies {
 
     // Ticket #24: AndroidX SplashScreen. API 31+ forces a system splash, so set the
     // system splash icon to a transparent drawable and let the custom Compose launch
-    // animation take over seamlessly.
+    // animation take over.
     implementation(libs.androidx.core.splashscreen)
 
     // Ticket #21: PDF table extraction. tabula-java depends on PDFBox 2.0.x (which uses

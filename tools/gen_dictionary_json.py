@@ -48,7 +48,7 @@ import sys
 # and interj.).
 # Note: this list no longer matches gen_words_json.py exactly. That script only
 # feeds the three preset books and is outside this ticket's contamination scope,
-# so the fix lands in the dictionary script alone.
+# so the fix is applied only in the dictionary script.
 POS_PREFIXES = (
     "prep.", "pron.", "conj.", "adv.", "num.", "art.", "aux.", "int.",
     "interj.", "abbr.", "adj.", "vt.", "vi.", "n.", "v.", "a.",
@@ -90,8 +90,7 @@ def parse_translation(translation):
     - A line without a POS prefix, such as a domain label `[计]/[医]/[化]` or an
       abbreviation gloss, no longer continues the previous line. The first such
       line degrades to `n.` so the word is not dropped. Later ones are dropped,
-      because they cannot be classified reliably. Better to give less than to
-      contaminate.
+      because they cannot be classified reliably.
     """
     if not translation:
         return []
@@ -122,8 +121,7 @@ def parse_translation(translation):
             # ones are dropped.
             # See ticket #23: in ECDICT these lines are usually another sense
             # missing its POS tag, often carrying a domain prefix. Continuing
-            # the previous line would smear senses across each other, so give
-            # less rather than contaminate.
+            # the previous line would smear senses across each other.
             if senses:
                 continue
             extra = re.sub(r"^\[[^\]]*\]\s*", "", line).strip()

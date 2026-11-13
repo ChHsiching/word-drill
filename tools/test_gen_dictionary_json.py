@@ -12,8 +12,7 @@ Expected behavior after the fix:
 - `adj. 轻的...` becomes its own sense and does not pollute n.
 - Lines with no POS or with domain labels, such as `计算机辅助教育...` or
   `[计] 计算机辅助教学...`, no longer merge into the previous line. A POS-less
-  first line degrades to `n.`; later lines are dropped. Better to give less
-  than to contaminate.
+  first line degrades to `n.`; later lines are dropped.
 """
 
 import sys

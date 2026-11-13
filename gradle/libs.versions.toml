@@ -19,7 +19,7 @@ androidxTestExtJunit = "1.2.1"
 espresso = "3.6.1"
 # Ticket #24: AndroidX SplashScreen. API 31+ forces a system splash. This library
 # sets the splash icon to a transparent drawable, which looks like a plain solid
-# background, so the custom Compose launch animation takes over seamlessly with no
+# background, so the custom Compose launch animation takes over with no
 # "big logo first, then animation" step.
 splashscreen = "1.0.1"
 # Ticket #21: JVM unit tests need an XmlPullParser implementation (the Android framework

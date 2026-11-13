@@ -15,7 +15,7 @@
 
     <!-- Ticket #24 splash screen theme, forced by the system on API 31+.
          parent must be Theme.SplashScreen and postSplashScreenTheme must point at the real theme.
-         windowSplashScreenBackground matches the app's main background color for a seamless handoff.
+         windowSplashScreenBackground matches the app's main background color.
          windowSplashScreenAnimatedIcon is a transparent drawable of the same color, so no system
          logo is visible. The custom Compose launch animation is the only animation the user
          sees, from the first frame.

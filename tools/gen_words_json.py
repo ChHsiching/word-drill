@@ -124,7 +124,7 @@ def parse_translation(translation):
             if not meaning:
                 continue
             if pos in pos_index:
-                # This POS already exists, so merge. Rare in theory; kept as a safety net.
+                # This POS already exists, so merge. Rare in theory; kept as a fallback.
                 idx = pos_index[pos]
                 if meaning not in senses[idx][1]:
                     senses[idx][1] = (senses[idx][1] + "； " + meaning) if senses[idx][1] else meaning
