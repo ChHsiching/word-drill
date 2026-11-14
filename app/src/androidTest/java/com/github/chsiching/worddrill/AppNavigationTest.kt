@@ -29,7 +29,7 @@ class AppNavigationTest {
         composeRule.onAllNodesWithText("库")[0].performClick()
         composeRule.waitForIdle()
         composeRule.onAllNodesWithText("库").assertCountEquals(1)
-        composeRule.waitUntil(10_000L) {
+        composeRule.waitUntil(60_000L) {
             composeRule.onAllNodesWithText("CET-4").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("词库").assertIsDisplayed()

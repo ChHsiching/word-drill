@@ -194,24 +194,28 @@ class MeScreenTest {
     }
 
     @Test
-    fun themeIcon_togglesToOppositeMode() = runBlocking {
+    fun themeIcon_lightCyclesToDark() = runBlocking {
         runBlocking { settings.setTheme(ThemeMode.LIGHT) }
-        renderWithVm(vm())
+        val svm = settingsVm()
+        renderWithVm(vm(), settingsViewModel = svm)
+        svm.themeMode.first { it == ThemeMode.LIGHT }
         composeRule.onNodeWithContentDescription("主题").performClick()
         composeRule.waitForIdle()
-        val mode = settings.themePreference.first { it == ThemeMode.DARK }
+        val mode = settings.themePreference.first { it != ThemeMode.LIGHT }
         assertThat(mode).isEqualTo(ThemeMode.DARK)
         Unit
     }
 
     @Test
-    fun themeIcon_darkToLight_togglesBack() = runBlocking {
+    fun themeIcon_darkCyclesToSystem() = runBlocking {
         runBlocking { settings.setTheme(ThemeMode.DARK) }
-        renderWithVm(vm())
+        val svm = settingsVm()
+        renderWithVm(vm(), settingsViewModel = svm)
+        svm.themeMode.first { it == ThemeMode.DARK }
         composeRule.onNodeWithContentDescription("主题").performClick()
         composeRule.waitForIdle()
-        val mode = settings.themePreference.first { it == ThemeMode.LIGHT }
-        assertThat(mode).isEqualTo(ThemeMode.LIGHT)
+        val mode = settings.themePreference.first { it != ThemeMode.DARK }
+        assertThat(mode).isEqualTo(ThemeMode.SYSTEM)
         Unit
     }
 
