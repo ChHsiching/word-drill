@@ -63,6 +63,7 @@ adb shell "run-as com.github.chsiching.worddrill sh -c 'cat files/datastore/word
 
 ## Tests
 
+- `connectedDebugAndroidTest` hangs forever in `MeScreenTest.themeIcon_darkToLight_togglesBack` (pre-existing, no CI baseline; issue #29). Run the suite with `-Pandroid.testInstrumentationRunnerArguments.notClass=com.github.chsiching.worddrill.ui.me.MeScreenTest`; the remaining 155 tests finish in about a minute. Never run two Gradle test invocations against the same emulator: the loser leaves locked files under `app/build/outputs/androidTest-results`, and the fix is `./gradlew --stop`, force-stop both app processes, delete that directory, and rerun.
 - `createComposeRule` / `createAndroidComposeRule` carry v2 deprecation warnings. Do not migrate. Stay on v1, matching the existing tests; the warnings are harmless. v2 uses StandardTestDispatcher, behaves differently, and would force a rewrite of the synchronization logic.
 - Any Flow `collect` with write side effects must use `distinctUntilChanged`, or repeated emits write the same value to the database repeatedly. `HorizontalPager`'s `settledPage` and list-refresh callbacks both emit the same value more than once.
 - Assert with `Truth.assertThat`, not `kotlin.assert`. Kotlin's `assert` on the JVM needs the `-ea` flag, which JUnit4 does not set by default, so `assert(x)` always passes and tests nothing. The repo convention is `com.google.common.truth.Truth.assertThat`; see `WordDrillDatabaseTest` and `BookNameValidationTest`.
