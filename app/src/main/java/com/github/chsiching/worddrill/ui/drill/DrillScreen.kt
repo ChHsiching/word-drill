@@ -56,8 +56,8 @@ import kotlinx.coroutines.launch
  * "Drill" tab: full-screen single-card browsing (Ticket #5 + #16 rewrite).
  *
  * Top bar (#16): book name (left) and skip + lock buttons (right) in a symmetric layout.
- * The skip button hides in the locked state; the lock button swaps icon variant and
- * inverts its background. Auto-unlock on tab switch is handled by
+ * The skip button stays visible and usable in the locked state (issue #17); the lock
+ * button swaps icon variant and inverts its background. Auto-unlock on tab switch is handled by
  * [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot] (locked resets to false on
  * a tab switch).
  *
@@ -69,8 +69,8 @@ import kotlinx.coroutines.launch
  * [shouldLogSwipe].
  *
  * @param locked top-bar locked state (hoisted at
- *   [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot]; when locked the nav bar
- *   fades out, skip hides, Pager swiping is disabled)
+ *   [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot]; when locked the nav
+ *   bar fades out; skip stays available and Pager swiping stays enabled)
  * @param onToggleLock lock button click callback
  * @param hidePhonetic true when the "hide phonetics" setting is active; the card omits the
  *   phonetics line
@@ -151,9 +151,8 @@ internal fun DrillPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
             // Review feedback 3: locking does not disable card swiping. Locking only hides
-            // the nav bar and skip button (see BottomNavOverlay.hidden in WordDrillRoot and
-            // the AnimatedVisibility in DrillTopBar); the user can still swipe through
-            // cards while locked.
+            // the nav bar (see BottomNavOverlay.hidden in WordDrillRoot); the user can
+            // still swipe through cards and tap skip while locked.
         ) { pageIndex ->
             WordCard(
                 word = cards[pageIndex],
@@ -174,8 +173,8 @@ internal fun DrillPager(
  * short name the Text does not fill its weight, so the left-aligned look is unchanged;
  * the counter is absolutely centered by the overlay Text.
  *
- * The locked state hides skip (AnimatedVisibility fade); the lock button gets an inverted
- * background and LockOpen icon.
+ * The skip button stays visible while locked (review feedback 4 / issue #17); the lock
+ * button gets an inverted background and LockOpen icon.
  */
 @Composable
 private fun DrillTopBar(
