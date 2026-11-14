@@ -10,7 +10,6 @@ import com.github.chsiching.worddrill.data.local.dao.WordDao
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
-import com.github.chsiching.worddrill.data.local.entity.Word
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -56,7 +55,7 @@ class FileWordImporter @Inject constructor(
                     val dictEntries = dictionaryDao.findByWord(row.word.lowercase())
                     if (dictEntries.isNotEmpty()) {
                         val phonetic = dictEntries.first().phonetic
-                        val wordId = upsertWord(row.word, phonetic)
+                        val wordId = wordDao.findOrInsertWord(row.word, phonetic)
                         for (entry in dictEntries) {
                             wordDao.insertSense(Sense(wordId = wordId, pos = entry.pos, meaning = entry.meaning))
                         }
@@ -70,7 +69,7 @@ class FileWordImporter @Inject constructor(
                         skipped++
                         continue
                     }
-                    val wordId = upsertWord(row.word, phonetic)
+                    val wordId = wordDao.findOrInsertWord(row.word, phonetic)
                     for ((pos, meaning) in senses) {
                         wordDao.insertSense(Sense(wordId = wordId, pos = pos, meaning = meaning))
                     }
@@ -80,10 +79,4 @@ class FileWordImporter @Inject constructor(
                 ImportSummary(success = success, skipped = skipped)
             }
         }
-
-    private suspend fun upsertWord(text: String, phonetic: String?): Long =
-        wordDao.findIdByText(text)
-            ?: wordDao.insert(Word(text = text, phonetic = phonetic)).let { id ->
-                if (id == -1L) wordDao.findIdByText(text)!! else id
-            }
 }

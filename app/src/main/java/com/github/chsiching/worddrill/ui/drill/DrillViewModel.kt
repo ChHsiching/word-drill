@@ -7,6 +7,7 @@ import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.WordWithSenses
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.dao.BookDao
+import com.github.chsiching.worddrill.data.local.dao.REVIEW_BOOK_NAME
 import com.github.chsiching.worddrill.data.local.dao.SwipeLogDao
 import com.github.chsiching.worddrill.data.local.dao.WordDao
 import com.github.chsiching.worddrill.data.local.entity.BookWord
@@ -130,9 +131,5 @@ class DrillViewModel @Inject constructor(
         } else {
             _uiState.value = ready.copy(cards = cards)
         }
-    }
-
-    private companion object {
-        const val REVIEW_BOOK_NAME = "复习"
     }
 }

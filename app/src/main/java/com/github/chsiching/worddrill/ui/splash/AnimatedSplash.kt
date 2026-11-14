@@ -103,15 +103,17 @@ fun AnimatedSplashOverlay(
             Element.LINE1, Element.LINE2, Element.LINE3,
             Element.BACK_CARD, Element.FRONT_CARD,
         )
+        val fadeOutStartMs = 1500L
+        val fadeOutStaggerMs = 100L
         for ((idx, e) in fadeOutOrder.withIndex()) {
-            val startTime = 1500L + idx * 100L
             launch {
-                delay(startTime)
+                delay(fadeOutStartMs + idx * fadeOutStaggerMs)
                 elements[e]!!.alpha.animateTo(0f, springIn)
             }
         }
 
-        delay(2500L)
+        val settleMs = 600L
+        delay(fadeOutStartMs + (fadeOutOrder.size - 1) * fadeOutStaggerMs + settleMs)
         onFinished()
     }
 

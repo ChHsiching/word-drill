@@ -49,14 +49,14 @@ class MainActivity : Hilt_MainActivity() {
         )
         setContent {
             val themeMode by themeState.collectAsStateWithLifecycle()
-            var renderedTheme by remember { mutableStateOf(themeMode) }
+            var revealedTheme by remember { mutableStateOf(themeMode) }
 
             androidx.compose.runtime.LaunchedEffect(themeMode) {
-                renderedTheme = themeMode
+                revealedTheme = themeMode
             }
 
-            WordDrillTheme(themeMode = renderedTheme) {
-                val darkBg = when (renderedTheme) {
+            WordDrillTheme(themeMode = revealedTheme) {
+                val darkBg = when (revealedTheme) {
                     ThemeMode.LIGHT -> false
                     ThemeMode.DARK -> true
                     ThemeMode.SYSTEM -> isSystemInDarkTheme()

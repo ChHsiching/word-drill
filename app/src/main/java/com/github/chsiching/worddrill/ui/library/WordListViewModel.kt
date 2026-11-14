@@ -12,7 +12,6 @@ import com.github.chsiching.worddrill.data.local.dao.DictionaryDao
 import com.github.chsiching.worddrill.data.local.dao.WordDao
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
-import com.github.chsiching.worddrill.data.local.entity.Word
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -32,6 +31,8 @@ val WORD_LIST_POS_OPTIONS: List<String> = listOf(
 
 private const val DEBOUNCE_MS = 300L
 
+enum class WordListFillSource { USER, DICTIONARY }
+
 sealed interface WordListDialog {
     data object None : WordListDialog
     data class Add(
@@ -40,7 +41,7 @@ sealed interface WordListDialog {
         val meaning: String = "",
         @StringRes val error: Int? = null,
 
-        val autoFilled: Boolean = false,
+        val fillSource: WordListFillSource = WordListFillSource.USER,
     ) : WordListDialog
     data class Edit(
         val senseId: Long,
@@ -113,25 +114,26 @@ class WordListViewModel @Inject constructor(
 
     fun onTextInput(text: String) {
         val current = _dialog.value as? WordListDialog.Add ?: return
-        val keepUserEdit = !current.autoFilled && (current.pos.isNotBlank() || current.meaning.isNotBlank())
+        val keepUserEdit = current.fillSource == WordListFillSource.USER &&
+            (current.pos.isNotBlank() || current.meaning.isNotBlank())
         _dialog.value = current.copy(
             text = text,
             error = validateAddWordInput(text, current.pos, current.meaning),
             pos = if (keepUserEdit) current.pos else "",
             meaning = if (keepUserEdit) current.meaning else "",
-            autoFilled = false,
+            fillSource = WordListFillSource.USER,
         )
         scheduleDictLookup(text, overwriteUserEdit = !keepUserEdit)
     }
 
     fun onPosInput(pos: String) {
         val current = _dialog.value as? WordListDialog.Add ?: return
-        _dialog.value = current.copy(pos = pos, error = validateAddWordInput(current.text, pos, current.meaning), autoFilled = false)
+        _dialog.value = current.copy(pos = pos, error = validateAddWordInput(current.text, pos, current.meaning), fillSource = WordListFillSource.USER)
     }
 
     fun onMeaningInput(meaning: String) {
         val current = _dialog.value as? WordListDialog.Add ?: return
-        _dialog.value = current.copy(meaning = meaning, error = validateAddWordInput(current.text, current.pos, meaning), autoFilled = false)
+        _dialog.value = current.copy(meaning = meaning, error = validateAddWordInput(current.text, current.pos, meaning), fillSource = WordListFillSource.USER)
     }
 
     private fun scheduleDictLookup(text: String, overwriteUserEdit: Boolean) {
@@ -144,14 +146,16 @@ class WordListViewModel @Inject constructor(
             if (entries.isEmpty()) return@launch
             val first = entries.first()
             val current = _dialog.value as? WordListDialog.Add ?: return@launch
-            if (!overwriteUserEdit && !current.autoFilled && (current.pos.isNotBlank() || current.meaning.isNotBlank())) {
+            if (!overwriteUserEdit && current.fillSource == WordListFillSource.USER &&
+                (current.pos.isNotBlank() || current.meaning.isNotBlank())
+            ) {
                 return@launch
             }
             _dialog.value = current.copy(
                 pos = first.pos,
                 meaning = first.meaning,
                 error = validateAddWordInput(current.text, first.pos, first.meaning),
-                autoFilled = true,
+                fillSource = WordListFillSource.DICTIONARY,
             )
         }
     }
@@ -164,10 +168,7 @@ class WordListViewModel @Inject constructor(
         val meaning = d.meaning.trim()
         viewModelScope.launch {
             db.withTransaction {
-                val wordId = wordDao.findIdByText(text)
-                    ?: wordDao.insert(Word(text = text)).let { id ->
-                        if (id == -1L) wordDao.findIdByText(text)!! else id
-                    }
+                val wordId = wordDao.findOrInsertWord(text, null)
                 wordDao.insertSense(Sense(wordId = wordId, pos = pos, meaning = meaning))
                 bookDao.linkBookWord(BookWord(bookId = bookId, wordId = wordId))
             }

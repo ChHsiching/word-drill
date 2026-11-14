@@ -25,6 +25,12 @@ interface WordDao {
     @Query("SELECT wordId FROM word WHERE text = :text LIMIT 1")
     suspend fun findIdByText(text: String): Long?
 
+    suspend fun findOrInsertWord(text: String, phonetic: String?): Long =
+        findIdByText(text)
+            ?: insert(Word(text = text, phonetic = phonetic)).let { id ->
+                if (id == -1L) findIdByText(text)!! else id
+            }
+
     @Query("SELECT * FROM word WHERE text = :text LIMIT 1")
     suspend fun getByText(text: String): Word?
 

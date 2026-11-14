@@ -1,7 +1,9 @@
 package com.github.chsiching.worddrill.ui.library
 
+import androidx.annotation.StringRes
 import com.github.chsiching.worddrill.R
 
+@StringRes
 internal fun validateAddWordInput(text: String, pos: String, meaning: String): Int? = when {
     text.trim().isEmpty() -> R.string.validation_word_empty
     pos.trim().isEmpty() -> R.string.validation_pos_empty
@@ -9,6 +11,7 @@ internal fun validateAddWordInput(text: String, pos: String, meaning: String): I
     else -> null
 }
 
+@StringRes
 internal fun validateSenseEditInput(pos: String, meaning: String): Int? = when {
     pos.trim().isEmpty() -> R.string.validation_pos_empty
     meaning.trim().isEmpty() -> R.string.validation_meaning_empty

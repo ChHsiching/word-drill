@@ -22,13 +22,15 @@ data class DeletedEntry(
     val wordText: String,
 )
 
+const val REVIEW_BOOK_NAME = "复习"
+
 @Dao
 interface BookDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(book: Book): Long
 
-    @Query("SELECT * FROM book WHERE deleted = 0 ORDER BY isPreset DESC, CASE WHEN name = '复习' THEN 1 ELSE 0 END, name ASC")
+    @Query("SELECT * FROM book WHERE deleted = 0 ORDER BY isPreset DESC, CASE WHEN name = '$REVIEW_BOOK_NAME' THEN 1 ELSE 0 END, name ASC")
     fun observeAll(): Flow<List<Book>>
 
     @Query(
@@ -39,7 +41,7 @@ interface BookDao {
         LEFT JOIN book_word bw ON b.bookId = bw.bookId AND bw.skipped = 0 AND bw.deleted = 0
         WHERE b.deleted = 0
         GROUP BY b.bookId
-        ORDER BY b.isPreset DESC, CASE WHEN b.name = '复习' THEN 1 ELSE 0 END, b.name ASC
+        ORDER BY b.isPreset DESC, CASE WHEN b.name = '$REVIEW_BOOK_NAME' THEN 1 ELSE 0 END, b.name ASC
         """
     )
     fun observeAllWithCounts(): Flow<List<BookWithCount>>

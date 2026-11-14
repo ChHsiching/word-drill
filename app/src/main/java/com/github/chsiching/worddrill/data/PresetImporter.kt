@@ -6,7 +6,6 @@ import com.github.chsiching.worddrill.data.local.dao.BookDao
 import com.github.chsiching.worddrill.data.local.dao.WordDao
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
-import com.github.chsiching.worddrill.data.local.entity.Word
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,10 +28,7 @@ class PresetImporter @Inject constructor(
             booksImported++
 
             for (wordSpec in bookSpec.words) {
-                val wordId = wordDao.findIdByText(wordSpec.text)
-                    ?: wordDao.insert(Word(text = wordSpec.text, phonetic = wordSpec.phonetic)).let { id ->
-                        if (id == -1L) wordDao.findIdByText(wordSpec.text)!! else id
-                    }
+                val wordId = wordDao.findOrInsertWord(wordSpec.text, wordSpec.phonetic)
 
                 for (sense in wordSpec.senses) {
                     wordDao.insertSense(Sense(wordId = wordId, pos = sense.pos, meaning = sense.meaning))
