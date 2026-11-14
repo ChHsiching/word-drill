@@ -186,7 +186,7 @@ class MeScreenTest {
         composeRule.onNodeWithText("通用", substring = false)
         composeRule.onNodeWithText("隐藏音标").assertIsDisplayed()
         composeRule.onNodeWithText("导航栏风格").assertIsDisplayed()
-        composeRule.onNodeWithText("简约导航").assertIsDisplayed()
+        composeRule.onNodeWithText("简约导航").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("导出数据")
         composeRule.onNodeWithText("导入数据")
         composeRule.onNodeWithText("关于", substring = false)
