@@ -54,27 +54,6 @@ import com.github.chsiching.worddrill.ui.theme.DialogTextField
 import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 
-/**
- * "Library" tab (Ticket #6 + #16 rewrite + #21 file import): book list + switch/create/
- * rename/delete/import.
- *
- * Design spec (#16): dropped CenterAlignedTopAppBar for a large title; plain-text list (no
- * leading icon); selected state uses a light gray background (chipBg) + check + bold text;
- * selection happens in place with no navigation.
- *
- * Keeps the Ticket #6/#11 abilities:
- * - Tap the row body: set as current book (writes DataStore; the "Drill" tab observes the
- *   same-source Flow and reloads immediately)
- * - Tap the trailing chevron: open the book's word list ([WordListScreen])
- * - Custom books: rename/delete entries (kept as TextButtons, matching the existing
- *   interaction)
- *
- * Ticket #21 addition: an "import from file" button below the "+ create book" button,
- * opening SAF + a book-name input.
- *
- * Preset books do not show rename/delete (isPreset check; the DAO layer's
- * rename/deleteCustom also guards with isPreset=0).
- */
 @Composable
 fun LibraryScreen(
     onOpenBook: (bookId: Long) -> Unit,
@@ -171,11 +150,6 @@ fun LibraryScreen(
     }
 }
 
-/**
- * Book row: plain text (name + subtitle) + chipBg background and check in the selected
- * state. Row body tap = set as current; trailing chevron = open the word list; custom
- * books get rename/delete TextButtons.
- */
 @Composable
 private fun BookRow(
     book: BookWithCount,
@@ -221,7 +195,6 @@ private fun BookRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp),
                 )
-                // Rename/delete entries for custom books (TextButtons under the subtitle, matching the existing interaction)
                 if (!book.isPreset) {
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         TextButton(onClick = onRename, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
@@ -233,7 +206,6 @@ private fun BookRow(
                     }
                 }
             }
-            // Selected-state check (secondary color, no inversion)
             if (isCurrent) {
                 Icon(
                     imageVector = Icons.Outlined.Check,
@@ -242,7 +214,6 @@ private fun BookRow(
                     modifier = Modifier.size(18.dp),
                 )
             }
-            // Trailing chevron: opens the word list
             IconButton(onClick = onOpen) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
@@ -254,7 +225,6 @@ private fun BookRow(
     }
 }
 
-/** Create-book button: chipBg background, corner radius 14, Plus icon + centered label. */
 @Composable
 private fun AddBookButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
@@ -285,11 +255,6 @@ private fun AddBookButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Import-from-file button (Ticket #21): same placement and style family as
- * [AddBookButton], but an OutlinedButton to set it apart (create is the primary entry,
- * import the secondary one).
- */
 @Composable
 private fun ImportBookButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     OutlinedButton(
@@ -345,16 +310,6 @@ private fun BookNameDialog(
     )
 }
 
-/**
- * File import dialog (Ticket #21).
- *
- * - Explaining text at the top (supported formats + column structure)
- * - "Pick file" button triggers SAF (OpenDocument, mime filter xlsx/txt/csv/pdf/any)
- * - Shows the picked filename
- * - Book-name input (reuses BookNameValidation)
- * - Confirm button: clickable only when a file is picked, the name passes validation, and
- *   not working
- */
 @Composable
 private fun ImportBookDialog(
     state: LibraryDialog.Import,
@@ -368,7 +323,6 @@ private fun ImportBookDialog(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri: Uri? ->
         if (uri != null) {
-            // Read DISPLAY_NAME from the Uri Cursor; fall back to uri.lastPathSegment when unavailable
             val filename = queryFilename(context, uri)
             onPickFile(uri, filename)
         }
@@ -455,7 +409,6 @@ private fun ImportBookDialog(
     )
 }
 
-/** Looks up the filename from a SAF Uri (DISPLAY_NAME column). Falls back to lastPathSegment when unavailable. */
 private fun queryFilename(context: android.content.Context, uri: Uri): String {
     return runCatching {
         context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
@@ -465,9 +418,6 @@ private fun queryFilename(context: android.content.Context, uri: Uri): String {
     }.getOrNull()?.takeIf { it.isNotBlank() } ?: (uri.lastPathSegment ?: "unknown")
 }
 
-/**
- * Import-done dialog (Ticket #21). Shows [ImportSummary]; the user closes it with OK.
- */
 @Composable
 private fun ImportDoneDialog(
     summary: com.github.chsiching.worddrill.data.wordimport.ImportSummary,
@@ -487,12 +437,6 @@ private fun ImportDoneDialog(
     )
 }
 
-/**
- * Delete-book double-confirmation dialog (Ticket #18).
- * Cancel is the safe option (default); delete uses a destructive light-red button to signal
- * the risk. The DAO layer guards with isPreset=0, and the UI already hides the delete entry
- * for preset books, so only custom books reach here.
- */
 @Composable
 private fun DeleteBookDialog(
     name: String,

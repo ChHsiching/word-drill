@@ -2,13 +2,6 @@ package com.github.chsiching.worddrill.data
 
 import org.json.JSONObject
 
-/**
- * Parse assets/words.json text into [PresetWords].
- * Uses Android's built-in org.json (no new dependency).
- *
- * The parsing logic is a standalone pure function, easy to verify in JVM unit tests by feeding
- * in small JSON strings.
- */
 object PresetWordsParser {
 
     fun parse(json: String): PresetWords {
@@ -37,13 +30,8 @@ object PresetWordsParser {
                         add(
                             PresetWords.Word(
                                 text = w.getString("text"),
-                                // Ticket #14: phonetic is nullable.
-                                // Warning: guard JSON null with w.isNull first, because Android's
-                                // bundled org.json optString(key, "") returns the string "null" when
-                                // the key exists with a JSON null value, so calling
-                                // optString directly would persist phonetic = "null" (hit and verified on
-                                // a real device). The same trap exists in DatabaseJsonSerializer's
-                                // deserialization path, handled the same way.
+                                // Android's org.json.optString(key, "") returns the string "null" on a
+                                // JSON null, so guard with isNull first.
                                 phonetic = if (w.isNull("phonetic")) {
                                     null
                                 } else {

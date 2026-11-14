@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ticket #24: placeholder icon for the system splash screen, a 1×1px transparent VectorDrawable.
-     windowSplashScreenAnimatedIcon must point at a drawable (the system rejects null);
-     fully transparent, the system splash is visually just the background color
-     (ic_launcher_background), so the custom Compose animation owns every frame and the
-     "big logo first, then animation" effect is gone. -->
+<!-- windowSplashScreenAnimatedIcon must point at a drawable (the system rejects null);
+     fully transparent so the splash shows only the background color. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="1dp"
     android:height="1dp"

@@ -15,12 +15,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Ticket #19: instrumented test for the built-in dictionary DAO + Importer (in-memory Room).
- * Verifies the schema, the findByWord query, the (word,pos) unique-index fallback, nullable phonetic, and idempotent import.
- *
- * The main seam is in [WordDrillDatabaseTest]; this is the new dictionary-table seam added by #19.
- */
 @RunWith(AndroidJUnit4::class)
 class DictionaryDaoTest {
 
@@ -43,8 +37,6 @@ class DictionaryDaoTest {
         db.close()
     }
 
-    // ---- schema and basic reads/writes ----
-
     @Test
     fun count_startsAtZero() = runTest {
         assertThat(dao.count()).isEqualTo(0)
@@ -60,8 +52,6 @@ class DictionaryDaoTest {
         )
         assertThat(dao.count()).isEqualTo(2)
     }
-
-    // ---- findByWord: the core query ----
 
     @Test
     fun findByWord_returnsEmptyForAbsent() = runTest {
@@ -84,7 +74,6 @@ class DictionaryDaoTest {
 
     @Test
     fun findByWord_isCaseSensitive() = runTest {
-        // ECDICT's word column is mostly lowercase base forms; a capitalized Apple is not found by default (callers must lower the word before querying).
         dao.insertAll(
             listOf(DictionaryEntry(word = "apple", pos = "n.", meaning = "苹果"))
         )
@@ -112,16 +101,12 @@ class DictionaryDaoTest {
         assertThat(dao.findByWord("run").single().phonetic).isNull()
     }
 
-    // ---- (word, pos) unique-index fallback ----
-
     @Test
     fun insertAll_ignoresDuplicateWordPos() = runTest {
         val e1 = DictionaryEntry(word = "apple", phonetic = "/p1/", pos = "n.", meaning = "苹果")
         val e2 = DictionaryEntry(word = "apple", phonetic = "/p2/", pos = "n.", meaning = "苹果（重复）")
         dao.insertAll(listOf(e1, e2))
-        // IGNORE fallback: only one (apple, n.) row
         assertThat(dao.count()).isEqualTo(1)
-        // The first row is kept; the second does not overwrite it
         assertThat(dao.findByWord("apple").single().phonetic).isEqualTo("/p1/")
     }
 
@@ -136,8 +121,6 @@ class DictionaryDaoTest {
         assertThat(dao.findByWord("match")).hasSize(2)
     }
 
-    // ---- Importer: end-to-end import ----
-
     @Test
     fun importer_insertsAllEntries() = runTest {
         val data = sampleDictionary()
@@ -149,7 +132,6 @@ class DictionaryDaoTest {
     @Test
     fun importer_queryByWordReturnsAllPos() = runTest {
         importer.importDictionary(sampleDictionary())
-        // apple has two entries in the sample: n. and v.
         val result = dao.findByWord("apple")
         assertThat(result.map { it.pos }).containsExactly("n.", "v.")
     }
@@ -159,16 +141,12 @@ class DictionaryDaoTest {
         val data = sampleDictionary()
         importer.importDictionary(data)
         val secondRun = importer.importDictionary(data)
-        // Second import: every (word,pos) already exists, the IGNORE fallback applies, 0 new rows
         assertThat(secondRun).isEqualTo(0)
         assertThat(dao.count()).isEqualTo(data.words.size)
     }
 
     @Test
     fun importer_phoneticIsNull_notStringNull_whenJsonNull() = runTest {
-        // Regression guard (same pitfall as PresetImporterTest): assets JSON with an explicit "phonetic": null.
-        // Android's real org.json optString returns the string "null" for a JSON null;
-        // this verifies that DictionaryWordsParser's isNull guard really works.
         val json = """
             {"source":"x","words":[
               {"word":"ghost","phonetic":null,"pos":"n.","meaning":"鬼"}

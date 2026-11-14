@@ -40,25 +40,12 @@ import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
 import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 
-/** Target pending permanent deletion (sealed to tell books and word entries apart, used for the confirm-dialog text). */
 private sealed interface PurgeTarget {
     val displayName: String
     data class BookItem(val bookId: Long, override val displayName: String) : PurgeTarget
     data class EntryItem(val bookId: Long, val wordId: Long, override val displayName: String) : PurgeTarget
 }
 
-/**
- * Recycle bin page (Ticket #22): lists soft-deleted books and word links, supporting
- * restore and permanent delete.
- *
- * Two list sections: "Books" first (whole books soft-deleted), then "Words" (a word of
- * some book soft-deleted). Each item has Restore and Permanent delete TextButtons;
- * permanent delete asks for confirmation (error color, irreversible). Empty state: when
- * both are empty, "recycle bin is empty" shows centered.
- *
- * Same style as [com.github.chsiching.worddrill.ui.library.WordListScreen]
- * (inline header + row-bottom divider).
- */
 @Composable
 fun RecycleBinScreen(
     onBack: () -> Unit,
@@ -71,7 +58,6 @@ fun RecycleBinScreen(
     val isEmpty = books.isEmpty() && entries.isEmpty()
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Inline header: back + title
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -241,13 +227,6 @@ private fun RowSeparator() {
     )
 }
 
-/**
- * Permanent-delete double-confirmation dialog (Ticket #22).
- * Same pattern as DeleteWordDialog in
- * [com.github.chsiching.worddrill.ui.library.WordListScreen], but the text says
- * "irreversible" (permanent delete is a real DELETE and cannot be restored), with a destructive
- * light-red button.
- */
 @Composable
 private fun PurgeConfirmDialog(
     displayName: String,

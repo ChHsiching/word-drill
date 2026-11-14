@@ -36,13 +36,7 @@ class MainActivity : Hilt_MainActivity() {
     lateinit var settings: SettingsRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Ticket #24: the SplashScreen must be installed before super.onCreate (required by the compat library).
-        // The splash theme sets the system icon to a transparent drawable; after startup the system switches back to Theme.WordDrill.
-        //
-        // setKeepOnScreenCondition: during cold start, Compose first-frame composition + the WordDrillRoot subtree
-        // (Hilt/Room/NavHost) initialization takes ~1-2s; during that period the system splash keeps showing a solid background color,
-        // avoiding a jarring blank gap between the splash disappearing and the animation starting.
-        // Once the animation's first frame is drawn (animReady set to true), the system splash hands off to the overlay.
+        // The SplashScreen compat library requires installSplashScreen() before super.onCreate.
         val animReady = AtomicBoolean(false)
         val splashScreen = installSplashScreen()
         splashScreen.setKeepOnScreenCondition { !animReady.get() }
@@ -55,12 +49,8 @@ class MainActivity : Hilt_MainActivity() {
         )
         setContent {
             val themeMode by themeState.collectAsStateWithLifecycle()
-            // renderedTheme tracks themeMode (the two sync up after DataStore's async refresh).
-            // During the reveal animation the DataStore write completes, themeMode changes, renderedTheme follows, and the underlying layer switches.
-            // The snapshot overlay covers the old theme, and the animation reveals the new theme underneath.
             var renderedTheme by remember { mutableStateOf(themeMode) }
 
-            // When themeMode changes, sync it to renderedTheme (themeMode updates after the DataStore write; this keeps up)
             androidx.compose.runtime.LaunchedEffect(themeMode) {
                 renderedTheme = themeMode
             }
@@ -79,8 +69,6 @@ class MainActivity : Hilt_MainActivity() {
                 ThemeRevealContent(
                     onThemeApplied = {},
                 ) {
-                    // Ticket #24 splash animation overlay: covers the main content during the animation,
-                    // and reveals the layer underneath once finished (the theme has stabilized).
                     var splashDone by remember { mutableStateOf(false) }
                     Box(Modifier.fillMaxSize()) {
                         WordDrillRoot()

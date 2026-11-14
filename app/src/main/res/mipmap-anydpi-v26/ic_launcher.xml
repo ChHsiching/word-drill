@@ -1,7 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ticket #24: adaptive icon (API 26+; with minSdk=26 that is every device).
-     <monochrome> serves Android 13+ themed icons by reusing the foreground drawable
-     (the system tints it by wallpaper; front/rear card contrast survives via alpha). -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />

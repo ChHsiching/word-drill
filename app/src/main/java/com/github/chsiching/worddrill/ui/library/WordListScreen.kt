@@ -50,18 +50,6 @@ import com.github.chsiching.worddrill.ui.theme.DialogTextField
 import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 
-/**
- * Secondary page of the "Library" tab: a book's word list (Ticket #7 + #16 rewrite + #9
- * POS dropdown and dictionary lookup).
- *
- * Design spec (#16): dropped the TopAppBar for an inline header of back + title + add
- * entry; rows separated by separator lines. All Ticket #7 abilities are kept (custom books
- * add/edit/remove; presets read-only).
- *
- * Ticket #9: [AddWordDialog]'s POS became a dropdown ([ExposedDropdownMenuBox],
- * readOnly=true) with 12 fixed POS values; after the word is typed,
- * [WordListViewModel] does a debounced dictionary lookup and auto-fills pos + meaning.
- */
 @Composable
 fun WordListScreen(
     onBack: () -> Unit,
@@ -72,7 +60,6 @@ fun WordListScreen(
     val readOnly = state.isPreset
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Inline header: back + title + add
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -209,7 +196,6 @@ private fun WordRow(
                 }
             }
         }
-        // Row-bottom divider
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -219,15 +205,6 @@ private fun WordRow(
     }
 }
 
-/**
- * Add-word dialog (Ticket #7 + #9 POS dropdown + dictionary lookup).
- *
- * - word input: onValueChange triggers [WordListViewModel.onTextInput]; the VM does the
- *   debounced dictionary lookup
- * - pos uses [ExposedDropdownMenuBox] (readOnly=true; only the 12 fixed POS choices, no
- *   free input)
- * - meaning input: auto-filled on a dictionary hit, still editable by hand
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddWordDialog(
@@ -262,7 +239,7 @@ private fun AddWordDialog(
                         label = stringResource(R.string.word_list_pos_dropdown_label),
                         singleLine = true,
                         isError = state.error != null,
-                        readOnly = true, // POS cannot be typed freely; dropdown selection only (issue #9)
+                        readOnly = true,
                         trailingIcon = {
                             ExposedDropdownMenuDefaults.TrailingIcon(posExpanded)
                         },
@@ -358,14 +335,6 @@ private fun EditSenseDialog(
     )
 }
 
-/**
- * Delete-word double-confirmation dialog (Ticket #22).
- * Same pattern as DeleteBookDialog in
- * [com.github.chsiching.worddrill.ui.library.LibraryScreen]: cancel is the safe option
- * (default); delete uses a destructive light-red button to signal the risk.
- * Semantics: soft delete (deleted=1, goes to the recycle bin, restorable); the text says
- * explicitly "restorable from the recycle bin".
- */
 @Composable
 private fun DeleteWordDialog(
     wordText: String,

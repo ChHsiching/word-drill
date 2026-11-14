@@ -12,22 +12,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * Software-settings ViewModel of the "Me" tab (Ticket #9 + #16).
- *
- * Separate from [MeViewModel] (stats aggregation): settings and stats are two concerns;
- * each observes its own Flow, so a settings change does not re-subscribe the stats
- * combine.
- *
- * Theme: [themeMode] subscribes to [SettingsRepository.themePreference]; a switch is
- * persisted, and [com.github.chsiching.worddrill.MainActivity] observes the same Flow, so
- * the global palette takes effect immediately.
- *
- * Ticket #16 adds UI settings: hide phonetics / nav bar style / compact navigation. All
- * three are also persisted to DataStore and observed by
- * [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot] to drive the nav bar and
- * card rendering.
- */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val settings: SettingsRepository,
@@ -57,15 +41,10 @@ class SettingsViewModel @Inject constructor(
         initialValue = false,
     )
 
-    /** User picked a new theme: persist it so it survives restart. */
     fun setTheme(mode: ThemeMode) {
         viewModelScope.launch { settings.setTheme(mode) }
     }
 
-    /**
-     * Cycles through the three [ThemeMode] states (review feedback 4: tapping the theme
-     * row cycles; no more dialog). Order: LIGHT, DARK, SYSTEM, back to LIGHT...
-     */
     fun cycleTheme() {
         val next = when (themeMode.value) {
             ThemeMode.LIGHT -> ThemeMode.DARK
@@ -83,7 +62,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setNavStyle(style) }
     }
 
-    /** Cycles between [NavStyle.PILL] and [NavStyle.BAR]. */
     fun cycleNavStyle() {
         val next = if (navStyle.value == NavStyle.PILL) NavStyle.BAR else NavStyle.PILL
         setNavStyle(next)

@@ -13,18 +13,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Ticket #20: idempotent-creation test for [ReviewBookInitializer] (in-memory Room + real DataStore).
- *
- * Acceptance coverage:
- * - The first call creates one preset "review" book (empty)
- * - A second call skips idempotently (no second book is created)
- * - The review book appears in the book list so the user can pick it to drill
- *
- * Note: the DataStore file persists across tests (same as [com.github.chsiching.worddrill.data.settings.SettingsRepositoryThemeTest]).
- * setUp clears the review_book_created flag so every test starts from a clean "not created" state;
- * the in-memory Room database is naturally empty each time, no cleanup needed.
- */
 @RunWith(AndroidJUnit4::class)
 class ReviewBookInitializerTest {
 
@@ -42,7 +30,6 @@ class ReviewBookInitializerTest {
             .build()
         settings = SettingsRepository(context)
         initializer = ReviewBookInitializer(db.bookDao(), settings)
-        // Clear the review_book_created flag written by the previous test run, for a clean starting point
         settings.clearReviewBookCreated()
         Unit
     }
@@ -61,7 +48,6 @@ class ReviewBookInitializerTest {
         val review = db.bookDao().getByName("复习")
         assertThat(review).isNotNull()
         assertThat(review!!.isPreset).isTrue()
-        // Empty by default (no entries)
         assertThat(db.bookDao().countWordsInBook(review.bookId)).isEqualTo(0)
         Unit
     }
@@ -69,9 +55,8 @@ class ReviewBookInitializerTest {
     @Test
     fun ensureReviewBookCreated_isIdempotent_acrossCalls() = runBlocking {
         initializer.ensureReviewBookCreated()
-        initializer.ensureReviewBookCreated() // second call
+        initializer.ensureReviewBookCreated()
 
-        // Only one "review" book
         val reviews = db.bookDao().observeAll().first().filter { it.name == "复习" }
         assertThat(reviews).hasSize(1)
         Unit
@@ -79,7 +64,6 @@ class ReviewBookInitializerTest {
 
     @Test
     fun ensureReviewBookCreated_appearsInBookList() = runBlocking {
-        // The review book appears in the book list so the user can pick it to drill
         db.bookDao().insert(com.github.chsiching.worddrill.data.local.entity.Book(name = "CET-4", isPreset = true))
         initializer.ensureReviewBookCreated()
 

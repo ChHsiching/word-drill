@@ -10,21 +10,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Ticket #19: test for the v2-to-v3 migration (add the dictionary table).
- *
- * Same pattern as [Migration12Test]: room-testing is not used (it needs schema export, and this project has
- * exportSchema=false, so that path is closed); instead, build a v2-shaped SQLite database by hand (manual CREATE TABLE
- * mimicking the Room codegen schema), run [WordDrillDatabase.MIGRATION_2_3.migrate],
- * then verify with PRAGMA / sqlite_master:
- *  - the dictionary table is created with a schema matching Room codegen (including AUTOINCREMENT, NOT NULL, backticks)
- *  - the (word, pos) unique index is created
- *  - old tables (word / sense, etc.) are untouched (existing user data is preserved)
- *
- * This is the minimal coverage of AGENTS.md §3 "surgical changes": test only this one cut, the migration.
- * [DictionaryDaoTest] covers the full chain (Room reads and writes normally on the upgraded database);
- * it operates on the dictionary table directly on the v3 schema.
- */
 @RunWith(AndroidJUnit4::class)
 class Migration23Test {
 
@@ -34,11 +19,10 @@ class Migration23Test {
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(null) // in-memory database
+            .name(null)
             .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(2) {
                 override fun onCreate(db: SupportSQLiteDatabase) {
-                    // v2 shape: word table (with phonetic) and sense table; the dictionary table does not exist yet.
-                    // Only tables relevant to this test's assertions are created; the rest are skipped.
+                    // Fixture SQL mimics the Room codegen schema shape
                     db.execSQL(
                         """
                         CREATE TABLE `word` (
@@ -70,7 +54,6 @@ class Migration23Test {
                     oldVersion: Int,
                     newVersion: Int,
                 ) {
-                    // The test body calls migrate() manually; not implemented here.
                 }
             })
             .build()
@@ -96,10 +79,6 @@ class Migration23Test {
 
     @Test
     fun migrate_dictionarySchemaMatchesRoomCodegen() {
-        // Verifies the migration-generated CREATE TABLE matches the Room codegen shape.
-        // Actual codegen shape (captured from sqlite_master on a real device):
-        //   CREATE TABLE `dictionary` (`dictId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-        //     `word` TEXT NOT NULL, `phonetic` TEXT, `pos` TEXT NOT NULL, `meaning` TEXT NOT NULL)
         WordDrillDatabase.MIGRATION_2_3.migrate(db)
 
         db.query("SELECT sql FROM sqlite_master WHERE type='table' AND name='dictionary'").use { c ->
@@ -123,7 +102,6 @@ class Migration23Test {
         ).use { c ->
             while (c.moveToNext()) indexes.add(c.getString(0) ?: "")
         }
-        // codegen shape: CREATE UNIQUE INDEX `index_dictionary_word_pos` ON `dictionary` (`word`, `pos`)
         assertThat(indexes).hasSize(1)
         assertThat(indexes[0]).contains("UNIQUE INDEX")
         assertThat(indexes[0]).contains("`index_dictionary_word_pos`")
@@ -155,7 +133,6 @@ class Migration23Test {
 
     @Test
     fun migrate_dictionaryIsWritableAfterUpgrade() {
-        // After the upgrade the table must be writable (first-launch import needs INSERT)
         WordDrillDatabase.MIGRATION_2_3.migrate(db)
         db.execSQL(
             "INSERT INTO dictionary (word, phonetic, pos, meaning) VALUES ('apple', '/ˈæpl/', 'n.', '苹果')"

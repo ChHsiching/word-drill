@@ -2,13 +2,6 @@ package com.github.chsiching.worddrill.data
 
 import org.json.JSONObject
 
-/**
- * Ticket #19: parse assets/dictionary.json text into [DictionaryWords].
- * Uses Android's built-in org.json (no new dependency).
- *
- * The parsing logic is a standalone pure function, easy to verify in JVM unit tests by feeding
- * in small JSON strings (same pattern as [PresetWordsParser]).
- */
 object DictionaryWordsParser {
 
     fun parse(json: String): DictionaryWords {
@@ -18,9 +11,8 @@ object DictionaryWordsParser {
         val words = buildList {
             for (i in 0 until wordsJson.length()) {
                 val w = wordsJson.getJSONObject(i)
-                // phonetic is nullable, and JSON null must be guarded with w.isNull first (same
-                // trap as PresetWordsParser: org.json.optString(key, "") returns the string "null"
-                // on a JSON null).
+                // Android's org.json.optString(key, "") returns the string "null" on a JSON null,
+                // so guard with isNull first.
                 val phonetic = if (w.isNull("phonetic")) {
                     null
                 } else {

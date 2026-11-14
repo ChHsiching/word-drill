@@ -10,20 +10,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Ticket #22: test for the v4-to-v5 migration (add the deleted column to the book_word table).
- *
- * Same pattern as [Migration34Test] (v3-to-v4 added skipped): room-testing is not used (it needs schema export,
- * and this project has exportSchema=false, so that path is closed); instead, build a v4-shaped SQLite database by hand
- * (manual CREATE TABLE mimicking the Room codegen schema, including the skipped column), run [WordDrillDatabase.MIGRATION_4_5.migrate],
- * then verify with PRAGMA:
- *  - the deleted column is added, typed INTEGER NOT NULL DEFAULT 0
- *  - old link rows are not lost and deleted defaults to 0 (not deleted)
- *  - after the upgrade the column is writable (the UPDATE path of setDeleted)
- *
- * [roomOpensAfterMigration_schemaValidationPasses] covers the full chain (Room reads and writes normally on the upgraded database);
- * it uses an on-disk database and Room schema validation.
- */
 @RunWith(AndroidJUnit4::class)
 class Migration45Test {
 
@@ -33,11 +19,10 @@ class Migration45Test {
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(null) // in-memory database
+            .name(null)
             .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(4) {
                 override fun onCreate(db: SupportSQLiteDatabase) {
-                    // v4 shape: book / word / book_word tables (with the skipped column, no deleted column).
-                    // Mimics the Room codegen schema shape.
+                    // Fixture SQL mimics the Room codegen schema shape at v4.
                     db.execSQL(
                         """
                         CREATE TABLE `book` (
@@ -77,7 +62,6 @@ class Migration45Test {
                     oldVersion: Int,
                     newVersion: Int,
                 ) {
-                    // The test body calls migrate() manually; not implemented here.
                 }
             })
             .build()
@@ -94,14 +78,12 @@ class Migration45Test {
     fun migrate_addsDeletedColumn() {
         WordDrillDatabase.MIGRATION_4_5.migrate(db)
 
-        // book_word gets deleted
         val bwColumns = mutableListOf<String>()
         db.query("PRAGMA table_info(book_word)").use { c ->
             while (c.moveToNext()) bwColumns.add(c.getString(1))
         }
         assertThat(bwColumns).contains("deleted")
 
-        // book also gets deleted
         val bookColumns = mutableListOf<String>()
         db.query("PRAGMA table_info(book)").use { c ->
             while (c.moveToNext()) bookColumns.add(c.getString(1))
@@ -117,12 +99,10 @@ class Migration45Test {
 
         WordDrillDatabase.MIGRATION_4_5.migrate(db)
 
-        // Old link rows should have deleted 0
         db.query("SELECT deleted FROM book_word WHERE bookId = 1 AND wordId = 1").use { c ->
             assertThat(c.moveToFirst()).isTrue()
             assertThat(c.getInt(0)).isEqualTo(0)
         }
-        // Old book rows should also have deleted 0
         db.query("SELECT deleted FROM book WHERE bookId = 1").use { c ->
             assertThat(c.moveToFirst()).isTrue()
             assertThat(c.getInt(0)).isEqualTo(0)
@@ -131,7 +111,6 @@ class Migration45Test {
 
     @Test
     fun migrate_preservesExistingLinksAndSkipped() {
-        // The upgrade must not lose old data or change existing skipped state
         db.execSQL("INSERT INTO book (name, isPreset) VALUES ('b', 0)")
         db.execSQL("INSERT INTO word (text) VALUES ('apple')")
         db.execSQL("INSERT INTO word (text) VALUES ('run')")
@@ -144,7 +123,6 @@ class Migration45Test {
             assertThat(c.moveToFirst()).isTrue()
             assertThat(c.getInt(0)).isEqualTo(2)
         }
-        // skipped state preserved: apple=1 (skipped), run=0 (not skipped)
         db.query("SELECT skipped FROM book_word WHERE bookId = 1 AND wordId = 1").use { c ->
             assertThat(c.moveToFirst()).isTrue()
             assertThat(c.getInt(0)).isEqualTo(1)
@@ -153,7 +131,6 @@ class Migration45Test {
 
     @Test
     fun migrate_deletedIsWritable() {
-        // After the upgrade deleted must be writable (the UPDATE path of setDeleted)
         db.execSQL("INSERT INTO book (name, isPreset) VALUES ('b', 0)")
         db.execSQL("INSERT INTO word (text) VALUES ('apple')")
         db.execSQL("INSERT INTO book_word (bookId, wordId) VALUES (1, 1)")
@@ -166,23 +143,12 @@ class Migration45Test {
         }
     }
 
-    /**
-     * End-to-end schema validation: create an on-disk v4 database, let Room run the migration and open v5, then do CRUD.
-     *
-     * This is what calling migrate() directly on a SupportSQLiteDatabase cannot cover: on open, Room compares the
-     * codegen-generated v5 schema with the actual on-disk schema; if the entity's `@ColumnInfo(defaultValue)` disagrees
-     * with the migration's `ALTER ... DEFAULT`, this throws IllegalStateException.
-     *
-     * The v4 fixture must create all v4 tables (word/sense/book/book_word[with skipped]/swipe_log/dictionary),
-     * otherwise Room schema validation fails on the missing tables (unrelated to deleted).
-     */
     @Test
     fun roomOpensAfterMigration_schemaValidationPasses() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val dbFile = java.io.File(context.cacheDir, "migration45-room-test.db")
         dbFile.delete()
 
-        // 1) Build a complete v4-shaped database file (all 6 tables mimicking Room codegen; book_word includes skipped)
         val v4Config = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
             .name(dbFile.absolutePath)
             .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(4) {
@@ -262,15 +228,14 @@ class Migration45Test {
             .build()
         val v4Helper = FrameworkSQLiteOpenHelperFactory().create(v4Config)
         val v4Db = v4Helper.writableDatabase
-        // Load one row of data to verify it survives the upgrade
         v4Db.execSQL("INSERT INTO book (name, isPreset) VALUES ('b', 0)")
         v4Db.execSQL("INSERT INTO word (text) VALUES ('apple')")
         v4Db.execSQL("INSERT INTO book_word (bookId, wordId) VALUES (1, 1)")
         v4Db.close()
         v4Helper.close()
 
-        // 2) Let Room open this v4 database file with all migrations registered, triggering the v4-to-v5 upgrade and schema validation.
-        //    If the entity defaultValue disagrees with the migration DEFAULT, IllegalStateException is thrown here.
+        // Opening with Room triggers the v4-to-v5 migration and schema validation; a
+        // defaultValue/DEFAULT mismatch throws IllegalStateException here.
         val roomDb = androidx.room.Room.databaseBuilder(
             context,
             WordDrillDatabase::class.java,
@@ -284,13 +249,11 @@ class Migration45Test {
             )
             .build()
         val deleted = kotlinx.coroutines.runBlocking {
-            // Opening triggers the migration; CRUD verifies the deleted column is readable and writable
             roomDb.bookDao().getDeleted(1, 1)
         }
         roomDb.close()
         dbFile.delete()
 
-        // After the upgrade old link rows have deleted defaulting to 0 (not deleted)
         assertThat(deleted).isFalse()
     }
 }

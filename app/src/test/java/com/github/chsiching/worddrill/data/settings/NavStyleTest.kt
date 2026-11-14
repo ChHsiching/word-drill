@@ -3,12 +3,6 @@ package com.github.chsiching.worddrill.data.settings
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
-/**
- * Pure-function JVM tests for [NavStyle.fromStorageName] (Ticket #16).
- *
- * Same as [ThemeMode]: unknown or corrupt values fall back safely to the default
- * [NavStyle.PILL] instead of throwing.
- */
 class NavStyleTest {
 
     @Test
@@ -30,6 +24,6 @@ class NavStyleTest {
     fun fromStorageName_defaultsToPill_whenUnknown() {
         assertThat(NavStyle.fromStorageName("garbage")).isEqualTo(NavStyle.PILL)
         assertThat(NavStyle.fromStorageName("")).isEqualTo(NavStyle.PILL)
-        assertThat(NavStyle.fromStorageName("pill")).isEqualTo(NavStyle.PILL) // case-sensitive
+        assertThat(NavStyle.fromStorageName("pill")).isEqualTo(NavStyle.PILL)
     }
 }

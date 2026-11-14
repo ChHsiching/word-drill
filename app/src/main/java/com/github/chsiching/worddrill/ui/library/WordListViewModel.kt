@@ -25,28 +25,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * Fixed POS dropdown options for manual word entry (issue #9 verbatim, 12 common POS).
- * File import's [com.github.chsiching.worddrill.data.wordimport.PosMeaningParser] supports
- * more (17), but manual entry is a high-frequency interaction and a shorter dropdown is
- * easier to pick from, so the issue's list of 12 is used.
- */
 val WORD_LIST_POS_OPTIONS: List<String> = listOf(
     "n.", "v.", "vt.", "vi.", "adj.", "adv.",
     "prep.", "conj.", "pron.", "art.", "num.", "int.",
 )
 
-/** Dictionary-lookup debounce: query the database only after the user stops typing for [DEBOUNCE_MS], avoiding one query per character. */
 private const val DEBOUNCE_MS = 300L
 
-/**
- * Secondary page of the "Library" tab: dialog states for a book's word list.
- * - [Add]: add a word (text + pos + meaning; since #9, entering text auto-looks-up the
- *   dictionary to fill pos+meaning)
- * - [Edit]: edit one sense (pos + meaning; wordText shown read-only)
- * - [Delete]: delete-word double confirmation (Ticket #22, soft-delete into the recycle
- *   bin, restorable)
- */
 sealed interface WordListDialog {
     data object None : WordListDialog
     data class Add(
@@ -54,7 +39,7 @@ sealed interface WordListDialog {
         val pos: String = "",
         val meaning: String = "",
         @StringRes val error: Int? = null,
-        /** Auto-fill flag: true means pos/meaning were auto-filled from the dictionary; the user can still edit them by hand. */
+
         val autoFilled: Boolean = false,
     ) : WordListDialog
     data class Edit(
@@ -64,14 +49,10 @@ sealed interface WordListDialog {
         val meaning: String = "",
         @StringRes val error: Int? = null,
     ) : WordListDialog
-    /** Ticket #22: delete-word double confirmation (wordText is used in the dialog text). */
+
     data class Delete(val wordId: Long, val wordText: String) : WordListDialog
 }
 
-/**
- * Word-list page UI state. bookName/isPreset are loaded once in init (constant for the
- * same destination).
- */
 data class WordListUiState(
     val bookName: String = "",
     val isPreset: Boolean = false,
@@ -79,25 +60,6 @@ data class WordListUiState(
     val dialog: WordListDialog = WordListDialog.None,
 )
 
-/**
- * ViewModel for a book's word list (Ticket #7 + #9 POS dropdown and dictionary lookup).
- *
- * - bookId comes from [SavedStateHandle] (navigation-compose syncs the composable route's
- *   nav arg into the same-source SavedStateHandle; `hiltViewModel()` binds to the current
- *   backStackEntry by default).
- * - The word list subscribes to [WordDao.observeWordsWithSensesByBook]; inserts, deletes,
- *   and edits re-emit automatically.
- * - Add: reuse the global word pool ([WordDao.findIdByText]), write the sense, then
- *   linkBookWord; the whole step is one transaction.
- * - **Ticket #9**: after [onTextInput], a debounced [DictionaryDao] lookup auto-fills pos
- *   and meaning on a hit (autoFilled=true flag; the user can still edit afterwards).
- * - Edit: [WordDao.updateSense].
- * - Delete (Ticket #22): [BookDao.setDeleted] soft-deletes book_word.deleted=1
- *   (book-level: only this book's link changes; deleting apple in CET-4 does not affect
- *   CET-6's link to the same word). The word goes to the recycle bin and is restorable.
- * - Preset books: the UI decides from isPreset whether to render the add/edit/delete
- *   buttons (the DAO layer does not block; the spec only requires the UI to be inert).
- */
 @HiltViewModel
 class WordListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -117,7 +79,6 @@ class WordListViewModel @Inject constructor(
     private val _bookName = MutableStateFlow("")
     private val _isPreset = MutableStateFlow(false)
 
-    /** Current debounced dictionary-lookup coroutine; a new input cancels the previous one. */
     private var dictLookupJob: Job? = null
 
     init {
@@ -148,26 +109,14 @@ class WordListViewModel @Inject constructor(
         initialValue = WordListUiState(),
     )
 
-    // ---- add word ----
-
     fun openAddDialog() { _dialog.value = WordListDialog.Add() }
 
-    /**
-     * Word text input change (called from onValueChange).
-     *
-     * Separate from [onPosInput] / [onMeaningInput]: a text change triggers the debounced
-     * dictionary lookup. On a hit, pos + meaning are auto-filled (autoFilled=true). Values
-     * the user hand-entered (autoFilled=false) are not overwritten (so the dictionary does
-     * not clobber a pos the user just changed).
-     */
     fun onTextInput(text: String) {
         val current = _dialog.value as? WordListDialog.Add ?: return
-        // Once the user has hand-edited pos/meaning (autoFilled=false), dictionary auto-fill no longer overrides them
         val keepUserEdit = !current.autoFilled && (current.pos.isNotBlank() || current.meaning.isNotBlank())
         _dialog.value = current.copy(
             text = text,
             error = validateAddWordInput(text, current.pos, current.meaning),
-            // Clear fields the user has not edited yet, so a dictionary hit can refill them
             pos = if (keepUserEdit) current.pos else "",
             meaning = if (keepUserEdit) current.meaning else "",
             autoFilled = false,
@@ -175,19 +124,16 @@ class WordListViewModel @Inject constructor(
         scheduleDictLookup(text, overwriteUserEdit = !keepUserEdit)
     }
 
-    /** POS input change (user picks/edits by hand; autoFilled immediately set to false). */
     fun onPosInput(pos: String) {
         val current = _dialog.value as? WordListDialog.Add ?: return
         _dialog.value = current.copy(pos = pos, error = validateAddWordInput(current.text, pos, current.meaning), autoFilled = false)
     }
 
-    /** Meaning input change (same as [onPosInput]). */
     fun onMeaningInput(meaning: String) {
         val current = _dialog.value as? WordListDialog.Add ?: return
         _dialog.value = current.copy(meaning = meaning, error = validateAddWordInput(current.text, current.pos, meaning), autoFilled = false)
     }
 
-    /** Debounced dictionary lookup; on a hit, auto-fill when pos+meaning are both empty or dictionary-filled. */
     private fun scheduleDictLookup(text: String, overwriteUserEdit: Boolean) {
         dictLookupJob?.cancel()
         val trimmed = text.trim()
@@ -198,7 +144,6 @@ class WordListViewModel @Inject constructor(
             if (entries.isEmpty()) return@launch
             val first = entries.first()
             val current = _dialog.value as? WordListDialog.Add ?: return@launch
-            // Fill only when overwriting is allowed (the new input has not been hand-edited); leave the user's edits alone
             if (!overwriteUserEdit && !current.autoFilled && (current.pos.isNotBlank() || current.meaning.isNotBlank())) {
                 return@launch
             }
@@ -211,30 +156,24 @@ class WordListViewModel @Inject constructor(
         }
     }
 
-    /** Submits add: after validation, one transaction writes word (reuse/create), sense, and linkBookWord. */
     fun submitAdd() {
         val d = _dialog.value as? WordListDialog.Add ?: return
-        if (d.error != null) return // validateAddWordInput already checks after trim
+        if (d.error != null) return
         val text = d.text.trim()
         val pos = d.pos.trim()
         val meaning = d.meaning.trim()
         viewModelScope.launch {
             db.withTransaction {
-                // 1) Dedup against the global word pool (reuse an existing wordId, else create; IGNORE fallback: -1 triggers a re-query)
                 val wordId = wordDao.findIdByText(text)
                     ?: wordDao.insert(Word(text = text)).let { id ->
                         if (id == -1L) wordDao.findIdByText(text)!! else id
                     }
-                // 2) Write the sense ((wordId, pos) unique; IGNORE covers duplicate POS)
                 wordDao.insertSense(Sense(wordId = wordId, pos = pos, meaning = meaning))
-                // 3) Link to the current book
                 bookDao.linkBookWord(BookWord(bookId = bookId, wordId = wordId))
             }
             _dialog.value = WordListDialog.None
         }
     }
-
-    // ---- edit sense ----
 
     fun openEditDialog(senseId: Long, wordText: String, pos: String, meaning: String) {
         _dialog.value = WordListDialog.Edit(
@@ -242,7 +181,6 @@ class WordListViewModel @Inject constructor(
         )
     }
 
-    /** Updates the edit inputs as they change and validates. */
     fun onEditInput(pos: String, meaning: String) {
         val error = validateSenseEditInput(pos, meaning)
         _dialog.value = (_dialog.value as? WordListDialog.Edit)
@@ -250,7 +188,6 @@ class WordListViewModel @Inject constructor(
             ?: WordListDialog.None
     }
 
-    /** Submits edit: after validation, updateSense. */
     fun submitEdit() {
         val d = _dialog.value as? WordListDialog.Edit ?: return
         if (d.error != null) return
@@ -262,14 +199,10 @@ class WordListViewModel @Inject constructor(
         }
     }
 
-    // ---- remove word from book (Ticket #22: soft-delete into the recycle bin, restorable) ----
-
-    /** Opens the delete-confirmation dialog (wordText is used in the dialog text). */
     fun openDeleteDialog(wordId: Long, wordText: String) {
         _dialog.value = WordListDialog.Delete(wordId = wordId, wordText = wordText)
     }
 
-    /** Confirms deletion: soft-delete book_word.deleted=1 (book-level: only this book's link changes). */
     fun submitDelete() {
         val d = _dialog.value as? WordListDialog.Delete ?: return
         viewModelScope.launch {

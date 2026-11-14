@@ -30,41 +30,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
-/**
- * Ticket #25 E-style dialog (modeled on DialogE in designs/worddrill-dialogs/dialog-5-full.html).
- *
- * Replaces Material3 [androidx.compose.material3.AlertDialog] with the Compose-native [Dialog]
- * plus a custom [Surface] container, 18dp corners + shadow, Apple-style layout.
- *
- * Key dimensions from the design spec (aligned with existing tokens):
- * - Container corner radius 18dp; padding 20/18/14 (top/sides/bottom); button area padding 0/16/16
- * - Title 17sp / 600 / centered / letterSpacing -0.3px
- * - Message 13sp / secondary / centered / line-height 1.5
- * - Button pill: corner radius 12, padding 12, horizontal row with gap 8; primary button solid
- *   onSurface, cancel chipBg + secondary, destructive light red fill + iOS red ([DestructiveFg])
- *
- * Known deviations from the design spec (Compose platform limits, not implementation slips):
- * - **No backdrop blur on the scrim**: the design spec's CSS `backdrop-filter: blur(3px)` blurs
- *   the content behind, but [Dialog] renders in its own Window and the system paints the scrim
- *   as a flat color, so the content behind cannot be blurred. Real backdrop blur would require
- *   a RenderEffect on the host Activity (a big cost in performance and complexity, beyond a
- *   dialog's job), so this implementation keeps the system default scrim dim (measured: the
- *   dark-theme scrim is pure black, the light-theme one translucent black).
- * - **Single-layer shadow**: the design spec wants two layers, close(0 4px 16px) +
- *   ambient(0 24px 48px), but Compose [Modifier.shadow] supports only one elevation plus the
- *   spot/ambient color channels. 24dp elevation approximates it (visually a wide soft shadow);
- *   no two-layer stacking.
- *
- * Callers fill in one of the three sections [title] / [message] / [content] plus a button
- * list; the visuals of all 11 dialogs converge into this one composable.
- *
- * @param onDismissRequest called on scrim tap / back key
- * @param title top title (17sp / 600 / centered)
- * @param message explanatory text below the title (13sp / secondary / centered); pick either
- *   this or [content], or supply both
- * @param content custom body (input fields, file pickers, etc.); can coexist with [message]
- * @param buttons bottom button area ([DialogButton] list, horizontal, gap 8dp)
- */
+// Compose platform limits: Dialog renders in its own Window and the system scrim is a flat
+// color, so the design's backdrop blur cannot be done; Modifier.shadow supports a single
+// elevation, so the design's two-layer shadow is approximated with one 24dp elevation.
 @Composable
 fun WordDrillDialog(
     onDismissRequest: () -> Unit,
@@ -77,17 +45,12 @@ fun WordDrillDialog(
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(
-            // Design spec container width ~230dp (centered on a 320dp phone screen). Platform
-            // default width is off; widthIn caps the width and fillMaxWidth stretches to the
-            // max available width after padding.
+            // The platform default width does not match the design; widthIn below caps it.
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = true,
         ),
     ) {
         Surface(
-            // Corner radius 18 + a single soft shadow (24dp elevation, spot/ambient channels
-            // both at 0.10 alpha). The design spec wants close+ambient two layers, but
-            // Modifier.shadow supports only one; see the file-header comment.
             modifier = modifier
                 .widthIn(max = 320.dp)
                 .shadow(
@@ -139,17 +102,6 @@ fun WordDrillDialog(
     }
 }
 
-/**
- * E-style dialog button (pill block, for [WordDrillDialog] only).
- *
- * Must sit inside a [RowScope] (the button area of [WordDrillDialog]): `Modifier.weight(1f)`
- * makes the buttons equal width and fill the row.
- *
- * Three styles matching the design spec:
- * - [DialogButtonStyle.Primary]: solid onSurface, inverted text, 600 (confirm/export/import/close/OK)
- * - [DialogButtonStyle.Cancel]: chipBg background + secondary text, 500 (cancel/non-destructive close)
- * - [DialogButtonStyle.Destructive]: [DestructiveBg] light red fill + [DestructiveFg] red text, 500
- */
 @Composable
 fun RowScope.DialogButton(
     text: String,
@@ -188,20 +140,8 @@ fun RowScope.DialogButton(
     }
 }
 
-/** E-style dialog button style (decides fill + text color + weight). */
 enum class DialogButtonStyle { Primary, Cancel, Destructive }
 
-/**
- * E-style dialog text field (TextField for [WordDrillDialog], matching the design spec).
- *
- * Design spec:
- * - chipBg fill + 10dp corner radius; normal-state border transparent (visually borderless),
- *   focus-state border becomes primary
- * - 15sp font size; error-state border becomes [DestructiveFg]
- *
- * This is a color-customized wrapper around [OutlinedTextField]; other behavior is untouched
- * (IME, clipboard, screen reader, etc. are preserved).
- */
 @Composable
 fun DialogTextField(
     value: String,
@@ -243,7 +183,6 @@ fun DialogTextField(
             focusedSupportingTextColor = colors.primary,
             unfocusedSupportingTextColor = colors.onSurfaceVariant,
             errorSupportingTextColor = DestructiveFg,
-            // normal-state border transparent (visually borderless); focus becomes primary, error becomes red
             focusedBorderColor = colors.primary,
             unfocusedBorderColor = Color.Transparent,
             disabledBorderColor = Color.Transparent,

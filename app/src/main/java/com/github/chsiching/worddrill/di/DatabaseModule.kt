@@ -14,12 +14,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/**
- * Exposes the Room database and its DAOs as singletons via Hilt.
- * The Application is already @HiltAndroidApp, so ViewModels can @Inject DAOs directly.
- *
- * The database file name worddrill.db aligns with export/import logic (later ticket).
- */
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
@@ -32,13 +26,6 @@ object DatabaseModule {
             WordDrillDatabase::class.java,
             "worddrill.db"
         )
-            // Register migrations explicitly: fallbackToDestructiveMigration would lose user
-            // books/swipe records, so it is disabled.
-            // - v1 to v2 (Ticket #14): add phonetic column to word table
-            // - v2 to v3 (Ticket #19): add dictionary table (read-only ECDICT dictionary)
-            // - v3 to v4 (Ticket #20): add skipped column to book_word table (skip flag, per-book independent)
-            // - v4 to v5 (Ticket #22): add deleted column to book_word table (soft-delete flag,
-            //   per-book independent, goes to recycle bin)
             .addMigrations(
                 WordDrillDatabase.MIGRATION_1_2,
                 WordDrillDatabase.MIGRATION_2_3,

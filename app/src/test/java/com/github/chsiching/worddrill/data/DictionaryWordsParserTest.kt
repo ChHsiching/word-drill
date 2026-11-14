@@ -4,10 +4,6 @@ import com.google.common.truth.Truth.assertThat
 import org.json.JSONException
 import org.junit.Test
 
-/**
- * Ticket #19: pure JVM tests for [DictionaryWordsParser] (secondary seam: the JSON deserialization logic).
- * Same pattern as [PresetWordsParserTest]: small JSON snippets verify the parse is correct.
- */
 class DictionaryWordsParserTest {
 
     private val sample = """
@@ -30,7 +26,6 @@ class DictionaryWordsParserTest {
     @Test
     fun parse_readsAllEntries() {
         val parsed = DictionaryWordsParser.parse(sample)
-        // Multiple parts of speech for the same word become multiple entry rows, kept as-is.
         assertThat(parsed.words).hasSize(3)
     }
 
@@ -51,8 +46,6 @@ class DictionaryWordsParserTest {
         assertThat(apples.map { it.pos }).containsExactly("n.", "v.")
     }
 
-    // ---- phonetic is nullable (same pitfall as PresetWordsParser) ----
-
     @Test
     fun parse_readsPhonetic_whenPresent() {
         val parsed = DictionaryWordsParser.parse(sample)
@@ -62,7 +55,6 @@ class DictionaryWordsParserTest {
     @Test
     fun parse_phoneticIsNull_whenAbsent() {
         val parsed = DictionaryWordsParser.parse(sample)
-        // "run" has no phonetic field, so it parses to null.
         assertThat(parsed.words.first { it.word == "run" }.phonetic).isNull()
     }
 
@@ -79,7 +71,6 @@ class DictionaryWordsParserTest {
 
     @Test
     fun parse_phoneticIsNull_whenJsonNull() {
-        // Regression guard: JSON null must parse to Kotlin null, not the string "null".
         val json = """
             {"source":"x","words":[
               {"word":"a","phonetic":null,"pos":"n.","meaning":"甲"}

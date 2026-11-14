@@ -52,29 +52,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
-/**
- * "Drill" tab: full-screen single-card browsing (Ticket #5 + #16 rewrite).
- *
- * Top bar (#16): book name (left) and skip + lock buttons (right) in a symmetric layout.
- * The skip button stays visible and usable in the locked state (issue #17); the lock
- * button swaps icon variant and inverts its background. Auto-unlock on tab switch is handled by
- * [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot] (locked resets to false on
- * a tab switch).
- *
- * Card (#16): word, then phonetics (if present, Charis SIL, can be turned off by the
- * "hide phonetics" setting), then a divider, then the sense list (italic part of speech
- * on the same line as the Chinese, one sense per row).
- *
- * Counting: [DrillViewModel.onPageSettled], reusing the Ticket #5 pure function
- * [shouldLogSwipe].
- *
- * @param locked top-bar locked state (hoisted at
- *   [com.github.chsiching.worddrill.ui.navigation.WordDrillRoot]; when locked the nav
- *   bar fades out; skip stays available and Pager swiping stays enabled)
- * @param onToggleLock lock button click callback
- * @param hidePhonetic true when the "hide phonetics" setting is active; the card omits the
- *   phonetics line
- */
 @Composable
 fun DrillScreen(
     modifier: Modifier = Modifier,
@@ -138,10 +115,6 @@ internal fun DrillPager(
             onToggleLock = onToggleLock,
             isReviewBook = isReviewBook,
             onAction = { page ->
-                // issue #1: the review book uses "Restore" (onRestore), regular books use
-                // "Skip" (onSkip). Both remove the card the same way (the word leaves the
-                // current list after restore/skip), and the pager stays at the same index
-                // pointing at the next card.
                 if (isReviewBook) onRestore(page) else onSkip(page)
             },
             currentPage = pagerState.currentPage,
@@ -150,9 +123,6 @@ internal fun DrillPager(
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
-            // Review feedback 3: locking does not disable card swiping. Locking only hides
-            // the nav bar (see BottomNavOverlay.hidden in WordDrillRoot); the user can
-            // still swipe through cards and tap skip while locked.
         ) { pageIndex ->
             WordCard(
                 word = cards[pageIndex],
@@ -162,20 +132,6 @@ internal fun DrillPager(
     }
 }
 
-/**
- * Top bar: book name (left), counter (center), skip + lock (right).
- *
- * Three-part layout: [book name weight 1f][Spacer weight 1f][buttons intrinsic].
- * The book name takes at most the left half (half of the remaining space), the Spacer
- * fills the middle for the counter overlay, and the buttons hug the far right at their
- * intrinsic width. A long name therefore wraps within the left half only; it never
- * encroaches on the counter's horizontal area and never squeezes the buttons. With a
- * short name the Text does not fill its weight, so the left-aligned look is unchanged;
- * the counter is absolutely centered by the overlay Text.
- *
- * The skip button stays visible while locked (review feedback 4 / issue #17); the lock
- * button gets an inverted background and LockOpen icon.
- */
 @Composable
 private fun DrillTopBar(
     bookName: String,
@@ -187,9 +143,6 @@ private fun DrillTopBar(
     onAction: (currentPage: Int) -> Unit,
     currentPage: Int,
 ) {
-    // issue #1: the review book button label is "Restore", regular books "Skip". onAction
-    // inside DrillPager already dispatches to onRestore/onSkip by isReviewBook; this spot
-    // only handles the no-arg closure and label switch.
     val actionLabel = if (isReviewBook) R.string.drill_restore else R.string.drill_skip
     Box(
         modifier = Modifier
@@ -197,17 +150,11 @@ private fun DrillTopBar(
             .padding(horizontal = 28.dp),
         contentAlignment = Alignment.Center,
     ) {
-        // Base layer: book name (weight 1f, at most the left half) + Spacer (weight 1f, reserved for the counter) + buttons (intrinsic, flush right)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Book name (left): weight(1f) splits the space left after the button width
-            // evenly with the Spacer, so the book name takes at most (total width - button
-            // width) / 2, stopping left of the screen centerline and never encroaching on
-            // the counter. softWrap is on by default; overlong names wrap instead of being
-            // cut off.
             Text(
                 text = bookName,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -215,13 +162,8 @@ private fun DrillTopBar(
                 letterSpacing = 1.sp,
                 modifier = Modifier.weight(1f),
             )
-            // Middle spacer: weight(1f) reserves space for the counter overlay, keeping the book name's right edge left of the screen centerline
             Spacer(Modifier.weight(1f))
-            // Skip/restore + lock (right)
-            // Review feedback 4: do not hide the skip button when locked (locking only hides the nav bar; skip stays available).
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // #17 review feedback #5: the skip button has no ripple box; press feedback
-                // comes from animating alpha between 0.4 and 1.0.
                 val actionInteraction = remember { MutableInteractionSource() }
                 val actionPressed by actionInteraction.collectIsPressedAsState()
                 val actionAlpha by animateFloatAsState(
@@ -246,7 +188,6 @@ private fun DrillTopBar(
                 LockButton(locked = locked, onClick = onToggleLock)
             }
         }
-        // Overlay: the counter is absolutely centered (unaffected by differing left/right widths)
         Text(
             text = "${index + 1} / $total",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -255,13 +196,6 @@ private fun DrillTopBar(
     }
 }
 
-/**
- * Lock button: transparent background and tertiary icon by default; inverted background (onSurface)
- * and background-colored icon in the locked state.
- *
- * #17 review feedback #6: no ripple box. Press feedback scales the icon to 0.9
- * (feedback on pointer-down, no waiting for release).
- */
 @Composable
 private fun LockButton(locked: Boolean, onClick: () -> Unit) {
     val bg = if (locked) MaterialTheme.colorScheme.onSurface else Color.Transparent
@@ -299,14 +233,6 @@ private fun LockButton(locked: Boolean, onClick: () -> Unit) {
     }
 }
 
-/**
- * Single card: word, phonetics, divider, sense list.
- * The spring entrance on card switch is driven naturally by HorizontalPager's page
- * recomposition (each page composable is an independent instance).
- *
- * Review feedback: dropped the "first card / last card" hints; the top counter "X / Y"
- * already states the position, and repeating it inside the card is redundant.
- */
 @Composable
 private fun WordCard(
     word: WordWithSenses,
@@ -324,19 +250,15 @@ private fun WordCard(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(0.dp),
-            // Review feedback 2: centering the card vertically sat too low; shifted up by
-            // about 12% of the screen (clear of the top bar, above the vertical center).
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 80.dp),
         ) {
-            // English word: 44sp SemiBold
             Text(
                 text = word.word.text,
                 style = typography.word.copy(color = colors.onSurface),
                 textAlign = TextAlign.Center,
             )
-            // Phonetics: Charis SIL, controlled by hidePhonetic
             if (!word.word.phonetic.isNullOrBlank() && !hidePhonetic) {
                 Text(
                     text = word.word.phonetic,
@@ -344,7 +266,6 @@ private fun WordCard(
                     modifier = Modifier.padding(top = 10.dp),
                 )
             }
-            // Divider: 32x1 separatorStrong
             Box(
                 modifier = Modifier
                     .padding(vertical = 20.dp)
@@ -352,7 +273,6 @@ private fun WordCard(
                     .height(1.dp)
                     .background(MaterialTheme.wordDrillColors.separatorStrong),
             )
-            // Sense list: one sense per row, italic part of speech on the same line as the Chinese
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,

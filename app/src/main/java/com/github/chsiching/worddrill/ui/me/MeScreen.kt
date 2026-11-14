@@ -64,20 +64,6 @@ import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 import com.github.chsiching.worddrill.ui.theme.wordDrillTypography
 import kotlinx.coroutines.delay
 
-/**
- * "Me" tab (Ticket #8 + #9 + #10 + #16 rewrite): stats card + grouped settings + data
- * export/import.
- *
- * Design spec (#16):
- * - Large "Me" title
- * - Stats card: today's big number (56sp) + current book progress bar (spring width
- *   transition) + lifetime count (24sp)
- * - Settings in three groups: Display (hide phonetics) / Navigation (nav bar style +
- *   compact navigation) / General (theme + export + import + about)
- * - Toggles use [Toggle] (black palette, spring knob animation), not the Material3 green
- *   Switch
- * - Bottom padding 120dp (keeps content clear of the floating nav)
- */
 @Composable
 fun MeScreen(
     onNavigateToRecycleBin: () -> Unit,
@@ -100,7 +86,6 @@ fun MeScreen(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 120.dp),
     ) {
-        // Large title + theme-switch icon at the top right (review feedback 5)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -117,13 +102,11 @@ fun MeScreen(
             ThemeToggleIcon(
                 themeMode = themeMode,
                 onToggle = { targetMode ->
-                    // Target theme of the three-state cycle (SYSTEM, LIGHT, DARK, back to SYSTEM)
                     settingsViewModel.setTheme(targetMode)
                 },
             )
         }
 
-        // Stats card
         StatsCard(
             state = state,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp),
@@ -131,7 +114,6 @@ fun MeScreen(
 
         Spacer(Modifier.size(24.dp))
 
-        // Display group
         SettingsGroup(label = stringResource(R.string.me_group_display)) {
             ToggleRow(
                 label = stringResource(R.string.me_setting_hide_phonetic),
@@ -142,7 +124,6 @@ fun MeScreen(
 
         Spacer(Modifier.size(16.dp))
 
-        // Navigation group
         SettingsGroup(label = stringResource(R.string.me_group_navigation)) {
             NavStyleRow(
                 current = navStyle,
@@ -158,7 +139,6 @@ fun MeScreen(
 
         Spacer(Modifier.size(16.dp))
 
-        // General group (review feedback 5: theme switching moved to the top-right icon; no longer a row in this group)
         SettingsGroup(label = stringResource(R.string.me_group_general)) {
             DataSection(
                 status = exportStatus,
@@ -179,9 +159,6 @@ fun MeScreen(
     }
 }
 
-/**
- * Stats card: today's big number (56sp) + progress bar (spring width) + lifetime count (24sp).
- */
 @Composable
 private fun StatsCard(state: MeStatsUiState, modifier: Modifier = Modifier) {
     val typography = MaterialTheme.wordDrillTypography
@@ -195,7 +172,6 @@ private fun StatsCard(state: MeStatsUiState, modifier: Modifier = Modifier) {
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Today: the biggest number
             Text(
                 text = state.todayCount.toString(),
                 style = typography.statNumberLarge.copy(color = colors.onSurface),
@@ -207,7 +183,6 @@ private fun StatsCard(state: MeStatsUiState, modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(top = 4.dp),
             )
 
-            // Progress bar: current book
             ProgressBar(
                 bookName = if (state.bookName.isEmpty()) stringResource(R.string.me_no_current_book) else state.bookName,
                 done = state.brushed,
@@ -216,14 +191,12 @@ private fun StatsCard(state: MeStatsUiState, modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(top = 28.dp),
             )
 
-            // Lifetime count: secondary stat (top divider + big number + label)
             Box(
                 modifier = Modifier
                     .padding(top = 24.dp)
                     .fillMaxWidth(),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                // Top divider (drawn first; the Column below covers the middle to leave room for text)
                 Box(
                     modifier = Modifier
                         .height(1.dp)
@@ -252,7 +225,6 @@ private fun StatsCard(state: MeStatsUiState, modifier: Modifier = Modifier) {
     }
 }
 
-/** Progress bar: book name + X/Y + bar + percent, spring width transition. */
 @Composable
 private fun ProgressBar(
     bookName: String,
@@ -262,7 +234,6 @@ private fun ProgressBar(
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
-    // Spring width transition: spec calls for a 0.5s spring.
     val animatedFraction by animateFloatAsState(
         targetValue = (percent / 100f).coerceIn(0f, 1f),
         animationSpec = spring(
@@ -314,7 +285,6 @@ private fun ProgressBar(
     }
 }
 
-/** Settings group: title + surface card container. */
 @Composable
 private fun SettingsGroup(label: String, content: @Composable () -> Unit) {
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -333,7 +303,6 @@ private fun SettingsGroup(label: String, content: @Composable () -> Unit) {
     }
 }
 
-/** In-group divider (0.5px separator, 16dp inset on each side). */
 @Composable
 private fun InGroupSeparator() {
     Box(
@@ -345,7 +314,6 @@ private fun InGroupSeparator() {
     )
 }
 
-/** Toggle settings row: label on the left, Toggle on the right. */
 @Composable
 private fun ToggleRow(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
     Row(
@@ -364,7 +332,6 @@ private fun ToggleRow(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
     }
 }
 
-/** Nav bar style row: tap cycles floating pill and bottom bar; current value + chevron on the right. */
 @Composable
 private fun NavStyleRow(current: NavStyle, onClick: () -> Unit) {
     Row(
@@ -396,28 +363,6 @@ private fun NavStyleRow(current: NavStyle, onClick: () -> Unit) {
     }
 }
 
-/** Theme row: tap opens a selection dialog. */
-/**
- * Top-right theme-switch icon (review feedback 5).
- *
- * - Currently light: sun icon (tap switches to the next state)
- * - Currently dark: moon icon
- * - Tap triggers [LocalThemeRevealTrigger] for a circular reveal expanding from the icon
- *   center
- * - SYSTEM state: sun or moon depending on the system's current dark/light setting
- */
-/**
- * Top-right theme-switch icon (review feedback 5).
- *
- * Tap: compute the target locally (if currently dark, switch to light, and vice versa), pass
- * it to [LocalThemeRevealTrigger] to fire the circular reveal, and write DataStore
- * (cycleTheme) to persist.
- */
-/**
- * Theme three-state cycle: SYSTEM, LIGHT, DARK, back to SYSTEM.
- * Pure function, so the target can be computed locally (the reveal must know the target
- * the instant it is tapped).
- */
 private fun nextThemeMode(current: ThemeMode): ThemeMode = when (current) {
     ThemeMode.SYSTEM -> ThemeMode.LIGHT
     ThemeMode.LIGHT -> ThemeMode.DARK
@@ -430,7 +375,6 @@ private fun ThemeToggleIcon(
     onToggle: (targetMode: ThemeMode) -> Unit,
 ) {
     val trigger = LocalThemeRevealTrigger.current
-    // One icon per state: LIGHT=sun, DARK=moon, SYSTEM=auto (circled A)
     val iconVector = when (themeMode) {
         ThemeMode.LIGHT -> Icons.Outlined.LightMode
         ThemeMode.DARK -> Icons.Outlined.DarkMode
@@ -468,9 +412,6 @@ private fun ThemeToggleIcon(
     }
 }
 
-/**
- * Data export/import section (Ticket #10): embedded in the General group, one row each.
- */
 @Composable
 private fun DataSection(
     status: ExportImportStatus,
@@ -589,7 +530,6 @@ private fun DataRow(label: String, onClick: () -> Unit, enabled: Boolean = true)
     }
 }
 
-/** About row: version number on the right. */
 @Composable
 private fun AboutRow(onClick: () -> Unit) {
     Row(
@@ -613,7 +553,6 @@ private fun AboutRow(onClick: () -> Unit) {
     }
 }
 
-/** Export/import status line. */
 @Composable
 private fun StatusLine(status: ExportImportStatus, onClear: () -> Unit) {
     when (status) {
