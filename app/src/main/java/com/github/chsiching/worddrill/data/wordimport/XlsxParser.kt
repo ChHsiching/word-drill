@@ -7,8 +7,6 @@ import java.util.zip.ZipInputStream
 
 object XlsxParser {
 
-    private const val NS_SHEET = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
-
     private fun colIndexFromRef(ref: String): Int {
         val letters = ref.takeWhile { it.isLetter() }
         var idx = 0
