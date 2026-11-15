@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
@@ -65,18 +66,24 @@ fun DrillScreen(
     when (val state = uiState) {
         DrillUiState.Loading -> CenterText(stringResource(R.string.drill_loading), modifier)
         DrillUiState.Empty -> CenterText(stringResource(R.string.drill_empty), modifier)
-        is DrillUiState.Ready -> DrillPager(
-            bookName = state.bookName,
-            cards = state.cards,
-            onPageSettled = viewModel::onPageSettled,
-            onSkip = { page -> viewModel.skipCurrentWord(page) },
-            isReviewBook = state.isReviewBook,
-            onRestore = { page -> viewModel.restoreCurrentWord(page) },
-            locked = locked,
-            onToggleLock = onToggleLock,
-            hidePhonetic = hidePhonetic,
-            modifier = modifier,
-        )
+        // Keyed on the book id so switching books rebuilds the pager at the new book's
+        // resume position; within one book the pager state (and the user's page)
+        // survives deck reloads from skip/restore.
+        is DrillUiState.Ready -> key(state.bookId) {
+            DrillPager(
+                bookName = state.bookName,
+                cards = state.cards,
+                initialPage = state.initialPageIndex,
+                onPageSettled = viewModel::onPageSettled,
+                onSkip = { page -> viewModel.skipCurrentWord(page) },
+                isReviewBook = state.isReviewBook,
+                onRestore = { page -> viewModel.restoreCurrentWord(page) },
+                locked = locked,
+                onToggleLock = onToggleLock,
+                hidePhonetic = hidePhonetic,
+                modifier = modifier,
+            )
+        }
     }
 }
 
@@ -84,6 +91,7 @@ fun DrillScreen(
 internal fun DrillPager(
     bookName: String,
     cards: List<WordWithSenses>,
+    initialPage: Int = 0,
     onPageSettled: (previousPage: Int, currentPage: Int) -> Unit,
     onSkip: (currentPage: Int) -> Unit,
     isReviewBook: Boolean,
@@ -93,7 +101,7 @@ internal fun DrillPager(
     hidePhonetic: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val pagerState = rememberPagerState(pageCount = { cards.size })
+    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { cards.size })
 
     LaunchedEffect(pagerState) {
         var previousSettled = pagerState.settledPage

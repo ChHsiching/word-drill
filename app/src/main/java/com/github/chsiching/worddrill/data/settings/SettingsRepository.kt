@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -66,6 +67,18 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setCurrentBookId(id: Long) {
         context.appDataStore.edit { it[currentBookIdKey] = id }
+    }
+
+    /** Resume position (GLOSSARY.md): per book, the id of the word last drilled.
+     *  Stored under a dynamic key derived from the book id, never as a deck index,
+     *  because skipping shifts indices. */
+    private fun resumeWordKey(bookId: Long) = longPreferencesKey("resume_word_$bookId")
+
+    suspend fun resumeWordId(bookId: Long): Long? =
+        context.appDataStore.data.first()[resumeWordKey(bookId)]
+
+    suspend fun setResumeWordId(bookId: Long, wordId: Long) {
+        context.appDataStore.edit { it[resumeWordKey(bookId)] = wordId }
     }
 
     val themePreference: Flow<ThemeMode> =

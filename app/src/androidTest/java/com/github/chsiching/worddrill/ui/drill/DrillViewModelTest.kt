@@ -14,6 +14,7 @@ import com.github.chsiching.worddrill.data.local.entity.Sense
 import com.github.chsiching.worddrill.data.local.entity.Word
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -66,6 +67,34 @@ class DrillViewModelTest {
         db.bookDao().linkBookWord(BookWord(bookId = bookId, wordId = wordId))
         return bookId
     }
+
+    /** Seeds a book under an explicit id. Resume keys are derived from the book id and
+     *  this process's DataStore survives across tests while in-memory ids restart at 1,
+     *  so each test owns a unique id range to stay order-independent. Returns the deck's
+     *  word ids in deck order (alphabetical). Word texts are unique in the schema and
+     *  shared across books, like the real importers do. */
+    private suspend fun insertBookWithWords(
+        bookId: Long,
+        name: String,
+        isPreset: Boolean,
+        vararg wordTexts: String,
+    ): List<Long> {
+        db.bookDao().insert(Book(bookId = bookId, name = name, isPreset = isPreset))
+        val wordIds = wordTexts.map { db.wordDao().findOrInsertWord(it, null) }
+        wordIds.forEach {
+            db.wordDao().insertSense(Sense(wordId = it, pos = "n.", meaning = "测试释义"))
+            db.bookDao().linkBookWord(BookWord(bookId = bookId, wordId = it))
+        }
+        return wordIds
+    }
+
+    /** The resume word saved for [bookId] within [timeoutMs], or null if none arrived.
+     *  The VM writes it from its own scope, so the test polls instead of assuming. */
+    private suspend fun awaitSavedResumeWordId(bookId: Long, timeoutMs: Long = 5_000): Long? =
+        withTimeoutOrNull(timeoutMs) {
+            while (settings.resumeWordId(bookId) == null) delay(50)
+            settings.resumeWordId(bookId)
+        }
 
     /**
      * Tests in this process share the app's DataStore, and a written current_book_id
@@ -120,6 +149,123 @@ class DrillViewModelTest {
         val ready = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
         assertThat(ready.bookName).isEqualTo("我的词书")
         assertThat(settings.currentBookId.first { it == mine }).isEqualTo(mine)
+        Unit
+    }
+
+    @Test
+    fun drilledWord_savedOnSettle_restoredAfterRestart() = runBlocking {
+        val bookId = 934_101L
+        val wordIds = insertBookWithWords(bookId, "恢复词书A", isPreset = false, "apple", "balance", "circle")
+        settings.setCurrentBookId(bookId)
+        val first = newViewModel()
+        first.uiState.first { it is DrillUiState.Ready }
+
+        // Drill forward: the pager settles on the second card, which becomes the
+        // book's resume position.
+        first.onPageSettled(previousPage = 0, currentPage = 1)
+        assertThat(awaitSavedResumeWordId(bookId)).isEqualTo(wordIds[1])
+
+        // Restarting (a new ViewModel) lands on the settled word, not the first card.
+        val restarted = newViewModel()
+        val ready = restarted.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+        assertThat(ready.initialPageIndex).isEqualTo(1)
+        assertThat(ready.cards[ready.initialPageIndex].word.text).isEqualTo("balance")
+        Unit
+    }
+
+    @Test
+    fun skippingCurrentCard_makesNextCardTheResumePoint() = runBlocking {
+        val bookId = 934_104L
+        val wordIds = insertBookWithWords(bookId, "跳过词书", isPreset = false, "apple", "balance", "circle")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+        vm.uiState.first { it is DrillUiState.Ready }
+
+        // Skipping the middle card shrinks the deck; the third card takes its index
+        // and becomes the resume point, so a restart never lands on a skipped word.
+        vm.skipCurrentWord(currentPage = 1)
+        val afterSkip = vm.uiState
+            .first { it is DrillUiState.Ready && it.cards.size == 2 } as DrillUiState.Ready
+        assertThat(afterSkip.initialPageIndex).isEqualTo(1)
+        assertThat(awaitSavedResumeWordId(bookId)).isEqualTo(wordIds[2])
+        Unit
+    }
+
+    @Test
+    fun switchingBooks_resumesEachBookAtItsOwnWord() = runBlocking {
+        val bookA = 934_102L
+        val bookB = 934_103L
+        val wordsA = insertBookWithWords(bookA, "词书甲", isPreset = false, "apple", "balance", "circle")
+        val wordsB = insertBookWithWords(bookB, "词书乙", isPreset = false, "apple", "balance", "circle")
+        settings.setCurrentBookId(bookA)
+        val vm = newViewModel()
+        vm.uiState.first { it is DrillUiState.Ready }
+
+        // Drill A to its third card, switch to B and drill it to its second card.
+        vm.onPageSettled(previousPage = 0, currentPage = 2)
+        assertThat(awaitSavedResumeWordId(bookA)).isEqualTo(wordsA[2])
+        settings.setCurrentBookId(bookB)
+        vm.uiState.first { it is DrillUiState.Ready && it.bookName == "词书乙" }
+        vm.onPageSettled(previousPage = 0, currentPage = 1)
+        assertThat(awaitSavedResumeWordId(bookB)).isEqualTo(wordsB[1])
+
+        // Switching back and forth keeps each book at its own resume position.
+        settings.setCurrentBookId(bookA)
+        val backInA = vm.uiState
+            .first { it is DrillUiState.Ready && it.bookName == "词书甲" } as DrillUiState.Ready
+        assertThat(backInA.initialPageIndex).isEqualTo(2)
+        settings.setCurrentBookId(bookB)
+        val backInB = vm.uiState
+            .first { it is DrillUiState.Ready && it.bookName == "词书乙" } as DrillUiState.Ready
+        assertThat(backInB.initialPageIndex).isEqualTo(1)
+        Unit
+    }
+
+    @Test
+    fun savedWordOutOfDeck_fallsBackToFirstCard() = runBlocking {
+        val bookId = 934_105L
+        insertBookWithWords(bookId, "失效词书", isPreset = false, "apple", "balance", "circle")
+        // A word that exists but is not in this deck, like one restored away.
+        val unlinked = db.wordDao().insert(Word(text = "absent"))
+        settings.setResumeWordId(bookId, unlinked)
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+
+        val ready = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+        assertThat(ready.initialPageIndex).isEqualTo(0)
+        Unit
+    }
+
+    @Test
+    fun reviewBook_resumesLikeAnyOtherBook() = runBlocking {
+        val sourceBookId = 934_106L
+        val reviewBookId = 934_107L
+        val wordIds = insertBookWithWords(sourceBookId, "来源词书", isPreset = false, "apple", "balance")
+        db.bookDao().insert(Book(bookId = reviewBookId, name = REVIEW_BOOK_NAME, isPreset = true))
+        wordIds.forEach {
+            db.bookDao().setSkipped(sourceBookId, it, skipped = true)
+            db.bookDao().linkBookWord(BookWord(bookId = reviewBookId, wordId = it))
+        }
+        settings.setResumeWordId(reviewBookId, wordIds[1])
+        settings.setCurrentBookId(reviewBookId)
+        val vm = newViewModel()
+
+        val ready = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+        assertThat(ready.isReviewBook).isTrue()
+        assertThat(ready.initialPageIndex).isEqualTo(1)
+        assertThat(ready.cards[ready.initialPageIndex].word.text).isEqualTo("balance")
+        Unit
+    }
+
+    @Test
+    fun freshInstall_noSavedPosition_startsAtFirstCard() = runBlocking {
+        val bookId = 934_108L
+        insertBookWithWords(bookId, "全新词书", isPreset = false, "apple", "balance", "circle")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+
+        val ready = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+        assertThat(ready.initialPageIndex).isEqualTo(0)
         Unit
     }
 
