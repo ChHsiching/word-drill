@@ -269,6 +269,39 @@ class DrillViewModelTest {
         Unit
     }
 
+    @Test
+    fun softDeletedRecordedBook_fallsBackToDefaultBook() = runBlocking {
+        insertBookWithWord("CET-4", isPreset = true, "alpha")
+        val customId = insertBookWithWord("临别礼物", isPreset = false, "beta")
+        settings.setCurrentBookId(customId)
+        db.bookDao().deleteCustom(customId)
+        val vm = newViewModel()
+
+        // The recorded book is soft-deleted to the recycle bin; resolving it as the
+        // current book strands the drill tab on the empty state (blind e2e finding).
+        val ready = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+        assertThat(ready.bookName).isEqualTo("CET-4")
+        Unit
+    }
+
+    @Test
+    fun deletingCurrentBookWhileAlive_fallsBackToDefaultBook() = runBlocking {
+        insertBookWithWord("CET-4", isPreset = true, "alpha")
+        val customId = insertBookWithWord("漂流书", isPreset = false, "beta")
+        settings.setCurrentBookId(customId)
+        val vm = newViewModel()
+        vm.uiState.first { it is DrillUiState.Ready }
+
+        // The ViewModel stays alive while the user deletes the current book in the
+        // Library; the recorded id never changes, so the loader must also react to
+        // the book list itself (blind e2e finding, second half).
+        db.bookDao().deleteCustom(customId)
+        val ready = vm.uiState.first { it is DrillUiState.Ready && it.bookName == "CET-4" } as DrillUiState.Ready
+        assertThat(ready.bookName).isEqualTo("CET-4")
+        assertThat(settings.currentBookId.first()).isEqualTo(ready.bookId)
+        Unit
+    }
+
     private companion object {
         const val NO_BOOK_ID = 999_999L
     }

@@ -17,7 +17,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -51,14 +51,16 @@ class DrillViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            settings.currentBookId
-                .distinctUntilChanged()
+            // Reload on either input. Deleting the current book in the Library does
+            // not change the recorded id, so observing the id alone would strand the
+            // drill tab on the deleted book's last state.
+            combine(settings.currentBookId, bookDao.observeAll()) { recorded, _ -> recorded }
                 .collect { recorded -> loadBookFor(recorded) }
         }
     }
 
     private suspend fun loadBookFor(recorded: Long?) {
-        val book = recorded?.let { bookDao.getById(it) }
+        val book = recorded?.let { bookDao.getById(it) }?.takeIf { !it.deleted }
             ?: defaultBookOrNull()?.also { settings.setCurrentBookId(it.bookId) }
 
         if (book == null) {
