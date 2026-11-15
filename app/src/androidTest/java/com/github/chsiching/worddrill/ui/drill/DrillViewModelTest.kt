@@ -43,12 +43,17 @@ class DrillViewModelTest {
     }
 
     @After
-    fun tearDown() {
+    fun tearDown() = runBlocking {
         // Each ViewModel's init collector stays subscribed to the shared DataStore for
         // as long as its scope lives; without cancelling it, a later DataStore write in
         // the same process would resume the collector against the closed database.
+        // The pause lets in-flight Room flow queries (the loader combines observeAll)
+        // drain before the pool closes, or close() races them and throws
+        // "connection pool has been closed" into whatever test runs next.
         viewModels.forEach { it.viewModelScope.cancel() }
+        delay(200)
         db.close()
+        Unit
     }
 
     private fun newViewModel(): DrillViewModel =
