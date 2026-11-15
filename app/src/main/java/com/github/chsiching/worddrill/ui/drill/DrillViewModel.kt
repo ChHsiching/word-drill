@@ -27,9 +27,11 @@ sealed interface DrillUiState {
     data object Loading : DrillUiState
     data object Empty : DrillUiState
     data class Ready(
+        val bookId: Long,
         val bookName: String,
         val cards: List<WordWithSenses>,
         val isReviewBook: Boolean = false,
+        val initialPageIndex: Int = 0,
     ) : DrillUiState
 }
 
@@ -84,17 +86,31 @@ class DrillViewModel @Inject constructor(
             _uiState.value = DrillUiState.Empty
             return
         }
+        // Resolve the saved word id to a deck index here, never at save time: skipping
+        // shifts indices, and a word that left the deck (skipped, deleted, restored
+        // away) falls back to the first card (GLOSSARY.md, resume position).
+        val savedWordId = settings.resumeWordId(bookId)
+        val initialPageIndex =
+            cards.indexOfFirst { it.word.wordId == savedWordId }.takeIf { it >= 0 } ?: 0
         _uiState.value = DrillUiState.Ready(
+            bookId = bookId,
             bookName = bookName,
             cards = cards,
             isReviewBook = bookName == REVIEW_BOOK_NAME,
+            initialPageIndex = initialPageIndex,
         )
     }
 
     fun onPageSettled(previousPage: Int, currentPage: Int) {
-        if (!shouldLogSwipe(previousPage, currentPage)) return
         val bookId = currentBookId ?: return
         val ready = _uiState.value as? DrillUiState.Ready ?: return
+        // The settled card is this book's resume position, saved on every settle; the
+        // pager's settledPage flow already de-duplicates emissions.
+        val settledWordId = ready.cards.getOrNull(currentPage)?.word?.wordId
+        if (settledWordId != null) {
+            viewModelScope.launch { settings.setResumeWordId(bookId, settledWordId) }
+        }
+        if (!shouldLogSwipe(previousPage, currentPage)) return
         val wordId = ready.cards.getOrNull(previousPage)?.word?.wordId ?: return
         viewModelScope.launch {
             swipeLogDao.insert(
@@ -115,7 +131,7 @@ class DrillViewModel @Inject constructor(
                     ?: bookDao.insert(Book(name = REVIEW_BOOK_NAME, isPreset = true)))
                 bookDao.linkBookWord(BookWord(bookId = reviewBookId, wordId = wordId))
             }
-            reloadCards(bookId, ready)
+            reloadCards(bookId, ready, currentPage)
         }
     }
 
@@ -129,16 +145,22 @@ class DrillViewModel @Inject constructor(
                 bookDao.unskipWordEverywhere(wordId)
                 bookDao.unlinkBookWord(bookId, wordId)
             }
-            reloadCards(bookId, ready)
+            reloadCards(bookId, ready, currentPage)
         }
     }
 
-    private suspend fun reloadCards(bookId: Long, ready: DrillUiState.Ready) {
+    private suspend fun reloadCards(bookId: Long, ready: DrillUiState.Ready, currentPage: Int) {
         val cards = wordDao.getWordsWithSensesByBook(bookId)
         if (cards.isEmpty()) {
             _uiState.value = DrillUiState.Empty
         } else {
-            _uiState.value = ready.copy(cards = cards)
+            // The acted-on word left the deck, so the card now at the clamped page is
+            // the new current card and the resume point. Saving it here (not via a
+            // settle event) is deliberate: a middle-page skip shrinks the deck without
+            // moving the pager, so no settle fires.
+            val page = currentPage.coerceAtMost(cards.size - 1)
+            _uiState.value = ready.copy(cards = cards, initialPageIndex = page)
+            settings.setResumeWordId(bookId, cards[page].word.wordId)
         }
     }
 }
