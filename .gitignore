@@ -49,3 +49,4 @@ designs/
 # Python cache
 __pycache__/
 *.pyc
+.zcode-tmp/
