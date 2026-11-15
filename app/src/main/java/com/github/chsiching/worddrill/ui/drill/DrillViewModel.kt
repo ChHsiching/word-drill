@@ -18,7 +18,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -56,7 +57,7 @@ class DrillViewModel @Inject constructor(
 
     private suspend fun loadBookFor(recorded: Long?) {
         val book = recorded?.let { bookDao.getById(it) }
-            ?: firstBookOrNull()?.also { settings.setCurrentBookId(it.bookId) }
+            ?: defaultBookOrNull()?.also { settings.setCurrentBookId(it.bookId) }
 
         if (book == null) {
             _uiState.value = DrillUiState.Empty
@@ -65,8 +66,16 @@ class DrillViewModel @Inject constructor(
         setReady(book.bookId, book.name)
     }
 
-    private suspend fun firstBookOrNull(): Book? =
-        bookDao.observeAll().first().firstOrNull()
+    // The default book is the first preset, non-review book in the library ordering
+    // (GLOSSARY.md). Waiting on the flow fixes the fresh-install race (#30): sampling
+    // the table once read it before the first-launch import had written any books, and
+    // nothing retried. The review book is created by its own initializer before the
+    // presets land, so it must not win the default slot; a recorded current book never
+    // reaches this fallback.
+    private suspend fun defaultBookOrNull(): Book? =
+        bookDao.observeAll()
+            .map { books -> books.firstOrNull { it.isPreset && it.name != REVIEW_BOOK_NAME } }
+            .firstOrNull { it != null }
 
     private suspend fun setReady(bookId: Long, bookName: String) {
         currentBookId = bookId
