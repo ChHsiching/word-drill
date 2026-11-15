@@ -17,8 +17,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -26,9 +27,11 @@ sealed interface DrillUiState {
     data object Loading : DrillUiState
     data object Empty : DrillUiState
     data class Ready(
+        val bookId: Long,
         val bookName: String,
         val cards: List<WordWithSenses>,
         val isReviewBook: Boolean = false,
+        val initialPageIndex: Int = 0,
     ) : DrillUiState
 }
 
@@ -48,15 +51,17 @@ class DrillViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            settings.currentBookId
-                .distinctUntilChanged()
+            // Reload on either input. Deleting the current book in the Library does
+            // not change the recorded id, so observing the id alone would strand the
+            // drill tab on the deleted book's last state.
+            combine(settings.currentBookId, bookDao.observeAll()) { recorded, _ -> recorded }
                 .collect { recorded -> loadBookFor(recorded) }
         }
     }
 
     private suspend fun loadBookFor(recorded: Long?) {
-        val book = recorded?.let { bookDao.getById(it) }
-            ?: firstBookOrNull()?.also { settings.setCurrentBookId(it.bookId) }
+        val book = recorded?.let { bookDao.getById(it) }?.takeIf { !it.deleted }
+            ?: defaultBookOrNull()?.also { settings.setCurrentBookId(it.bookId) }
 
         if (book == null) {
             _uiState.value = DrillUiState.Empty
@@ -65,8 +70,16 @@ class DrillViewModel @Inject constructor(
         setReady(book.bookId, book.name)
     }
 
-    private suspend fun firstBookOrNull(): Book? =
-        bookDao.observeAll().first().firstOrNull()
+    // The default book is the first preset, non-review book in the library ordering
+    // (GLOSSARY.md). Waiting on the flow fixes the fresh-install race (#30): sampling
+    // the table once read it before the first-launch import had written any books, and
+    // nothing retried. The review book is created by its own initializer before the
+    // presets land, so it must not win the default slot; a recorded current book never
+    // reaches this fallback.
+    private suspend fun defaultBookOrNull(): Book? =
+        bookDao.observeAll()
+            .map { books -> books.firstOrNull { it.isPreset && it.name != REVIEW_BOOK_NAME } }
+            .firstOrNull { it != null }
 
     private suspend fun setReady(bookId: Long, bookName: String) {
         currentBookId = bookId
@@ -75,17 +88,31 @@ class DrillViewModel @Inject constructor(
             _uiState.value = DrillUiState.Empty
             return
         }
+        // Resolve the saved word id to a deck index here, never at save time: skipping
+        // shifts indices, and a word that left the deck (skipped, deleted, restored
+        // away) falls back to the first card (GLOSSARY.md, resume position).
+        val savedWordId = settings.resumeWordId(bookId)
+        val initialPageIndex =
+            cards.indexOfFirst { it.word.wordId == savedWordId }.takeIf { it >= 0 } ?: 0
         _uiState.value = DrillUiState.Ready(
+            bookId = bookId,
             bookName = bookName,
             cards = cards,
             isReviewBook = bookName == REVIEW_BOOK_NAME,
+            initialPageIndex = initialPageIndex,
         )
     }
 
     fun onPageSettled(previousPage: Int, currentPage: Int) {
-        if (!shouldLogSwipe(previousPage, currentPage)) return
         val bookId = currentBookId ?: return
         val ready = _uiState.value as? DrillUiState.Ready ?: return
+        // The settled card is this book's resume position, saved on every settle; the
+        // pager's settledPage flow already de-duplicates emissions.
+        val settledWordId = ready.cards.getOrNull(currentPage)?.word?.wordId
+        if (settledWordId != null) {
+            viewModelScope.launch { settings.setResumeWordId(bookId, settledWordId) }
+        }
+        if (!shouldLogSwipe(previousPage, currentPage)) return
         val wordId = ready.cards.getOrNull(previousPage)?.word?.wordId ?: return
         viewModelScope.launch {
             swipeLogDao.insert(
@@ -106,7 +133,7 @@ class DrillViewModel @Inject constructor(
                     ?: bookDao.insert(Book(name = REVIEW_BOOK_NAME, isPreset = true)))
                 bookDao.linkBookWord(BookWord(bookId = reviewBookId, wordId = wordId))
             }
-            reloadCards(bookId, ready)
+            reloadCards(bookId, ready, currentPage)
         }
     }
 
@@ -120,16 +147,22 @@ class DrillViewModel @Inject constructor(
                 bookDao.unskipWordEverywhere(wordId)
                 bookDao.unlinkBookWord(bookId, wordId)
             }
-            reloadCards(bookId, ready)
+            reloadCards(bookId, ready, currentPage)
         }
     }
 
-    private suspend fun reloadCards(bookId: Long, ready: DrillUiState.Ready) {
+    private suspend fun reloadCards(bookId: Long, ready: DrillUiState.Ready, currentPage: Int) {
         val cards = wordDao.getWordsWithSensesByBook(bookId)
         if (cards.isEmpty()) {
             _uiState.value = DrillUiState.Empty
         } else {
-            _uiState.value = ready.copy(cards = cards)
+            // The acted-on word left the deck, so the card now at the clamped page is
+            // the new current card and the resume point. Saving it here (not via a
+            // settle event) is deliberate: a middle-page skip shrinks the deck without
+            // moving the pager, so no settle fires.
+            val page = currentPage.coerceAtMost(cards.size - 1)
+            _uiState.value = ready.copy(cards = cards, initialPageIndex = page)
+            settings.setResumeWordId(bookId, cards[page].word.wordId)
         }
     }
 }

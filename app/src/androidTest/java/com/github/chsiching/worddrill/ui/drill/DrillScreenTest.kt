@@ -3,12 +3,14 @@ package com.github.chsiching.worddrill.ui.drill
 import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -18,7 +20,9 @@ import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
 import com.github.chsiching.worddrill.data.local.entity.Word
+import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -193,5 +197,52 @@ class DrillScreenTest {
         composeRule.onNodeWithContentDescription("锁定").assertIsDisplayed()
         composeRule.onNodeWithText("1 / 3").assertIsDisplayed()
         composeRule.onNodeWithText(longName).assertIsDisplayed()
+    }
+
+    @Test
+    fun restoredResumePosition_pagerVisiblyLandsOnSavedCard() {
+        // The pager must open on the book's resume position once cards load, not just
+        // carry it in the data layer: with "balance" saved, the visible counter and
+        // card are the second ones from the first frame.
+        val vm = runBlocking { seedResumedBookAndCreateViewModel() }
+        try {
+            composeRule.setContent {
+                WordDrillTheme {
+                    Surface {
+                        DrillScreen(viewModel = vm)
+                    }
+                }
+            }
+            composeRule.waitUntil(10_000L) {
+                composeRule.onAllNodesWithText("2 / 3").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithText("2 / 3").assertIsDisplayed()
+            composeRule.onNodeWithText("balance").assertIsDisplayed()
+        } finally {
+            vm.viewModelScope.cancel()
+        }
+    }
+
+    /** A book whose saved resume position is its second card ("balance"). The book id
+     *  is explicit and in this test's own range: resume keys live in the process-wide
+     *  DataStore while the in-memory database (and its ids) reset per test. */
+    private suspend fun seedResumedBookAndCreateViewModel(): DrillViewModel {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val settings = SettingsRepository(context)
+        val bookId = 934_501L
+        val book = db.bookDao().insert(Book(bookId = bookId, name = "恢复词书", isPreset = false))
+        listOf("apple", "balance", "circle").forEach {
+            val wordId = db.wordDao().findOrInsertWord(it, null)
+            db.bookDao().linkBookWord(BookWord(bookId = book, wordId = wordId))
+        }
+        settings.setResumeWordId(bookId, db.wordDao().findIdByText("balance")!!)
+        settings.setCurrentBookId(bookId)
+        return DrillViewModel(
+            db = db,
+            bookDao = db.bookDao(),
+            wordDao = db.wordDao(),
+            swipeLogDao = db.swipeLogDao(),
+            settings = settings,
+        )
     }
 }
