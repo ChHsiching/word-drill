@@ -1,14 +1,17 @@
 package com.github.chsiching.worddrill.ui.me
 
 import androidx.compose.material3.Surface
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -24,6 +27,7 @@ import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlin.math.min
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -61,6 +65,7 @@ class MeScreenTest {
     @After
     fun tearDown() {
         db.close()
+        runBlocking { settings.setDwellInterval(5f) }
     }
 
     private fun seedSwipe(wordId: Long, timestamp: Long, bid: Long = bookId) = runBlocking {
@@ -255,5 +260,62 @@ class MeScreenTest {
         composeRule.onNodeWithText("取消", substring = false).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("确认导入").assertIsNotDisplayed()
+    }
+
+    @Test
+    fun dwellRow_showsCurrentValue_withUnitLabel() = runBlocking {
+        settings.setDwellInterval(12.5f)
+        renderWithVm(vm())
+        composeRule.onNodeWithText("自动连播间隔").performScrollTo().assertIsDisplayed()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("12.5 秒").fetchSemanticsNodes().isNotEmpty()
+        }
+        Unit
+    }
+
+    @Test
+    fun dwellRow_tapExpandsSliderWithCaption_tapAgainCollapses() {
+        renderWithVm(vm())
+        composeRule.onNodeWithText("自动连播间隔").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("在学习页双击卡片开始或暂停").assertIsDisplayed()
+        composeRule.onNodeWithText("1s").assertIsDisplayed()
+        composeRule.onNodeWithText("30s").assertIsDisplayed()
+
+        composeRule.onNodeWithText("自动连播间隔").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("在学习页双击卡片开始或暂停").assertIsNotDisplayed()
+    }
+
+    @Test
+    fun dwellSlider_dragUpdatesValueLive_andPersistsAfterRecreatingScreen() {
+        runBlocking { settings.setDwellInterval(5f) }
+        renderWithVm(vm())
+        composeRule.onNodeWithText("自动连播间隔").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("在学习页双击卡片开始或暂停").assertIsDisplayed()
+
+        // Drag the thumb to the far right edge: the value updates live and clamps at 30 s.
+        composeRule.onNodeWithTag(DwellSliderTestTag).performScrollTo().performTouchInput {
+            down(center)
+            val endX = right - 1f
+            var x = centerX
+            while (x < endX) {
+                x = min(x + 40f, endX)
+                moveTo(Offset(x, centerY))
+                advanceEventTime(16L)
+            }
+            up()
+        }
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("30.0 秒").fetchSemanticsNodes().isNotEmpty()
+        }
+        assertThat(runBlocking { settings.dwellInterval.first() }).isEqualTo(30f)
+
+        // Re-create the screen with a fresh settings ViewModel: the persisted value loads.
+        renderWithVm(vm(), settingsViewModel = settingsVm())
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("30.0 秒").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 }

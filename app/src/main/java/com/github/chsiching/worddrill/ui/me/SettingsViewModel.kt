@@ -2,6 +2,7 @@ package com.github.chsiching.worddrill.ui.me
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.chsiching.worddrill.data.settings.DwellInterval
 import com.github.chsiching.worddrill.data.settings.NavStyle
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.data.settings.ThemeMode
@@ -41,6 +42,12 @@ class SettingsViewModel @Inject constructor(
         initialValue = false,
     )
 
+    val dwellInterval: StateFlow<Float> = settings.dwellInterval.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = DwellInterval.DEFAULT_SECONDS,
+    )
+
     fun setTheme(mode: ThemeMode) {
         viewModelScope.launch { settings.setTheme(mode) }
     }
@@ -69,5 +76,9 @@ class SettingsViewModel @Inject constructor(
 
     fun setCompactNav(value: Boolean) {
         viewModelScope.launch { settings.setCompactNav(value) }
+    }
+
+    fun setDwellInterval(seconds: Float) {
+        viewModelScope.launch { settings.setDwellInterval(seconds) }
     }
 }

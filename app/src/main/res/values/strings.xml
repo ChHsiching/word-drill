@@ -88,6 +88,11 @@
     <string name="me_group_navigation">导航</string>
     <string name="me_group_general">通用</string>
     <string name="me_setting_hide_phonetic">隐藏音标</string>
+    <string name="me_setting_dwell_interval">自动连播间隔</string>
+    <string name="me_setting_dwell_value">%1$.1f 秒</string>
+    <string name="me_setting_dwell_hint_min">1s</string>
+    <string name="me_setting_dwell_hint_max">30s</string>
+    <string name="me_setting_dwell_caption">在学习页双击卡片开始或暂停</string>
     <string name="me_setting_nav_style">导航栏风格</string>
     <string name="me_setting_nav_style_pill">浮动胶囊</string>
     <string name="me_setting_nav_style_bar">底部栏</string>
