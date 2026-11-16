@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
@@ -71,7 +72,17 @@ class DrillViewModel @Inject constructor(
             // Reload on either input. Deleting the current book in the Library does
             // not change the recorded id, so observing the id alone would strand the
             // drill tab on the deleted book's last state.
-            combine(settings.currentBookId, bookDao.observeAll()) { recorded, _ -> recorded }
+            // distinctUntilChanged per source, never after the combine: DataStore's
+            // .data re-emits on every edit of any key, so without it each unrelated
+            // write (dwell, and every settle's resume write) would re-fire loadBookFor,
+            // whose setReady stops playback and drains pending advance commands —
+            // auto-advance would die after its first flip. After the combine a real
+            // book-table change must still reload even when the recorded id is
+            // unchanged, so only the sources are de-duplicated.
+            combine(
+                settings.currentBookId.distinctUntilChanged(),
+                bookDao.observeAll().distinctUntilChanged(),
+            ) { recorded, _ -> recorded }
                 .collect { recorded -> loadBookFor(recorded) }
         }
     }
