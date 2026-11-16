@@ -302,8 +302,8 @@ class MeScreenTest {
         // Expanding grows content below the tapped row; scroll the caption into view
         // so the display assertion holds on the CI emulator's shorter viewport.
         composeRule.onNodeWithText("在学习页双击卡片开始或暂停").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("1s").assertIsDisplayed()
-        composeRule.onNodeWithText("30s").assertIsDisplayed()
+        composeRule.onNodeWithText("1s", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("30s", substring = false).assertIsDisplayed()
 
         composeRule.onNodeWithText("自动连播间隔").performClick()
         composeRule.waitForIdle()
