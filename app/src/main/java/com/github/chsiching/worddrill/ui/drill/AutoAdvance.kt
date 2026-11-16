@@ -101,6 +101,10 @@ internal class AutoAdvance(
         countdown = null
         elapsedMillis = 0
         cardDwellMillis = 0
+        // A buffered-but-unexecuted advance belongs to the context being stopped; it
+        // must never flip a pager that no longer shows that deck.
+        while (_advance.tryReceive().isSuccess) {
+        }
         _state.value = AutoAdvanceState()
     }
 

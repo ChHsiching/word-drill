@@ -177,4 +177,19 @@ class AutoAdvanceTest {
         runCurrent()
         assertThat(machine.state.value.elapsedFraction).isWithin(0.001f).of(0.2f)
     }
+
+    @Test
+    fun stop_discardsAPendingAdvanceCommand() = runTest {
+        val machine = machine()
+
+        // The dwell elapsed and the command is buffered but not yet executed when the
+        // playback context goes away (e.g. the book switched): the stale command must
+        // not flip a fresh pager later.
+        machine.toggle(page = 0, deckSize = 3)
+        advanceTimeBy(5_000)
+        runCurrent()
+        machine.stop()
+
+        assertThat(withTimeoutOrNull(1_000) { machine.advance.first() }).isNull()
+    }
 }
