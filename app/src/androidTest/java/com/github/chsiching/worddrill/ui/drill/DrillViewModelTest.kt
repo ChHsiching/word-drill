@@ -311,6 +311,35 @@ class DrillViewModelTest {
     }
 
     @Test
+    fun stopAutoAdvance_stopsOutright_lateSettleAndFurtherDwellStayIdle() = runBlocking {
+        val bookId = 934_111L
+        insertBookWithWords(bookId, "离场词书", isPreset = false, "apple", "balance", "circle")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+        vm.uiState.first { it is DrillUiState.Ready }
+        try {
+            settings.setDwellInterval(1f)
+            vm.toggleAutoAdvance(currentPage = 0)
+            assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Playing)
+
+            // The leave-route / ON_STOP seam: playback stops outright, never pauses.
+            vm.stopAutoAdvance()
+            assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Idle)
+
+            // A flip whose animation was mid-flight when the user left settles late on
+            // the restored screen: playback must stay idle, not resurrect from it.
+            vm.onPageSettled(previousPage = 0, currentPage = 1)
+            assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Idle)
+
+            // The stopped countdown emits nothing further.
+            assertThat(withTimeoutOrNull(1_500) { vm.advance.first() }).isNull()
+        } finally {
+            settings.setDwellInterval(DwellInterval.DEFAULT_SECONDS)
+        }
+        Unit
+    }
+
+    @Test
     fun softDeletedRecordedBook_fallsBackToDefaultBook() = runBlocking {
         insertBookWithWord("CET-4", isPreset = true, "alpha")
         val customId = insertBookWithWord("临别礼物", isPreset = false, "beta")

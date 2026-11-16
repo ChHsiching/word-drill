@@ -140,6 +140,14 @@ class DrillViewModel @Inject constructor(
         autoAdvance.toggle(currentPage, ready.cards.size)
     }
 
+    /** Stops playback outright (never pauses): the drill screen calls this when its
+     *  composition goes away (leaving the drill route — the backstack retains this
+     *  ViewModel across tab switches, so disposal is the leave signal) and on app
+     *  ON_STOP. Re-entering the drill screen always starts idle. */
+    fun stopAutoAdvance() {
+        autoAdvance.stop()
+    }
+
     fun onPageSettled(previousPage: Int, currentPage: Int) {
         val bookId = currentBookId ?: return
         val ready = _uiState.value as? DrillUiState.Ready ?: return
