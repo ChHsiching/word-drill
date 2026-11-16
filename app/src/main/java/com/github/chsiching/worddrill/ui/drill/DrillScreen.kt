@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -63,6 +64,17 @@ import kotlinx.coroutines.launch
 /** Test tag of the auto-advance dwell hairline at the drill screen's bottom edge. */
 internal const val AutoAdvanceHairlineTag = "auto_advance_hairline"
 
+/** Auto-advance lifecycle integration (#39). Leaving the drill route disposes this
+ *  screen's composition while the nav backstack retains the ViewModel across tab
+ *  switches, so disposal is the leave signal: playback stops, and re-entering always
+ *  starts idle. */
+@Composable
+private fun AutoAdvanceLifecycle(onStopPlayback: () -> Unit) {
+    DisposableEffect(Unit) {
+        onDispose { onStopPlayback() }
+    }
+}
+
 @Composable
 fun DrillScreen(
     modifier: Modifier = Modifier,
@@ -72,6 +84,8 @@ fun DrillScreen(
     viewModel: DrillViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    AutoAdvanceLifecycle(onStopPlayback = viewModel::stopAutoAdvance)
 
     when (val state = uiState) {
         DrillUiState.Loading -> CenterText(stringResource(R.string.drill_loading), modifier)
