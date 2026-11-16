@@ -108,7 +108,7 @@ class DrillPlaybackTest {
                         cards = cards(),
                         onPageSettled = { previous, current ->
                             settleLog += previous to current
-                            machine.onSettled(current, deckSize)
+                            machine.reposition(current, deckSize)
                         },
                         onSkip = {},
                         isReviewBook = false,

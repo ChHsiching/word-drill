@@ -153,7 +153,7 @@ class DrillViewModel @Inject constructor(
         val ready = _uiState.value as? DrillUiState.Ready ?: return
         // Every settle repositions playback (manual swipe or auto flip) without
         // pausing; the logging and resume writes below are the untouched settle path.
-        autoAdvance.onSettled(currentPage, ready.cards.size)
+        autoAdvance.reposition(currentPage, ready.cards.size)
         // The settled card is this book's resume position, saved on every settle; the
         // pager's settledPage flow already de-duplicates emissions.
         val settledWordId = ready.cards.getOrNull(currentPage)?.word?.wordId
@@ -208,7 +208,7 @@ class DrillViewModel @Inject constructor(
             // Skip/restore swapped the word under the pager: playback continues on the
             // new current card with a fresh countdown, never pausing.
             val page = currentPage.coerceAtMost(cards.size - 1)
-            autoAdvance.onDeckChanged(page, cards.size)
+            autoAdvance.reposition(page, cards.size)
             // The acted-on word left the deck, so the card now at the clamped page is
             // the new current card and the resume point. Saving it here (not via a
             // settle event) is deliberate: a middle-page skip shrinks the deck without

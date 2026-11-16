@@ -72,7 +72,7 @@ class AutoAdvanceTest {
         assertThat(machine.state.value.phase).isEqualTo(AutoAdvancePhase.Playing)
         assertThat(machine.state.value.elapsedFraction).isWithin(0.001f).of(1f)
 
-        machine.onSettled(page = 1, deckSize = 3)
+        machine.reposition(page = 1, deckSize = 3)
         assertThat(machine.state.value.phase).isEqualTo(AutoAdvancePhase.Playing)
         assertThat(machine.state.value.elapsedFraction).isWithin(0.001f).of(0f)
         advanceTimeBy(1_000)
@@ -128,7 +128,7 @@ class AutoAdvanceTest {
         assertThat(machine.state.value.elapsedFraction).isWithin(0.001f).of(0.6f)
 
         // A backward manual swipe: the deck repositions without pausing.
-        machine.onSettled(page = 0, deckSize = 3)
+        machine.reposition(page = 0, deckSize = 3)
         assertThat(machine.state.value.phase).isEqualTo(AutoAdvancePhase.Playing)
         assertThat(machine.state.value.elapsedFraction).isWithin(0.001f).of(0f)
 
@@ -147,7 +147,7 @@ class AutoAdvanceTest {
         runCurrent()
         machine.toggle(page = 0, deckSize = 3) // pause at 0.4
 
-        machine.onSettled(page = 1, deckSize = 3)
+        machine.reposition(page = 1, deckSize = 3)
         assertThat(machine.state.value.phase).isEqualTo(AutoAdvancePhase.Paused)
         assertThat(machine.state.value.elapsedFraction).isWithin(0.001f).of(0f)
 
@@ -166,7 +166,7 @@ class AutoAdvanceTest {
         runCurrent()
 
         // Skip shrinks the deck; the next card sits under the same index.
-        machine.onDeckChanged(page = 0, deckSize = 2)
+        machine.reposition(page = 0, deckSize = 2)
         assertThat(machine.state.value.phase).isEqualTo(AutoAdvancePhase.Playing)
         assertThat(machine.state.value.elapsedFraction).isWithin(0.001f).of(0f)
 
