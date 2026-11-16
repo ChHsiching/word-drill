@@ -1,5 +1,9 @@
 package com.github.chsiching.worddrill.ui.drill
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.WindowManager
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -44,6 +48,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -64,15 +69,33 @@ import kotlinx.coroutines.launch
 /** Test tag of the auto-advance dwell hairline at the drill screen's bottom edge. */
 internal const val AutoAdvanceHairlineTag = "auto_advance_hairline"
 
-/** Auto-advance lifecycle integration (#39). Leaving the drill route disposes this
- *  screen's composition while the nav backstack retains the ViewModel across tab
- *  switches, so disposal is the leave signal: playback stops, and re-entering always
- *  starts idle. */
+/** Auto-advance lifecycle integration (#39). The keep-screen-on window flag is held
+ *  exactly while the phase is Playing, and playback stops when this screen leaves
+ *  composition — leaving the drill route, whose nav backstack retains the ViewModel
+ *  across tab switches, so disposal is the leave signal. Re-entering always starts
+ *  idle. */
 @Composable
-private fun AutoAdvanceLifecycle(onStopPlayback: () -> Unit) {
+private fun AutoAdvanceLifecycle(isPlaying: Boolean, onStopPlayback: () -> Unit) {
+    val view = LocalView.current
+    val window = view.context.findActivity()?.window
+
+    // Pause, stop, and leave all flip [isPlaying] or dispose the effect, releasing
+    // the flag so the screen may sleep again outside an active session.
+    DisposableEffect(isPlaying) {
+        if (isPlaying) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+
     DisposableEffect(Unit) {
         onDispose { onStopPlayback() }
     }
+}
+
+/** The hosting activity's window, walking ContextWrapper chains (themed contexts). */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 @Composable
@@ -84,8 +107,12 @@ fun DrillScreen(
     viewModel: DrillViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val playback by viewModel.playback.collectAsStateWithLifecycle()
 
-    AutoAdvanceLifecycle(onStopPlayback = viewModel::stopAutoAdvance)
+    AutoAdvanceLifecycle(
+        isPlaying = playback.phase == AutoAdvancePhase.Playing,
+        onStopPlayback = viewModel::stopAutoAdvance,
+    )
 
     when (val state = uiState) {
         DrillUiState.Loading -> CenterText(stringResource(R.string.drill_loading), modifier)
@@ -94,7 +121,6 @@ fun DrillScreen(
         // resume position; within one book the pager state (and the user's page)
         // survives deck reloads from skip/restore.
         is DrillUiState.Ready -> key(state.bookId) {
-            val playback by viewModel.playback.collectAsStateWithLifecycle()
             DrillPager(
                 bookName = state.bookName,
                 cards = state.cards,

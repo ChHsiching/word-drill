@@ -134,4 +134,33 @@ class DrillLifecycleTest {
         assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Idle)
         composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertDoesNotExist()
     }
+
+    @Test
+    fun keepScreenOn_heldWhilePlaying_releasedOnPauseAndLeave() {
+        val vm = runBlocking { seedViewModel(939_103L, "常亮词书", "apple", "balance") }
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillScreen(viewModel = vm)
+                }
+            }
+        }
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("apple").fetchSemanticsNodes().isNotEmpty()
+        }
+        assertThat(keepScreenOnHeld()).isFalse()
+
+        // Playing holds the window flag: a hands-free session doesn't black out.
+        composeRule.onNodeWithText("apple").performTouchInput { doubleClick() }
+        composeRule.waitForIdle()
+        assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Playing)
+        assertThat(keepScreenOnHeld()).isTrue()
+
+        // Pausing releases it even though the frozen hairline stays visible.
+        composeRule.onNodeWithText("apple").performTouchInput { doubleClick() }
+        composeRule.waitForIdle()
+        assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Paused)
+        assertThat(keepScreenOnHeld()).isFalse()
+        composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertIsDisplayed()
+    }
 }
