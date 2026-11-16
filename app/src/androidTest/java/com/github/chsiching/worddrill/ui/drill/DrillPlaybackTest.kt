@@ -28,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -62,9 +63,15 @@ class DrillPlaybackTest {
     }
 
     @After
-    fun tearDown() {
+    fun tearDown() = runBlocking {
         machineScope.cancel()
+        // Drain in-flight Room queries before closing (the 8c3567a convention): the
+        // composition is released only after this method, so recompositions may still
+        // hold cards() queries against this database, and a close that races them
+        // throws "connection pool has been closed" into whatever test runs next.
+        delay(200)
         db.close()
+        Unit
     }
 
     private fun seedData() = runBlocking {

@@ -13,6 +13,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -26,6 +28,8 @@ import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.data.settings.ThemeMode
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.math.min
@@ -44,6 +48,11 @@ class MeScreenTest {
     private lateinit var db: WordDrillDatabase
     private lateinit var settings: SettingsRepository
     private var bookId: Long = 0L
+
+    /** ViewModels built for this test; no ViewModelStore ever clears them, so their
+     *  stateIn(WhileSubscribed) collectors would outlive the test against the closed
+     *  database. */
+    private val viewModels = mutableListOf<ViewModel>()
 
     @Before
     fun setUp() = runBlocking {
@@ -64,9 +73,17 @@ class MeScreenTest {
     }
 
     @After
-    fun tearDown() {
+    fun tearDown() = runBlocking {
+        // Cancel every ViewModel's scope and drain in-flight Room queries before the
+        // pool closes (the 8c3567a convention): this process's DataStore is shared,
+        // and a later test's settings write would otherwise resume a leaked
+        // collector's query against this closed database, throwing
+        // "connection pool has been closed" into that later test.
+        viewModels.forEach { it.viewModelScope.cancel() }
+        delay(200)
         db.close()
-        runBlocking { settings.setDwellInterval(5f) }
+        settings.setDwellInterval(5f)
+        Unit
     }
 
     private fun seedSwipe(wordId: Long, timestamp: Long, bid: Long = bookId) = runBlocking {
@@ -78,14 +95,15 @@ class MeScreenTest {
         swipeLogDao = db.swipeLogDao(),
         bookDao = db.bookDao(),
         settings = settings,
-    )
+    ).also { viewModels.add(it) }
 
-    private fun settingsVm(): SettingsViewModel = SettingsViewModel(settings)
+    private fun settingsVm(): SettingsViewModel = SettingsViewModel(settings).also { viewModels.add(it) }
 
     private fun exportImportVm(): ExportImportViewModel {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val app = ctx.applicationContext as android.app.Application
         return ExportImportViewModel(app, BackupService(db, db.bookDao(), db.wordDao(), db.swipeLogDao()))
+            .also { viewModels.add(it) }
     }
 
     private suspend fun stableState(viewModel: MeViewModel): MeStatsUiState =
