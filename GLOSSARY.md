@@ -9,3 +9,5 @@ Domain vocabulary for WordDrill. Keep this file free of implementation detail; i
 - **Resume position** — the word a book was last drilled at, remembered per book. Reopening a book lands on its resume position; when that word is no longer in the deck (skipped, deleted, restored away), the book opens at its first card instead.
 - **Review book** — the preset book named 复习, a dynamic set of the words currently skipped in any book, deduplicated across books. Drilled like any other book; empty by default.
 - **Deck** — the cards a book currently offers: its words that are neither skipped nor deleted, ordered alphabetically. Skipping a word shrinks the deck, which is why positions are remembered by word, not by index.
+- **Auto-advance** — a drill-screen playback mode that advances to the next card after a chosen dwell time. Manual interaction repositions but does not stop it; leaving the drill screen or reaching the deck's end stops it.
+- **Dwell time** — how long auto-advance stays on a card before advancing to the next; set in the Me tab, remembered across launches.
