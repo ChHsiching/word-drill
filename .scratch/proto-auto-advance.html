@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE · #28 自动连播 v5.3 · 双击版：进度线位置二选一（抛弃型原型，勿合入）</title>
+<!--
+  PROTOTYPE (throwaway — do not ship). v5.2 of the #28 auto-advance design.
+
+  Settled by the user (2026-11-16 grilling, recorded in project memory):
+  NO added controls on the drill screen. DOUBLE-TAP the card toggles play/pause.
+  Dwell interval lives in a Me-tab settings row. Every flip logs a swipe; resume
+  position follows; manual swipe resets the timer but never pauses; skip never
+  pauses; stop at deck end and on leaving the screen; keep-screen-on while
+  playing; lock hides only the capsule nav.
+
+  The ONE open question: where the 2px dwell hairline lives.
+    A — bottom edge of the screen
+    B — top edge, directly under the status bar
+    C — contrast, no indicator at all
+
+  The Me tab is a FAITHFUL replica of MeScreen.kt (v5.1 used an invented modal
+  sheet — user rejected that: prototype must match reality or not exist):
+  real group labels 显示/导航/通用, real row labels and anatomy (ToggleRow,
+  NavStyleRow with value + chevron, DataRow), real Switch colors and WordDrillDialog
+  anatomy (radius 18, title 17sp SemiBold, message slot, 取消/确定 buttons
+  46dp/radius 12), real tokens from Color.kt/Type.kt at 1px = 1dp.
+  The NEW row 自动连播间隔 follows NavStyleRow anatomy, placed in the 显示
+  group under 隐藏音标 (placement is an open micro-call). Per user 2026-11-16:
+  NO separate dialog — the slider is INLINE in the group card, in two
+  switchable forms (HUD buttons): tap-to-expand under the row (chevron
+  rotates, default form) or always-visible (no chevron). Dragging applies
+  instantly (no draft / no 确定); the teaching line sits under the slider.
+  Stats numbers are wired to the demo session.
+-->
+<style>
+  :root{
+    --bg:#FAFAFA; --surface:#FFFFFF; --elevated:#FFFFFF;
+    --text:#1A1A1A; --text2:#86868B; --text3:#AEAEB2;
+    --sep:rgba(0,0,0,.06); --sepstrong:rgba(0,0,0,.12);
+    --track:#E8E8ED; --chip:#F5F5F7;
+    --pagebg:#E9E9EE; --chrometext:#3A3A3C;
+    --ease:cubic-bezier(.2,0,0,1);
+    --shadow-float:0 1px 3px rgba(0,0,0,.10), 0 6px 18px rgba(0,0,0,.14);
+  }
+  [data-theme=dark]{
+    --bg:#000000; --surface:#1C1C1E; --elevated:#2C2C2E;
+    --text:#FFFFFF; --text2:#98989F; --text3:#636366;
+    --sep:rgba(255,255,255,.08); --sepstrong:rgba(255,255,255,.15);
+    --track:#38383A; --chip:#2C2C2E;
+    --pagebg:#111; --chrometext:#CFCFD4;
+    --shadow-float:0 1px 3px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.5);
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--pagebg); color:var(--chrometext);
+    font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    display:flex; flex-direction:column; align-items:center; gap:14px; padding:18px 12px 32px;
+  }
+  body.no-trans *{transition:none !important}
+  header{font-size:13px; text-align:center; line-height:1.7}
+  header b{font-size:15px}
+  header .warn{color:#B25000}
+  .stage{display:flex; gap:22px; align-items:flex-start; flex-wrap:wrap; justify-content:center}
+
+  /* ---------- phone ---------- */
+  .phone{
+    width:412px; height:916px; background:var(--bg); border-radius:28px;
+    overflow:hidden; position:relative; box-shadow:0 18px 50px rgba(0,0,0,.28);
+    user-select:none; touch-action:none; flex:0 0 auto;
+  }
+  .statusbar{
+    height:34px; display:flex; justify-content:space-between; align-items:center;
+    padding:0 22px; font-size:13px; font-weight:600; color:var(--text); z-index:3;
+  }
+  .statusbar .right{display:flex; gap:5px; align-items:center; font-weight:400}
+
+  /* drill screen */
+  .drillscreen{position:absolute; inset:34px 0 0 0; display:none}
+  .drillscreen.show{display:block}
+  .topbar{
+    height:56px; position:relative; display:flex; align-items:center;
+    padding:0 28px; margin-top:4px;
+  }
+  .bookname{
+    flex:1; font-size:14px; letter-spacing:1px; color:var(--text2);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .counter{
+    position:absolute; left:0; right:0; text-align:center; font-size:11px;
+    color:var(--text2); pointer-events:none; font-variant-numeric:tabular-nums;
+  }
+  .topactions{display:flex; align-items:center; gap:10px}
+  .skipbtn{
+    font-size:14px; color:var(--text2); cursor:pointer; padding:4px 0 4px 12px;
+    transition:opacity .15s ease-out;
+  }
+  .skipbtn:active{opacity:.4}
+  .lockbtn{
+    width:30px; height:30px; border-radius:50%; border:none; cursor:pointer;
+    background:transparent; display:flex; align-items:center; justify-content:center;
+    color:var(--text2); transition:scale .15s ease-out, background-color .15s ease-out;
+  }
+  .lockbtn.locked{background:var(--text); color:var(--bg)}
+  .lockbtn:not(.locked):active{scale:.96}
+  .cardarea{position:absolute; top:60px; bottom:0; left:0; right:0; overflow:hidden; cursor:grab}
+  .card{position:absolute; inset:0; padding:80px 28px 0; text-align:center}
+  .card.slide-in{animation:nextIn .3s var(--ease)}
+  .card.slide-in.back{animation-name:prevIn}
+  @keyframes nextIn{from{transform:translateX(70px); opacity:0} to{transform:none; opacity:1}}
+  @keyframes prevIn{from{transform:translateX(-70px); opacity:0} to{transform:none; opacity:1}}
+  .card .word{
+    font-family:Georgia,'Times New Roman',serif; font-size:44px; font-weight:600;
+    letter-spacing:-.5px; line-height:48px; color:var(--text);
+  }
+  .card .phonetic{
+    font-family:Georgia,serif; font-size:17px; letter-spacing:.5px; color:var(--text2);
+    margin-top:10px;
+  }
+  .card .rule{width:32px; height:1px; background:var(--sepstrong); margin:20px auto}
+  .card .sense{display:flex; gap:8px; justify-content:center; align-items:baseline; margin:10px 0}
+  .card .pos{font-size:15px; font-style:italic; color:var(--text2)}
+  .card .meaning{font-size:22px; line-height:30px; color:var(--text)}
+  .emptydeck{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:var(--text2); font-size:15px;
+  }
+
+  /* dwell hairline (the ONE open question) */
+  .edgeprog,.topprog{position:absolute; left:0; right:0; height:2px; z-index:4;
+    pointer-events:none; display:none}
+  .edgeprog{bottom:0}
+  .topprog{top:34px}               /* directly under the status bar */
+  .phone[data-variant=a] .edgeprog{display:block}
+  .phone[data-variant=b] .topprog{display:block}
+  /* variant c: neither — the no-indicator contrast */
+  .edgeprog .fill,.topprog .fill{height:100%; width:0%; background:var(--text); opacity:.55}
+
+  /* capsule nav */
+  .capsule{
+    position:absolute; left:50%; transform:translateX(-50%); bottom:20px;
+    display:flex; gap:20px; padding:9px 20px; border-radius:100px;
+    background:color-mix(in srgb, var(--surface) 85%, transparent);
+    backdrop-filter:blur(14px) saturate(1.6);
+    box-shadow:var(--shadow-float); transition:opacity .25s ease-out; z-index:5;
+  }
+  .capsule.hidden{opacity:0; pointer-events:none}
+  .capitem{display:flex; flex-direction:column; align-items:center; gap:3px;
+    font-size:10px; color:var(--text3); cursor:pointer; width:38px}
+  .capitem.active{color:var(--text)}
+  .capitem svg{width:20px; height:20px}
+  .gesturebar{position:absolute; bottom:7px; left:50%; transform:translateX(-50%);
+    width:120px; height:4px; border-radius:2px; background:var(--sepstrong)}
+
+  /* ---------- Me tab — faithful replica of MeScreen.kt ---------- */
+  .mescreen{
+    position:absolute; inset:34px 0 0 0; overflow-y:auto; display:none;
+    padding-bottom:120px; scrollbar-width:none;
+  }
+  .mescreen::-webkit-scrollbar{display:none}
+  .mescreen.show{display:block}
+  .mehead{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:24px 24px 28px;
+  }
+  .mehead h2{font-size:36px; font-weight:700; line-height:44px; color:var(--text);
+    letter-spacing:-.5px}
+  .themeicon{
+    width:44px; height:44px; border:none; background:none; cursor:pointer; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; color:var(--text2);
+    transition:scale .15s ease-out;
+  }
+  .themeicon:active{scale:.92}
+  .themeicon svg{width:22px; height:22px}
+
+  .statscard{
+    margin:0 16px; background:var(--surface); border-radius:20px;
+    padding:28px 24px; display:flex; flex-direction:column; align-items:center;
+  }
+  .statscard .big{font-size:56px; font-weight:700; letter-spacing:-1px; line-height:60px;
+    color:var(--text); font-variant-numeric:tabular-nums}
+  .statscard .biglab{font-size:12px; font-weight:500; line-height:16px; color:var(--text2);
+    margin-top:4px}
+  .progblock{width:100%; margin-top:28px}
+  .progblock .prow{display:flex; justify-content:space-between; font-size:12px;
+    font-weight:500; line-height:16px}
+  .progblock .pbook{color:var(--text2)}
+  .progblock .pcount{color:var(--text); font-variant-numeric:tabular-nums}
+  .progblock .ptrack{height:6px; border-radius:3px; background:var(--track); margin-top:8px;
+    overflow:hidden}
+  .progblock .pfill{height:100%; background:var(--text); border-radius:3px; width:0%;
+    transition:width .4s var(--ease)}
+  .progblock .ppct{font-size:11px; line-height:16px; color:var(--text2); text-align:right;
+    margin-top:6px; font-variant-numeric:tabular-nums}
+  .totalsep{width:100%; height:1px; background:var(--sep); margin-top:24px}
+  .totalblock{margin-top:20px; text-align:center}
+  .totalblock .num{font-size:24px; font-weight:600; line-height:28px; color:var(--text);
+    font-variant-numeric:tabular-nums}
+  .totalblock .lab{font-size:11px; line-height:16px; color:var(--text2); margin-top:2px}
+
+  .mgroup{margin:16px 16px 0}
+  .mgroup .glab{font-size:12px; font-weight:500; color:var(--text2); padding:0 0 8px 12px}
+  .mgroup .gcard{background:var(--surface); border-radius:14px}
+  .mrow{
+    display:flex; align-items:center; gap:8px; width:100%; border:none; background:none;
+    text-align:left; padding:14px 16px; cursor:pointer; color:var(--text);
+    font-family:inherit;
+  }
+  .mrow.static{cursor:default}
+  .mrow:active{opacity:.55}
+  .mrow .lab{flex:1; font-size:16px; line-height:24px; color:var(--text)}
+  .mrow .val{font-size:14px; line-height:20px; color:var(--text2);
+    font-variant-numeric:tabular-nums}
+  .mrow .chev{color:var(--text2); display:flex}
+  .mrow .chev svg{width:18px; height:18px}
+  .msep{height:1px; background:var(--sep); margin:0 16px}
+
+  /* Switch per Toggle.kt: checked track onSurface/thumb surface; unchecked track chipBg */
+  .sw{width:52px; height:32px; border-radius:16px; background:var(--chip); position:relative;
+    cursor:pointer; flex:0 0 auto; transition:background-color .2s var(--ease)}
+  .sw .knob{position:absolute; top:50%; left:8px; width:16px; height:16px; border-radius:50%;
+    background:var(--surface); transform:translateY(-50%);
+    transition:left .2s var(--ease), width .2s var(--ease), height .2s var(--ease)}
+  .sw.on{background:var(--text)}
+  .sw.on .knob{left:24px; width:24px; height:24px}
+
+  /* ---------- inline interval slider (no dialog, per user 2026-11-16) ----------
+     two switchable forms: tap-to-expand (chevron rotates; default) or always-on */
+  .islider{display:none; padding:2px 16px 4px}
+  .intervalblock.open .islider, .phone[data-slider=always] .islider{display:block}
+  .phone[data-slider=always] .intervalblock .chev{display:none}
+  .intervalblock .chev svg{transition:transform .2s var(--ease)}
+  .intervalblock.open .chev svg{transform:rotate(90deg)}
+  /* custom slider in the app's own control grammar: track = the StatsCard
+     progress bar (6dp, rounded, progressTrack base + onSurface fill);
+     thumb = the Switch knob (surface color + soft shadow), grows on press */
+  .islider input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:28px;
+    background:transparent; margin:0; cursor:pointer;
+  }
+  .islider input[type=range]::-webkit-slider-runnable-track{
+    height:6px; border-radius:3px;
+    background:linear-gradient(90deg, var(--text) var(--fill,13%), var(--track) var(--fill,13%));
+  }
+  .islider input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:22px; height:22px; border-radius:50%;
+    background:var(--surface); border:1px solid var(--sepstrong); margin-top:-8px;
+    box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:scale .15s ease-out;
+  }
+  .islider input[type=range]:active::-webkit-slider-thumb{scale:1.12}
+  .islider input[type=range]::-moz-range-track{height:6px; border-radius:3px; background:var(--track)}
+  .islider input[type=range]::-moz-range-progress{height:6px; border-radius:3px; background:var(--text)}
+  .islider input[type=range]::-moz-range-thumb{width:22px; height:22px; border-radius:50%;
+    background:var(--surface); border:1px solid var(--sepstrong);
+    box-shadow:0 1px 2px rgba(0,0,0,.12)}
+  .dhint{display:flex; justify-content:space-between; font-size:11px; color:var(--text3);
+    margin-top:2px}
+  .icap{font-size:11px; line-height:16px; color:var(--text3); padding:8px 0 12px}
+
+  /* ---------- HUD + switcher ---------- */
+  .hud{width:300px; background:rgba(127,127,127,.10); border-radius:14px; padding:16px;
+    font-size:12.5px; line-height:1.75; flex:0 0 auto}
+  .hud h3{font-size:13px; margin-bottom:6px; color:var(--chrometext)}
+  .hud table{width:100%; border-collapse:collapse}
+  .hud td{padding:1px 0; vertical-align:top}
+  .hud td:first-child{color:#888; white-space:nowrap; padding-right:10px}
+  .hud .beh{margin-top:10px; padding-top:8px; border-top:1px dashed rgba(128,128,128,.4)}
+  .hud .theme{margin-top:10px; display:flex; gap:8px; flex-wrap:wrap}
+  .hud button{border:1px solid rgba(128,128,128,.5); background:none; color:var(--chrometext);
+    border-radius:8px; padding:3px 12px; cursor:pointer; font-size:12px;
+    transition:scale .15s ease-out}
+  .hud button:active{scale:.96}
+  .hud button.on{background:var(--chrometext); color:var(--pagebg)}
+  .switcher{
+    display:flex; align-items:center; gap:10px; background:#1A1A1A; color:#FAFAFA;
+    border-radius:100px; padding:8px 14px; box-shadow:0 6px 20px rgba(0,0,0,.35);
+    font-size:13px;
+  }
+  .switcher button{background:none; border:none; color:#FAFAFA; font-size:16px; cursor:pointer; padding:2px 8px}
+  .switcher .vlabel{min-width:250px; text-align:center}
+
+  @media (prefers-reduced-motion: reduce){
+    .card.slide-in, .card.slide-in.back{animation:none}
+    .dlg{scale:1; transition:opacity .15s ease-out}
+    .lockbtn:active, .dlgbtn:active, .themeicon:active{scale:1}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <b>抛弃型原型 · #28 自动连播 v5.3（双击版）— 待定：进度线位置 + 滑杆形态</b><br>
+  <span class="warn">◀ ▶ 或方向键切换变体（<code>#a/#b/#c</code>）；三变体行为一致，只有进度线不同；“我的”页为 MeScreen 实况复刻</span>
+</header>
+
+<div class="switcher">
+  <button id="prev">◀</button>
+  <span class="vlabel" id="vlabel">A · 底边细线（双击卡片开始/暂停）</span>
+  <button id="next">▶</button>
+</div>
+
+<div class="stage">
+  <div class="phone" id="phone" data-variant="a" data-theme="light">
+    <div class="statusbar"><span>9:41</span>
+      <span class="right">
+        <svg width="15" height="11" viewBox="0 0 15 11"><rect x="0" y="7" width="2.5" height="4" rx="1" fill="currentColor"/><rect x="4" y="5" width="2.5" height="6" rx="1" fill="currentColor"/><rect x="8" y="2.5" width="2.5" height="8.5" rx="1" fill="currentColor"/><rect x="12" y="0" width="2.5" height="11" rx="1" fill="currentColor" opacity=".35"/></svg>
+        <svg width="15" height="11" viewBox="0 0 16 12"><path d="M8 11.5 1 4.8a9.8 9.8 0 0 1 14 0L8 11.5z" fill="currentColor"/></svg>
+        <svg width="22" height="11" viewBox="0 0 25 12"><rect x=".5" y=".5" width="20" height="11" rx="3" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="14" height="8" rx="1.6" fill="currentColor"/><rect x="21.5" y="3.5" width="2.5" height="5" rx="1" fill="currentColor" opacity=".4"/></svg>
+      </span>
+    </div>
+
+    <!-- drill screen -->
+    <div class="drillscreen show" id="drillscreen">
+      <div class="topbar">
+        <span class="bookname">CET-4</span>
+        <span class="counter" id="counter">1 / 10</span>
+        <span class="topactions">
+          <span class="skipbtn" id="skipbtn">跳过</span>
+          <button class="lockbtn" id="lockbtn" title="锁定（只隐藏导航）">
+            <svg id="lockicon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          </button>
+        </span>
+      </div>
+      <div class="cardarea" id="cardarea"></div>
+    </div>
+
+    <!-- Me tab — replica of MeScreen.kt -->
+    <div class="mescreen" id="mescreen">
+      <div class="mehead">
+        <h2>我的</h2>
+        <button class="themeicon" id="themeicon" title="主题（跟随系统 / 浅色 / 深色）"></button>
+      </div>
+
+      <div class="statscard">
+        <div class="big" id="statToday">0</div>
+        <div class="biglab">今日刷卡</div>
+        <div class="progblock">
+          <div class="prow"><span class="pbook">CET-4</span><span class="pcount" id="statDone">0 / 10</span></div>
+          <div class="ptrack"><div class="pfill" id="statFill"></div></div>
+          <div class="ppct" id="statPct">0%</div>
+        </div>
+        <div class="totalsep"></div>
+        <div class="totalblock">
+          <div class="num" id="statTotal">0</div>
+          <div class="lab">累计刷卡</div>
+        </div>
+      </div>
+
+      <div class="mgroup">
+        <div class="glab">显示</div>
+        <div class="gcard">
+          <div class="mrow" id="rowPhonetic" role="button" tabindex="0">
+            <span class="lab">隐藏音标</span>
+            <span class="sw" id="swPhonetic"><span class="knob"></span></span>
+          </div>
+          <div class="msep"></div>
+          <div class="intervalblock" id="intervalblock">
+            <button class="mrow" id="rowInterval" title="自动连播间隔">
+              <span class="lab">自动连播间隔</span>
+              <span class="val" id="intervalval">5.0 秒</span>
+              <span class="chev"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></span>
+            </button>
+            <div class="islider" id="islider">
+              <input type="range" id="slider" min="1" max="30" step="0.5" value="5">
+              <div class="dhint"><span>1s</span><span>30s</span></div>
+              <div class="icap">在学习页双击卡片开始或暂停</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mgroup">
+        <div class="glab">导航</div>
+        <div class="gcard">
+          <button class="mrow" id="rowNavStyle" title="点按切换（真实行为：循环切换）">
+            <span class="lab">导航栏风格</span>
+            <span class="val" id="navstyleval">浮动胶囊</span>
+            <span class="chev"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></span>
+          </button>
+          <div class="msep"></div>
+          <div class="mrow" id="rowCompact" role="button" tabindex="0">
+            <span class="lab">简约导航</span>
+            <span class="sw" id="swCompact"><span class="knob"></span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mgroup">
+        <div class="glab">通用</div>
+        <div class="gcard">
+          <button class="mrow static"><span class="lab">导出数据</span>
+            <span class="chev"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></span></button>
+          <div class="msep"></div>
+          <button class="mrow static"><span class="lab">导入数据</span>
+            <span class="chev"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></span></button>
+          <div class="msep"></div>
+          <button class="mrow static"><span class="lab">回收站</span>
+            <span class="chev"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg></span></button>
+          <div class="msep"></div>
+          <div class="mrow static"><span class="lab">关于</span><span class="val">0.2.0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="capsule" id="capsule">
+      <span class="capitem active" id="capstudy" title="学习">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="12" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/></svg>
+        学习
+      </span>
+      <span class="capitem" id="caplib" title="库（原型未含）">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>
+        库
+      </span>
+      <span class="capitem" id="capme" title="我的">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>
+        我的
+      </span>
+    </div>
+    <div class="gesturebar"></div>
+
+    <div class="edgeprog" id="edgeprog"><div class="fill" id="edgefill"></div></div>
+    <div class="topprog" id="topprog"><div class="fill" id="topfill"></div></div>
+
+  </div>
+
+  <aside class="hud" id="hud">
+    <h3>状态（每次操作后刷新）</h3>
+    <table>
+      <tr><td>模式</td><td id="st-mode">未播放</td></tr>
+      <tr><td>间隔</td><td id="st-dwell">5.0 秒</td></tr>
+      <tr><td>卡片</td><td id="st-page">1 / 10</td></tr>
+      <tr><td>刷卡记录</td><td id="st-swipe">0 条</td></tr>
+      <tr><td>屏幕常亮</td><td id="st-wake">—</td></tr>
+      <tr><td>锁定</td><td id="st-lock">关（导航可见）</td></tr>
+    </table>
+    <div class="beh">
+      已定行为（三变体一致）：<br>
+      · <b>双击卡片</b>：开始 / 暂停（唯一入口，学习页零新增控件）<br>
+      · 手动滑动只重置计时，<b>不</b>暂停<br>
+      · 连播中跳过不暂停<br>
+      · 滑到最后一张：播完即停<br>
+      · 自动翻和向前滑都记刷卡；续学位置跟随<br>
+      · 播放中屏幕常亮；锁定只藏导航<br>
+      唯一待定（本原型的问题）：2px 进度线放哪<br>
+      A <b>底边细线</b>：屏幕最底边左→右<br>
+      B <b>顶边细线</b>：状态栏下沿左→右（Stories / Safari 派）<br>
+      C <b>对照·无进度线</b>：双击后仅靠翻卡感知启动<br>
+      “我的”页 = MeScreen 实况复刻；新行<b>自动连播间隔</b>暂放“显示”组（归属可调）；滑杆在行内（点击展开 / 默认显示两种形态，下方按钮切换），拖动即时生效<br>
+      交互：拖动卡片翻页 · 双击卡片开始/暂停 · 点“我的”看新设置行
+    </div>
+    <div class="theme">
+      <button id="thlight" class="on">浅色</button>
+      <button id="thdark">深色</button>
+      <button id="dwellbtn">去“我的”页</button>
+      <button id="resetbtn">复位</button>
+    </div>
+    <div class="theme">
+      <span style="color:#888">滑杆形态：</span>
+      <button id="slExpand" class="on">点击展开</button>
+      <button id="slAlways">默认显示</button>
+    </div>
+  </aside>
+</div>
+
+<script>
+(function(){
+  var WORDS = [
+    {w:"abandon",  ph:"/əˈbændən/",   s:[["v.","放弃；抛弃"]]},
+    {w:"ability",  ph:"/əˈbɪləti/",   s:[["n.","能力；才能"]]},
+    {w:"abnormal", ph:"/æbˈnɔːrml/",  s:[["adj.","反常的；异常的"]]},
+    {w:"aboard",   ph:"/əˈbɔːrd/",    s:[["adv.","在船（飞机、车）上"]]},
+    {w:"abolish",  ph:"/əˈbɑːlɪʃ/",   s:[["v.","废除；取消"]]},
+    {w:"absorb",   ph:"/əbˈzɔːrb/",   s:[["v.","吸收；使专心"]]},
+    {w:"abstract", ph:"/ˈæbstrækt/",  s:[["adj.","抽象的"],["n.","摘要"]]},
+    {w:"absurd",   ph:"/əbˈsɜːrd/",   s:[["adj.","荒谬的；荒唐的"]]},
+    {w:"abundant", ph:"/əˈbʌndənt/",  s:[["adj.","丰富的；充裕的"]]},
+    {w:"abuse",    ph:"/əˈbjuːz/",    s:[["v.","滥用"],["n.","虐待"]]}
+  ];
+  var VNAMES = {a:"A · 底边细线（双击卡片开始/暂停）",
+                b:"B · 顶边细线（双击卡片开始/暂停）",
+                c:"C · 对照：无进度线（双击卡片开始/暂停）"};
+
+  var S = {
+    variant:(location.hash||"").replace("#","") || "a",
+    screen:"drill",           // drill | me
+    mode:"idle",              // idle | playing | paused
+    sliderMode:"expand",      // expand | always
+    sliderOpen:false, dwell:5,
+    deck:WORDS.slice(), page:0, swipes:0, total:WORDS.length,
+    locked:false, elapsed:0, lastTick:0, raf:0, _resume:false,
+    hidePhonetic:false, compactNav:false, navStyle:"pill",
+    themeMode:"light"
+  };
+  if(!VNAMES[S.variant]) S.variant = "a";
+
+  var $ = function(id){return document.getElementById(id)};
+  var phone=$("phone"), cardarea=$("cardarea"), capsule=$("capsule"),
+      edgefill=$("edgefill"), topfill=$("topfill"), slider=$("slider");
+
+  var ICONS = {
+    light:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.6"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/></svg>',
+    dark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 4a8 8 0 1 0 8 8c0-.5-.05-1-.14-1.47A6 6 0 0 1 10.6 4.14c-.2-.09-.4-.13-.6-.14z"/></svg>',
+    auto:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4V2.8M12 21.2V20M4 12H2.8M21.2 12H20M6.3 6.3l-.9-.9M18.6 18.6l-.9-.9M17.7 6.3l.9-.9M5.4 17.7l.9.9"/><path d="M12 7.2 9.7 14h1.5l.5-1.4h2.6l.5 1.4h1.5L12 7.2zm-.9 4.2.9-2.6.9 2.6h-1.8z" fill="currentColor" stroke="none"/></svg>'
+  };
+
+  function fmtDwell(d){ return (Math.round(d*10)/10).toFixed(1); }
+
+  /* ---------- drill render ---------- */
+  function renderCard(dir){
+    cardarea.innerHTML = "";
+    if(!S.deck.length){
+      cardarea.innerHTML = '<div class="emptydeck">这本书没有单词了</div>';
+      return;
+    }
+    var c = S.deck[S.page], d = document.createElement("div");
+    d.className = "card" + (dir ? " slide-in" + (dir==="prev" ? " back" : "") : "");
+    var html = '<div class="word">'+c.w+'</div>';
+    if(c.ph && !S.hidePhonetic) html += '<div class="phonetic">'+c.ph+'</div>';
+    html += '<div class="rule"></div>';
+    c.s.forEach(function(x){ html += '<div class="sense"><span class="pos">'+x[0]+'</span><span class="meaning">'+x[1]+'</span></div>'; });
+    d.innerHTML = html;
+    cardarea.appendChild(d);
+  }
+  function currentCardEl(){ return cardarea.querySelector(".card"); }
+
+  function renderChrome(){
+    var onDrill = S.screen==="drill";
+    $("drillscreen").classList.toggle("show", onDrill);
+    $("mescreen").classList.toggle("show", !onDrill);
+    $("capstudy").classList.toggle("active", onDrill);
+    $("capme").classList.toggle("active", !onDrill);
+    $("counter").textContent = S.deck.length ? (S.page+1)+" / "+S.deck.length : "0 / 0";
+    $("st-mode").textContent = {idle:"未播放", playing:"连播中 ▶", paused:"已暂停 ⏸"}[S.mode];
+    $("st-dwell").textContent = fmtDwell(S.dwell)+" 秒";
+    $("st-page").textContent = S.deck.length ? (S.page+1)+" / "+S.deck.length : "空";
+    $("st-swipe").textContent = S.swipes+" 条";
+    $("st-wake").textContent = S.mode==="playing" ? "常亮 ✓" : "—";
+    $("st-lock").textContent = S.locked ? "开（导航已隐藏）" : "关（导航可见）";
+    capsule.classList.toggle("hidden", S.locked && onDrill);
+    renderMe();
+  }
+  function renderMe(){
+    $("intervalval").textContent = fmtDwell(S.dwell)+" 秒";
+    $("navstyleval").textContent = S.navStyle==="pill" ? "浮动胶囊" : "底部栏";
+    $("swPhonetic").classList.toggle("on", S.hidePhonetic);
+    $("swCompact").classList.toggle("on", S.compactNav);
+    var done = Math.min(S.page, S.total), pct = Math.round(done/S.total*100);
+    $("statToday").textContent = S.swipes;
+    $("statTotal").textContent = S.swipes;
+    $("statDone").textContent = done+" / "+S.total;
+    $("statFill").style.width = pct+"%";
+    $("statPct").textContent = pct+"%";
+    $("themeicon").innerHTML = ICONS[S.themeMode];
+  }
+  function setProgress(p){
+    edgefill.style.width = (p*100).toFixed(2)+"%";
+    topfill.style.width = (p*100).toFixed(2)+"%";
+  }
+
+  /* ---------- timer ---------- */
+  function stopRaf(){ if(S.raf){cancelAnimationFrame(S.raf); S.raf=0;} }
+  function tick(ts){
+    if(S.mode!=="playing"){stopRaf(); return;}
+    if(!S.lastTick) S.lastTick=ts;
+    S.elapsed += ts - S.lastTick; S.lastTick = ts;
+    var ms = S.dwell*1000;
+    setProgress(Math.min(S.elapsed/ms, 1));
+    if(S.elapsed >= ms){
+      if(S.page < S.deck.length-1){ go(S.page+1); S.elapsed=0; }
+      else { S.mode="idle"; S._resume=false; S.elapsed=0; setProgress(0); renderChrome(); stopRaf(); return; }
+    }
+    S.raf = requestAnimationFrame(tick);
+  }
+  function startTimer(){ stopRaf(); S.lastTick=0; S.elapsed = S._resume ? S.elapsed : 0; S.raf=requestAnimationFrame(tick); }
+
+  function togglePlay(){
+    if(S.mode==="playing"){ S.mode="paused"; S._resume=true; stopRaf(); }
+    else if(S.mode==="paused"){ S.mode="playing"; startTimer(); }   // elapsed preserved
+    else { S.mode="playing"; S._resume=false; S.elapsed=0; startTimer(); }
+    renderChrome();
+  }
+
+  /* ---------- navigation ---------- */
+  function go(p){
+    if(p<0 || p>=S.deck.length) return;
+    var forward = p > S.page;
+    S.page = p;
+    if(forward) S.swipes++;                 // every forward flip logs
+    renderCard(forward ? "next" : "prev");
+    if(S.mode==="playing"){ S.elapsed=0; S.lastTick=0; }   // reposition never pauses
+    renderChrome();
+  }
+
+  /* ---------- gestures: drag with rubber-band + flick, double-tap toggles ---------- */
+  function rubber(o){ return (o*400*0.55)/(400+0.55*Math.abs(o)); }
+  var drag=null, tap={t:0, x:0, y:0};
+  cardarea.addEventListener("pointerdown", function(e){
+    drag={x:e.clientX, t:performance.now(), vx:0, moved:false};
+  });
+  window.addEventListener("pointermove", function(e){
+    if(!drag) return;
+    var now=performance.now(), dx=e.clientX-drag.x, dt=now-drag.t;
+    if(dt>0){ drag.vx = 0.7*drag.vx + 0.3*(dx-(drag.lastDx||0))/dt; drag.lastDx=dx; drag.t=now; }
+    if(Math.abs(dx)>6) drag.moved=true;
+    var el=currentCardEl(); if(!el || !drag.moved) return;
+    var eff=dx, atStart=S.page===0&&dx>0, atEnd=S.page===S.deck.length-1&&dx<0;
+    if(atStart||atEnd) eff=(dx>0?1:-1)*rubber(Math.abs(dx));
+    el.style.transform="translateX("+eff*.6+"px)";
+  });
+  window.addEventListener("pointerup", function(e){
+    if(!drag) return;
+    var dx=drag.lastDx||0, el=currentCardEl();
+    if(el) el.style.transform="";
+    if(drag.moved && S.deck.length){
+      var flickFwd=drag.vx>0.6, flickBack=drag.vx<-0.6;
+      if((dx<-45||flickFwd) && S.page<S.deck.length-1) go(S.page+1);
+      else if((dx>45||flickBack) && S.page>0) go(S.page-1);
+    }
+    else if(!drag.moved && S.deck.length){
+      var now=performance.now();
+      if(now-tap.t<320 && Math.hypot(e.clientX-tap.x, e.clientY-tap.y)<40){
+        togglePlay(); tap.t=0;
+      } else { tap.t=now; tap.x=e.clientX; tap.y=e.clientY; }
+    }
+    drag=null;
+  });
+
+  /* ---------- screens ---------- */
+  function goDrill(){ S.screen="drill"; renderCard(); renderChrome(); }
+  function goMe(){
+    // leaving the drill screen stops playback (settled behavior)
+    if(S.mode==="playing"){ S.mode="idle"; S._resume=false; S.elapsed=0; stopRaf(); setProgress(0); }
+    S.screen="me"; renderChrome();
+    $("mescreen").scrollTop = 0;
+  }
+  $("capstudy").addEventListener("click", goDrill);
+  $("capme").addEventListener("click", goMe);
+  $("dwellbtn").addEventListener("click", goMe);
+
+  /* ---------- Me-tab interactions (faithful: toggles flip, nav style cycles) ---------- */
+  $("rowPhonetic").addEventListener("click", function(){
+    S.hidePhonetic=!S.hidePhonetic; renderMe();
+    if(S.screen==="drill") renderCard();
+  });
+  $("rowCompact").addEventListener("click", function(){
+    S.compactNav=!S.compactNav; renderMe();
+  });
+  $("rowNavStyle").addEventListener("click", function(){
+    S.navStyle = S.navStyle==="pill" ? "bar" : "pill"; renderMe();
+  });
+
+  /* ---------- inline interval slider: tap expands or always-on,
+     dragging applies instantly (no dialog, no draft) ---------- */
+  function setSliderMode(m){
+    S.sliderMode=m; phone.dataset.slider=m;
+    $("slExpand").classList.toggle("on", m==="expand");
+    $("slAlways").classList.toggle("on", m==="always");
+  }
+  $("rowInterval").addEventListener("click", function(){
+    if(S.sliderMode!=="expand") return;
+    S.sliderOpen=!S.sliderOpen;
+    $("intervalblock").classList.toggle("open", S.sliderOpen);
+  });
+  $("slExpand").onclick=function(){ setSliderMode("expand"); };
+  $("slAlways").onclick=function(){ setSliderMode("always"); };
+  function syncSliderFill(){
+    var pct = ((slider.value - slider.min)/(slider.max - slider.min)*100).toFixed(2)+"%";
+    slider.style.setProperty("--fill", pct);
+  }
+  slider.addEventListener("input", function(){
+    S.dwell = +slider.value; syncSliderFill(); renderChrome();   // instant apply
+  });
+
+  $("resetbtn").addEventListener("click", function(){
+    S.mode="idle"; S._resume=false; S.elapsed=0; stopRaf(); setProgress(0);
+    S.deck=WORDS.slice(); S.page=0; S.swipes=0;
+    S.screen="drill";
+    renderCard(); renderChrome();
+  });
+
+  $("skipbtn").addEventListener("click", function(){
+    if(!S.deck.length) return;
+    S.deck.splice(S.page,1);
+    if(S.page > S.deck.length-1) S.page = S.deck.length-1;
+    if(S.deck.length===0){ S.mode="idle"; stopRaf(); }
+    renderCard("next");
+    if(S.mode==="playing"){ S.elapsed=0; S.lastTick=0; }
+    renderChrome();
+  });
+
+  $("lockbtn").addEventListener("click", function(){
+    S.locked=!S.locked;
+    $("lockbtn").classList.toggle("locked", S.locked);
+    $("lockicon").innerHTML = S.locked
+      ? '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.9-.8"/>'
+      : '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>';
+    renderChrome();
+  });
+
+  /* ---------- theme: light / dark / auto (real cycle), auto follows system ---------- */
+  function applyTheme(){
+    var dark = S.themeMode==="dark" ||
+      (S.themeMode==="auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.body.classList.add("no-trans");
+    phone.dataset.theme = dark ? "dark" : "light";
+    document.body.dataset.theme = dark ? "dark" : "light";
+    $("thlight").classList.toggle("on", S.themeMode==="light");
+    $("thdark").classList.toggle("on", S.themeMode==="dark");
+    renderMe();
+    requestAnimationFrame(function(){requestAnimationFrame(function(){
+      document.body.classList.remove("no-trans");
+    })});
+  }
+  $("thlight").onclick=function(){ S.themeMode="light"; applyTheme(); };
+  $("thdark").onclick=function(){ S.themeMode="dark"; applyTheme(); };
+  $("themeicon").onclick=function(){
+    S.themeMode = S.themeMode==="light" ? "dark" : (S.themeMode==="dark" ? "auto" : "light");
+    applyTheme();
+  };
+  if(window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener
+    ? window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function(){ if(S.themeMode==="auto") applyTheme(); })
+    : null;
+
+  /* ---------- variant ---------- */
+  function setVariant(v, push){
+    S.variant=v; phone.dataset.variant=v;
+    $("vlabel").textContent=VNAMES[v];
+    renderChrome();
+    if(push) location.hash=v;
+  }
+  $("prev").onclick=function(){var ks=["a","b","c"]; setVariant(ks[(ks.indexOf(S.variant)+2)%3], true);};
+  $("next").onclick=function(){var ks=["a","b","c"]; setVariant(ks[(ks.indexOf(S.variant)+1)%3], true);};
+  window.addEventListener("keydown", function(e){
+    var tag=(document.activeElement&&document.activeElement.tagName)||"";
+    if(tag==="INPUT"||tag==="TEXTAREA") return;
+    if(e.key==="ArrowLeft") $("prev").click();
+    if(e.key==="ArrowRight") $("next").click();
+  });
+  window.addEventListener("hashchange", function(){
+    var v=(location.hash||"").replace("#",""); if(VNAMES[v]) setVariant(v,false);
+  });
+
+  /* ---------- init ---------- */
+  setVariant(S.variant, false);
+  setSliderMode(S.sliderMode);
+  syncSliderFill();
+  applyTheme();
+  renderCard(); renderChrome();
+})();
+</script>
+</body>
+</html>
