@@ -43,12 +43,15 @@ internal class AutoAdvance(
     /** Countdown granularity. Dwell values are 0.5 s steps, so every dwell is a multiple. */
     private val tickMillis = 50L
 
+    /** How long the deck-end full-width hairline stays visible before playback stops. */
+    internal val completeHoldMillis = 250L
+
     private val _state = MutableStateFlow(AutoAdvanceState())
     val state: StateFlow<AutoAdvanceState> = _state.asStateFlow()
 
     private val _advance = Channel<Int>(Channel.UNLIMITED)
 
-    /** Pages the screen should animate to; each one's settle closes the loop via [onSettled]. */
+    /** Pages the screen should animate to; each one's settle closes the loop via [reposition]. */
     val advance: Flow<Int> = _advance.receiveAsFlow()
 
     private var page = 0
@@ -80,19 +83,21 @@ internal class AutoAdvance(
     }
 
     /**
-     * A page settled (manual swipe or an auto-advance flip): repositions playback on
-     * that page. While playing the countdown restarts; playback never pauses.
+     * Repositions playback on a page: a page settled (manual swipe or an auto-advance
+     * flip), or the deck reloaded under an unchanged pager index (skip/restore) —
+     * either way the word under the pager changed. While playing the countdown
+     * restarts on the new current card; playback never pauses.
      */
-    fun onSettled(page: Int, deckSize: Int) {
-        reposition(page, deckSize)
-    }
-
-    /**
-     * The deck reloaded under an unchanged pager index (skip/restore): the word under
-     * the index changed, so the countdown restarts on the new current card.
-     */
-    fun onDeckChanged(page: Int, deckSize: Int) {
-        reposition(page, deckSize)
+    fun reposition(page: Int, deckSize: Int) {
+        this.page = page
+        this.deckSize = deckSize
+        elapsedMillis = 0
+        when (_state.value.phase) {
+            AutoAdvancePhase.Playing -> startCountdown()
+            AutoAdvancePhase.Paused ->
+                _state.value = _state.value.copy(elapsedFraction = 0f)
+            AutoAdvancePhase.Idle -> Unit
+        }
     }
 
     /** Returns to Idle with no elapsed time (deck end, deck gone, or leaving playback). */
@@ -106,18 +111,6 @@ internal class AutoAdvance(
         while (_advance.tryReceive().isSuccess) {
         }
         _state.value = AutoAdvanceState()
-    }
-
-    private fun reposition(page: Int, deckSize: Int) {
-        this.page = page
-        this.deckSize = deckSize
-        elapsedMillis = 0
-        when (_state.value.phase) {
-            AutoAdvancePhase.Playing -> startCountdown()
-            AutoAdvancePhase.Paused ->
-                _state.value = _state.value.copy(elapsedFraction = 0f)
-            AutoAdvancePhase.Idle -> Unit
-        }
     }
 
     /** Starts (or resumes) the countdown; already-elapsed time is preserved. */
@@ -145,13 +138,18 @@ internal class AutoAdvance(
         }
     }
 
-    private fun onDwellComplete() {
+    private suspend fun onDwellComplete() {
         if (page < deckSize - 1) {
             _advance.trySend(page + 1)
             // The countdown for the next card starts when the screen reports the
-            // flip's settle through onSettled; until then the hairline rests full.
+            // flip's settle through reposition; until then the hairline rests full.
         } else {
-            // Deck end: the fill duty is complete, playback stops, the line disappears.
+            // Deck end: hold the complete frame for a visible beat first — without
+            // this, stop()'s Idle/zero write lands in the same coroutine turn and
+            // the full-width hairline never renders. Cancellation-safe: a toggle,
+            // reposition, or stop during the hold cancels this delay, and the
+            // canceller already performed its own state transition.
+            delay(completeHoldMillis)
             stop()
         }
     }

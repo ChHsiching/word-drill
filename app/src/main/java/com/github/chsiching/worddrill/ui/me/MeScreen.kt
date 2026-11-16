@@ -6,7 +6,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -383,7 +382,7 @@ private fun NavStyleRow(current: NavStyle, onClick: () -> Unit) {
 }
 
 /** Test tag on the dwell-interval slider so instrumented tests can locate the control. */
-const val DwellSliderTestTag = "dwellIntervalSlider"
+internal const val DwellSliderTestTag = "dwellIntervalSlider"
 
 /** Value row for the auto-advance dwell interval; tapping expands an inline slider
  *  inside the same group card. Drags apply instantly - no dialog, no draft. */
@@ -392,7 +391,7 @@ private fun DwellIntervalRow(value: Float, onValueChange: (Float) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 90f else 0f,
-        animationSpec = tween(durationMillis = 200),
+        animationSpec = spring(),
         label = "dwellChevronRotation",
     )
     Column {
@@ -467,7 +466,7 @@ private fun DwellSlider(value: Float, onValueChange: (Float) -> Unit) {
     val pressed by interactionSource.collectIsPressedAsState()
     val thumbScale by animateFloatAsState(
         targetValue = if (pressed) 1.12f else 1f,
-        animationSpec = tween(durationMillis = 150),
+        animationSpec = spring(),
         label = "dwellThumbScale",
     )
     val shadowColor = Color.Black.copy(alpha = 0.12f)
