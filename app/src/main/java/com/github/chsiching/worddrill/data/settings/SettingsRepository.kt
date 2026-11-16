@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -30,6 +31,7 @@ class SettingsRepository @Inject constructor(
     private val hidePhoneticKey = booleanPreferencesKey("hide_phonetic")
     private val navStyleKey = stringPreferencesKey("nav_style")
     private val compactNavKey = booleanPreferencesKey("compact_nav")
+    private val dwellIntervalKey = floatPreferencesKey("dwell_interval_seconds")
 
     val presetImported: Flow<Boolean> = context.appDataStore.data.map { it[presetImportedKey] ?: false }
 
@@ -105,5 +107,12 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setCompactNav(value: Boolean) {
         context.appDataStore.edit { it[compactNavKey] = value }
+    }
+
+    val dwellInterval: Flow<Float> =
+        context.appDataStore.data.map { it[dwellIntervalKey] ?: DwellInterval.DEFAULT_SECONDS }
+
+    suspend fun setDwellInterval(seconds: Float) {
+        context.appDataStore.edit { it[dwellIntervalKey] = DwellInterval.normalize(seconds) }
     }
 }
