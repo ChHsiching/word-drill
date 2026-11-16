@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -37,8 +38,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -49,9 +54,14 @@ import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.local.WordWithSenses
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 import com.github.chsiching.worddrill.ui.theme.wordDrillTypography
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
+
+/** Test tag of the auto-advance dwell hairline at the drill screen's bottom edge. */
+internal const val AutoAdvanceHairlineTag = "auto_advance_hairline"
 
 @Composable
 fun DrillScreen(
@@ -70,6 +80,7 @@ fun DrillScreen(
         // resume position; within one book the pager state (and the user's page)
         // survives deck reloads from skip/restore.
         is DrillUiState.Ready -> key(state.bookId) {
+            val playback by viewModel.playback.collectAsStateWithLifecycle()
             DrillPager(
                 bookName = state.bookName,
                 cards = state.cards,
@@ -82,6 +93,9 @@ fun DrillScreen(
                 onToggleLock = onToggleLock,
                 hidePhonetic = hidePhonetic,
                 modifier = modifier,
+                onToggleAutoAdvance = viewModel::toggleAutoAdvance,
+                playbackState = playback,
+                advance = viewModel.advance,
             )
         }
     }
@@ -100,6 +114,9 @@ internal fun DrillPager(
     onToggleLock: () -> Unit,
     hidePhonetic: Boolean,
     modifier: Modifier = Modifier,
+    onToggleAutoAdvance: (currentPage: Int) -> Unit = {},
+    playbackState: AutoAdvanceState = AutoAdvanceState(),
+    advance: Flow<Int> = emptyFlow(),
 ) {
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { cards.size })
 
@@ -114,30 +131,79 @@ internal fun DrillPager(
             }
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        DrillTopBar(
-            bookName = bookName,
-            index = pagerState.currentPage,
-            total = cards.size,
-            locked = locked,
-            onToggleLock = onToggleLock,
-            isReviewBook = isReviewBook,
-            onAction = { page ->
-                if (isReviewBook) onRestore(page) else onSkip(page)
-            },
-            currentPage = pagerState.currentPage,
-        )
+    // Auto-advance flips execute as programmatic animated scrolls; the settle they
+    // produce flows through the same onPageSettled path as a manual swipe, so swipe
+    // logging and resume writes stay completely unchanged.
+    LaunchedEffect(pagerState, advance) {
+        advance.collect { target -> pagerState.animateScrollToPage(target) }
+    }
 
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-        ) { pageIndex ->
-            WordCard(
-                word = cards[pageIndex],
-                hidePhonetic = hidePhonetic,
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            DrillTopBar(
+                bookName = bookName,
+                index = pagerState.currentPage,
+                total = cards.size,
+                locked = locked,
+                onToggleLock = onToggleLock,
+                isReviewBook = isReviewBook,
+                onAction = { page ->
+                    if (isReviewBook) onRestore(page) else onSkip(page)
+                },
+                currentPage = pagerState.currentPage,
+            )
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    // Double-tap on the card area toggles auto-advance. Single taps
+                    // stay inert, and a tap that turns into a drag cancels here so
+                    // the pager keeps handling the swipe.
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = { onToggleAutoAdvance(pagerState.currentPage) },
+                        )
+                    },
+            ) { pageIndex ->
+                WordCard(
+                    word = cards[pageIndex],
+                    hidePhonetic = hidePhonetic,
+                )
+            }
+        }
+
+        if (playbackState.phase != AutoAdvancePhase.Idle) {
+            AutoAdvanceHairline(
+                elapsedFraction = playbackState.elapsedFraction,
+                modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
     }
+}
+
+/** The dwell hairline: a 2 dp full-width line at the screen's very bottom edge
+ *  (approved prototype `.scratch/proto-auto-advance.html`, `edgeprog`): onSurface at
+ *  55 % opacity filling left-to-right with the elapsed fraction, frozen while paused,
+ *  absent while idle. It renders inside the drill content, so the capsule nav drawn
+ *  later by the navigation root always floats above it. */
+@Composable
+private fun AutoAdvanceHairline(elapsedFraction: Float, modifier: Modifier = Modifier) {
+    val fill = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(2.dp)
+            .testTag(AutoAdvanceHairlineTag)
+            .drawBehind {
+                if (elapsedFraction > 0f) {
+                    drawRect(
+                        color = fill,
+                        size = Size(size.width * elapsedFraction, size.height),
+                    )
+                }
+            },
+    )
 }
 
 @Composable
