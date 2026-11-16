@@ -220,4 +220,34 @@ class DrillLifecycleTest {
         assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Idle)
         composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertDoesNotExist()
     }
+
+    @Test
+    fun singleCardDeck_startsThenStopsWhenItsDwellCompletes() {
+        runBlocking { settings.setDwellInterval(1f) }
+        val vm = runBlocking { seedViewModel(939_105L, "单卡词书", "apple") }
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillScreen(viewModel = vm)
+                }
+            }
+        }
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("1 / 1").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithText("apple").performTouchInput { doubleClick() }
+        composeRule.waitForIdle()
+        assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Playing)
+        composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertIsDisplayed()
+
+        // The only card's dwell completes and playback stops: no next page to flip
+        // to, no timer left spinning.
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag(AutoAdvanceHairlineTag).fetchSemanticsNodes().isEmpty()
+        }
+        assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Idle)
+        composeRule.onNodeWithText("1 / 1").assertIsDisplayed()
+        assertThat(keepScreenOnHeld()).isFalse()
+    }
 }
