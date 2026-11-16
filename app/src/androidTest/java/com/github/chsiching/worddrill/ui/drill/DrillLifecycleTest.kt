@@ -198,4 +198,26 @@ class DrillLifecycleTest {
         assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Idle)
         composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertDoesNotExist()
     }
+
+    @Test
+    fun emptyDeck_doubleTapIsInert_noHairlineEver() {
+        // A book with no cards: the mode can't start meaninglessly.
+        val vm = runBlocking { seedViewModel(939_104L, "空生命周期书") }
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillScreen(viewModel = vm)
+                }
+            }
+        }
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("这个词书是空的").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithText("这个词书是空的").performTouchInput { doubleClick() }
+        composeRule.waitForIdle()
+
+        assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Idle)
+        composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertDoesNotExist()
+    }
 }
