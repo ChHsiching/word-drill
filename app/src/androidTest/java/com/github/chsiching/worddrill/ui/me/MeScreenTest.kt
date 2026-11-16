@@ -1,6 +1,7 @@
 package com.github.chsiching.worddrill.ui.me
 
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
@@ -294,7 +295,24 @@ class MeScreenTest {
     @Test
     fun dwellSlider_dragUpdatesValueLive_andPersistsAfterRecreatingScreen() {
         runBlocking { settings.setDwellInterval(5f) }
-        renderWithVm(vm())
+        // setContent may run only once per activity, so this test renders once and
+        // reads the settings ViewModel through a swappable holder. The "re-create"
+        // step below swaps in a fresh SettingsViewModel over the same DataStore and
+        // recomposition replays the load, which is what persistence must prove.
+        val settingsHolder = mutableStateOf(settingsVm())
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    MeScreen(
+                        onNavigateToRecycleBin = {},
+                        viewModel = vm(),
+                        settingsViewModel = settingsHolder.value,
+                        exportImportViewModel = exportImportVm(),
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
         composeRule.onNodeWithText("自动连播间隔").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("在学习页双击卡片开始或暂停").performScrollTo().assertIsDisplayed()
@@ -316,8 +334,8 @@ class MeScreenTest {
         }
         assertThat(runBlocking { settings.dwellInterval.first() }).isEqualTo(30f)
 
-        // Re-create the screen with a fresh settings ViewModel: the persisted value loads.
-        renderWithVm(vm(), settingsViewModel = settingsVm())
+        // Re-create the screen: swap a fresh settings ViewModel, recomposition reloads.
+        composeRule.runOnUiThread { settingsHolder.value = settingsVm() }
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText("30.0 秒").fetchSemanticsNodes().isNotEmpty()
         }
