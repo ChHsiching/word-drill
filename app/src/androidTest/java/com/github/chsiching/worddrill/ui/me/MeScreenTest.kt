@@ -190,8 +190,10 @@ class MeScreenTest {
         composeRule.onNodeWithText("导航").assertIsDisplayed()
         composeRule.onNodeWithText("通用", substring = false)
         composeRule.onNodeWithText("隐藏音标").assertIsDisplayed()
-        composeRule.onNodeWithText("导航栏风格").assertIsDisplayed()
+        // The CI emulator viewport is shorter: assert the top-bar icon before any
+        // performScrollTo moves it off screen, and scroll below-fold rows into view.
         composeRule.onNodeWithContentDescription("主题").assertIsDisplayed()
+        composeRule.onNodeWithText("导航栏风格").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("简约导航").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("导出数据")
         composeRule.onNodeWithText("导入数据")
@@ -278,7 +280,9 @@ class MeScreenTest {
         renderWithVm(vm())
         composeRule.onNodeWithText("自动连播间隔").performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("在学习页双击卡片开始或暂停").assertIsDisplayed()
+        // Expanding grows content below the tapped row; scroll the caption into view
+        // so the display assertion holds on the CI emulator's shorter viewport.
+        composeRule.onNodeWithText("在学习页双击卡片开始或暂停").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("1s").assertIsDisplayed()
         composeRule.onNodeWithText("30s").assertIsDisplayed()
 
@@ -293,7 +297,7 @@ class MeScreenTest {
         renderWithVm(vm())
         composeRule.onNodeWithText("自动连播间隔").performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("在学习页双击卡片开始或暂停").assertIsDisplayed()
+        composeRule.onNodeWithText("在学习页双击卡片开始或暂停").performScrollTo().assertIsDisplayed()
 
         // Drag the thumb to the far right edge: the value updates live and clamps at 30 s.
         composeRule.onNodeWithTag(DwellSliderTestTag).performScrollTo().performTouchInput {
