@@ -81,26 +81,39 @@ class AutoAdvanceTest {
     }
 
     @Test
-    fun lastCardDwell_stopsPlayback_noLoop() = runTest {
+    fun lastCardDwell_showsCompleteBeat_thenStopsPlayback_noLoop() = runTest {
         val machine = machine()
 
         machine.toggle(page = 2, deckSize = 3)
         advanceTimeBy(5_000)
         runCurrent()
 
+        // The dwell finished: the full-width frame is on screen for a visible beat,
+        // not instantly overwritten by the stop.
+        assertThat(machine.state.value.phase).isEqualTo(AutoAdvancePhase.Playing)
+        assertThat(machine.state.value.elapsedFraction).isWithin(0.001f).of(1f)
+
+        // After the hold the fill duty is complete, playback stops, the line disappears.
+        advanceTimeBy(machine.completeHoldMillis)
+        runCurrent()
         assertThat(machine.state.value.phase).isEqualTo(AutoAdvancePhase.Idle)
         assertThat(machine.state.value.elapsedFraction).isWithin(0.001f).of(0f)
         assertThat(withTimeoutOrNull(1_000) { machine.advance.first() }).isNull()
     }
 
     @Test
-    fun singleCardDeck_stopsWhenOnlyCardCompletes() = runTest {
+    fun singleCardDeck_showsCompleteBeat_thenStopsWhenOnlyCardCompletes() = runTest {
         val machine = machine()
 
         machine.toggle(page = 0, deckSize = 1)
         advanceTimeBy(5_000)
         runCurrent()
 
+        assertThat(machine.state.value.phase).isEqualTo(AutoAdvancePhase.Playing)
+        assertThat(machine.state.value.elapsedFraction).isWithin(0.001f).of(1f)
+
+        advanceTimeBy(machine.completeHoldMillis)
+        runCurrent()
         assertThat(machine.state.value.phase).isEqualTo(AutoAdvancePhase.Idle)
         assertThat(withTimeoutOrNull(1_000) { machine.advance.first() }).isNull()
     }

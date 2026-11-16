@@ -43,6 +43,9 @@ internal class AutoAdvance(
     /** Countdown granularity. Dwell values are 0.5 s steps, so every dwell is a multiple. */
     private val tickMillis = 50L
 
+    /** How long the deck-end full-width hairline stays visible before playback stops. */
+    internal val completeHoldMillis = 250L
+
     private val _state = MutableStateFlow(AutoAdvanceState())
     val state: StateFlow<AutoAdvanceState> = _state.asStateFlow()
 
@@ -145,13 +148,18 @@ internal class AutoAdvance(
         }
     }
 
-    private fun onDwellComplete() {
+    private suspend fun onDwellComplete() {
         if (page < deckSize - 1) {
             _advance.trySend(page + 1)
             // The countdown for the next card starts when the screen reports the
             // flip's settle through onSettled; until then the hairline rests full.
         } else {
-            // Deck end: the fill duty is complete, playback stops, the line disappears.
+            // Deck end: hold the complete frame for a visible beat first — without
+            // this, stop()'s Idle/zero write lands in the same coroutine turn and
+            // the full-width hairline never renders. Cancellation-safe: a toggle,
+            // reposition, or stop during the hold cancels this delay, and the
+            // canceller already performed its own state transition.
+            delay(completeHoldMillis)
             stop()
         }
     }
