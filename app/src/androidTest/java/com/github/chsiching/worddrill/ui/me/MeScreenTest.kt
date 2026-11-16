@@ -1,14 +1,20 @@
 package com.github.chsiching.worddrill.ui.me
 
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -22,8 +28,11 @@ import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.data.settings.ThemeMode
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlin.math.min
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -39,6 +48,11 @@ class MeScreenTest {
     private lateinit var db: WordDrillDatabase
     private lateinit var settings: SettingsRepository
     private var bookId: Long = 0L
+
+    /** ViewModels built for this test; no ViewModelStore ever clears them, so their
+     *  stateIn(WhileSubscribed) collectors would outlive the test against the closed
+     *  database. */
+    private val viewModels = mutableListOf<ViewModel>()
 
     @Before
     fun setUp() = runBlocking {
@@ -59,8 +73,17 @@ class MeScreenTest {
     }
 
     @After
-    fun tearDown() {
+    fun tearDown() = runBlocking {
+        // Cancel every ViewModel's scope and drain in-flight Room queries before the
+        // pool closes (the 8c3567a convention): this process's DataStore is shared,
+        // and a later test's settings write would otherwise resume a leaked
+        // collector's query against this closed database, throwing
+        // "connection pool has been closed" into that later test.
+        viewModels.forEach { it.viewModelScope.cancel() }
+        delay(200)
         db.close()
+        settings.setDwellInterval(5f)
+        Unit
     }
 
     private fun seedSwipe(wordId: Long, timestamp: Long, bid: Long = bookId) = runBlocking {
@@ -72,14 +95,15 @@ class MeScreenTest {
         swipeLogDao = db.swipeLogDao(),
         bookDao = db.bookDao(),
         settings = settings,
-    )
+    ).also { viewModels.add(it) }
 
-    private fun settingsVm(): SettingsViewModel = SettingsViewModel(settings)
+    private fun settingsVm(): SettingsViewModel = SettingsViewModel(settings).also { viewModels.add(it) }
 
     private fun exportImportVm(): ExportImportViewModel {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val app = ctx.applicationContext as android.app.Application
         return ExportImportViewModel(app, BackupService(db, db.bookDao(), db.wordDao(), db.swipeLogDao()))
+            .also { viewModels.add(it) }
     }
 
     private suspend fun stableState(viewModel: MeViewModel): MeStatsUiState =
@@ -185,8 +209,10 @@ class MeScreenTest {
         composeRule.onNodeWithText("导航").assertIsDisplayed()
         composeRule.onNodeWithText("通用", substring = false)
         composeRule.onNodeWithText("隐藏音标").assertIsDisplayed()
-        composeRule.onNodeWithText("导航栏风格").assertIsDisplayed()
+        // The CI emulator viewport is shorter: assert the top-bar icon before any
+        // performScrollTo moves it off screen, and scroll below-fold rows into view.
         composeRule.onNodeWithContentDescription("主题").assertIsDisplayed()
+        composeRule.onNodeWithText("导航栏风格").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("简约导航").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("导出数据")
         composeRule.onNodeWithText("导入数据")
@@ -255,5 +281,81 @@ class MeScreenTest {
         composeRule.onNodeWithText("取消", substring = false).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("确认导入").assertIsNotDisplayed()
+    }
+
+    @Test
+    fun dwellRow_showsCurrentValue_withUnitLabel() = runBlocking {
+        settings.setDwellInterval(12.5f)
+        renderWithVm(vm())
+        composeRule.onNodeWithText("自动连播间隔").performScrollTo().assertIsDisplayed()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("12.5 秒").fetchSemanticsNodes().isNotEmpty()
+        }
+        Unit
+    }
+
+    @Test
+    fun dwellRow_tapExpandsSliderWithCaption_tapAgainCollapses() {
+        renderWithVm(vm())
+        composeRule.onNodeWithText("自动连播间隔").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        // Expanding grows content below the tapped row; scroll the caption into view
+        // so the display assertion holds on the CI emulator's shorter viewport.
+        composeRule.onNodeWithText("在学习页双击卡片开始或暂停").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("1s", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("30s", substring = false).assertIsDisplayed()
+
+        composeRule.onNodeWithText("自动连播间隔").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("在学习页双击卡片开始或暂停").assertIsNotDisplayed()
+    }
+
+    @Test
+    fun dwellSlider_dragUpdatesValueLive_andPersistsAfterRecreatingScreen() {
+        runBlocking { settings.setDwellInterval(5f) }
+        // setContent may run only once per activity, so this test renders once and
+        // reads the settings ViewModel through a swappable holder. The "re-create"
+        // step below swaps in a fresh SettingsViewModel over the same DataStore and
+        // recomposition replays the load, which is what persistence must prove.
+        val settingsHolder = mutableStateOf(settingsVm())
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    MeScreen(
+                        onNavigateToRecycleBin = {},
+                        viewModel = vm(),
+                        settingsViewModel = settingsHolder.value,
+                        exportImportViewModel = exportImportVm(),
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("自动连播间隔").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("在学习页双击卡片开始或暂停").performScrollTo().assertIsDisplayed()
+
+        // Drag the thumb to the far right edge: the value updates live and clamps at 30 s.
+        composeRule.onNodeWithTag(DwellSliderTestTag).performScrollTo().performTouchInput {
+            down(center)
+            val endX = right - 1f
+            var x = centerX
+            while (x < endX) {
+                x = min(x + 40f, endX)
+                moveTo(Offset(x, centerY))
+                advanceEventTime(16L)
+            }
+            up()
+        }
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("30.0 秒").fetchSemanticsNodes().isNotEmpty()
+        }
+        assertThat(runBlocking { settings.dwellInterval.first() }).isEqualTo(30f)
+
+        // Re-create the screen: swap a fresh settings ViewModel, recomposition reloads.
+        composeRule.runOnUiThread { settingsHolder.value = settingsVm() }
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("30.0 秒").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 }

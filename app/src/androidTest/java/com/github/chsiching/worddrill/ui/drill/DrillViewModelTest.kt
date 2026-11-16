@@ -12,6 +12,7 @@ import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
 import com.github.chsiching.worddrill.data.local.entity.Word
+import com.github.chsiching.worddrill.data.settings.DwellInterval
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -271,6 +272,70 @@ class DrillViewModelTest {
 
         val ready = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
         assertThat(ready.initialPageIndex).isEqualTo(0)
+        Unit
+    }
+
+    @Test
+    fun autoAdvance_togglesThroughViewModel_advancesAndContinuesOnSettle() = runBlocking {
+        val bookId = 934_110L
+        insertBookWithWords(bookId, "连播词书", isPreset = false, "apple", "balance", "circle")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+        vm.uiState.first { it is DrillUiState.Ready }
+        try {
+            // A 1 s dwell keeps this device-paced test fast; restored afterwards so
+            // later classes in the shared process see the default again.
+            settings.setDwellInterval(1f)
+
+            vm.toggleAutoAdvance(currentPage = 0)
+            assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Playing)
+
+            vm.toggleAutoAdvance(currentPage = 0) // pause freezes
+            assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Paused)
+
+            vm.toggleAutoAdvance(currentPage = 0) // resume continues
+            assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Playing)
+
+            // The dwell elapses and the ViewModel emits the flip command.
+            val target = withTimeoutOrNull(5_000) { vm.advance.first() }
+            assertThat(target).isEqualTo(1)
+
+            // The screen executes the flip; its settle flows through the existing
+            // onPageSettled, which repositions playback on the new card.
+            vm.onPageSettled(previousPage = 0, currentPage = 1)
+            assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Playing)
+        } finally {
+            settings.setDwellInterval(DwellInterval.DEFAULT_SECONDS)
+        }
+        Unit
+    }
+
+    @Test
+    fun stopAutoAdvance_stopsOutright_lateSettleAndFurtherDwellStayIdle() = runBlocking {
+        val bookId = 934_111L
+        insertBookWithWords(bookId, "离场词书", isPreset = false, "apple", "balance", "circle")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+        vm.uiState.first { it is DrillUiState.Ready }
+        try {
+            settings.setDwellInterval(1f)
+            vm.toggleAutoAdvance(currentPage = 0)
+            assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Playing)
+
+            // The leave-route / ON_STOP seam: playback stops outright, never pauses.
+            vm.stopAutoAdvance()
+            assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Idle)
+
+            // A flip whose animation was mid-flight when the user left settles late on
+            // the restored screen: playback must stay idle, not resurrect from it.
+            vm.onPageSettled(previousPage = 0, currentPage = 1)
+            assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Idle)
+
+            // The stopped countdown emits nothing further.
+            assertThat(withTimeoutOrNull(1_500) { vm.advance.first() }).isNull()
+        } finally {
+            settings.setDwellInterval(DwellInterval.DEFAULT_SECONDS)
+        }
         Unit
     }
 

@@ -7,7 +7,10 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -26,9 +30,11 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.BrightnessAuto
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,10 +47,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -53,6 +64,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.BuildConfig
 import com.github.chsiching.worddrill.R
+import com.github.chsiching.worddrill.data.settings.DwellInterval
 import com.github.chsiching.worddrill.data.settings.NavStyle
 import com.github.chsiching.worddrill.data.settings.ThemeMode
 import com.github.chsiching.worddrill.ui.theme.DialogButton
@@ -77,6 +89,7 @@ fun MeScreen(
     val hidePhonetic by settingsViewModel.hidePhonetic.collectAsStateWithLifecycle()
     val navStyle by settingsViewModel.navStyle.collectAsStateWithLifecycle()
     val compactNav by settingsViewModel.compactNav.collectAsStateWithLifecycle()
+    val dwellInterval by settingsViewModel.dwellInterval.collectAsStateWithLifecycle()
     val exportStatus by exportImportViewModel.status.collectAsStateWithLifecycle()
     var showAbout by remember { mutableStateOf(false) }
 
@@ -119,6 +132,11 @@ fun MeScreen(
                 label = stringResource(R.string.me_setting_hide_phonetic),
                 on = hidePhonetic,
                 onToggle = settingsViewModel::setHidePhonetic,
+            )
+            InGroupSeparator()
+            DwellIntervalRow(
+                value = dwellInterval,
+                onValueChange = settingsViewModel::setDwellInterval,
             )
         }
 
@@ -361,6 +379,136 @@ private fun NavStyleRow(current: NavStyle, onClick: () -> Unit) {
             modifier = Modifier.size(18.dp),
         )
     }
+}
+
+/** Test tag on the dwell-interval slider so instrumented tests can locate the control. */
+internal const val DwellSliderTestTag = "dwellIntervalSlider"
+
+/** Value row for the auto-advance dwell interval; tapping expands an inline slider
+ *  inside the same group card. Drags apply instantly - no dialog, no draft. */
+@Composable
+private fun DwellIntervalRow(value: Float, onValueChange: (Float) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 90f else 0f,
+        animationSpec = spring(),
+        label = "dwellChevronRotation",
+    )
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.me_setting_dwell_interval),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = stringResource(R.string.me_setting_dwell_value, value),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(18.dp)
+                    .rotate(chevronRotation),
+            )
+        }
+        if (expanded) {
+            Column(
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 4.dp),
+            ) {
+                DwellSlider(value = value, onValueChange = onValueChange)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = stringResource(R.string.me_setting_dwell_hint_min),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                    Text(
+                        text = stringResource(R.string.me_setting_dwell_hint_max),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.me_setting_dwell_caption),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Custom slider in the app's own control grammar (approved prototype): the 6 dp stats
+ *  progress track (progressTrack base + onSurface fill) with a switch-knob thumb
+ *  (surface fill, hairline border, whisper shadow) that grows slightly while pressed. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DwellSlider(value: Float, onValueChange: (Float) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val thumbScale by animateFloatAsState(
+        targetValue = if (pressed) 1.12f else 1f,
+        animationSpec = spring(),
+        label = "dwellThumbScale",
+    )
+    val shadowColor = Color.Black.copy(alpha = 0.12f)
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        valueRange = DwellInterval.MIN_SECONDS..DwellInterval.MAX_SECONDS,
+        steps = DwellInterval.STEPS_BETWEEN_BOUNDS,
+        interactionSource = interactionSource,
+        thumb = {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .shadow(2.dp, CircleShape, ambientColor = shadowColor, spotColor = shadowColor)
+                    .background(colors.surface, CircleShape)
+                    .border(1.dp, MaterialTheme.wordDrillColors.separatorStrong, CircleShape)
+                    .scale(thumbScale),
+            )
+        },
+        track = { state ->
+            val fraction = (
+                (state.value - DwellInterval.MIN_SECONDS) /
+                    (DwellInterval.MAX_SECONDS - DwellInterval.MIN_SECONDS)
+                ).coerceIn(0f, 1f)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .background(MaterialTheme.wordDrillColors.progressTrack, RoundedCornerShape(3.dp)),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction)
+                        .height(6.dp)
+                        .background(colors.onSurface, RoundedCornerShape(3.dp)),
+                )
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(DwellSliderTestTag),
+    )
 }
 
 private fun nextThemeMode(current: ThemeMode): ThemeMode = when (current) {

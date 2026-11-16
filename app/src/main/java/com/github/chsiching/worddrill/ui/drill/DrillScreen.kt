@@ -1,9 +1,15 @@
 package com.github.chsiching.worddrill.ui.drill
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.Window
+import android.view.WindowManager
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -37,21 +44,84 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.local.WordWithSenses
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 import com.github.chsiching.worddrill.ui.theme.wordDrillTypography
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+
+/** Test tag of the auto-advance dwell hairline at the drill screen's bottom edge. */
+internal const val AutoAdvanceHairlineTag = "auto_advance_hairline"
+
+/** Auto-advance lifecycle integration (#39). The keep-screen-on window flag is held
+ *  exactly while the phase is Playing, and playback stops when this screen leaves
+ *  composition (leaving the drill route, whose nav backstack retains the ViewModel
+ *  across tab switches, so disposal is the leave signal) and on app ON_STOP.
+ *  Re-entering always starts idle. */
+@Composable
+private fun AutoAdvanceLifecycle(isPlaying: Boolean, onStopPlayback: () -> Unit) {
+    val view = LocalView.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val window = view.context.findActivity()?.window
+
+    // Pause, stop, and leave all flip [isPlaying] or dispose the effect, releasing
+    // the flag so the screen may sleep again outside an active session.
+    DisposableEffect(isPlaying) {
+        if (isPlaying) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { releaseKeepScreenOn(window) }
+    }
+
+    DisposableEffect(Unit) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                // Cards must not flip unattended in the background. The flag is
+                // cleared here too: recomposition is frame-driven and frames stop
+                // with the stopped window, so the effect above may not re-run promptly.
+                onStopPlayback()
+                releaseKeepScreenOn(window)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            releaseKeepScreenOn(window)
+            onStopPlayback()
+        }
+    }
+}
+
+/** The keep-screen-on invariant: the flag is held exactly while playing, so every
+ *  exit from an active session — pause/stop recomposition, app ON_STOP, or leaving
+ *  composition — must release it so the screen may sleep again. */
+private fun releaseKeepScreenOn(window: Window?) {
+    window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+}
+
+/** The hosting activity's window, walking ContextWrapper chains (themed contexts). */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 @Composable
 fun DrillScreen(
@@ -62,6 +132,12 @@ fun DrillScreen(
     viewModel: DrillViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val playback by viewModel.playback.collectAsStateWithLifecycle()
+
+    AutoAdvanceLifecycle(
+        isPlaying = playback.phase == AutoAdvancePhase.Playing,
+        onStopPlayback = viewModel::stopAutoAdvance,
+    )
 
     when (val state = uiState) {
         DrillUiState.Loading -> CenterText(stringResource(R.string.drill_loading), modifier)
@@ -82,6 +158,9 @@ fun DrillScreen(
                 onToggleLock = onToggleLock,
                 hidePhonetic = hidePhonetic,
                 modifier = modifier,
+                onToggleAutoAdvance = viewModel::toggleAutoAdvance,
+                playbackState = playback,
+                advance = viewModel.advance,
             )
         }
     }
@@ -100,6 +179,9 @@ internal fun DrillPager(
     onToggleLock: () -> Unit,
     hidePhonetic: Boolean,
     modifier: Modifier = Modifier,
+    onToggleAutoAdvance: (currentPage: Int) -> Unit,
+    playbackState: AutoAdvanceState,
+    advance: Flow<Int>,
 ) {
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { cards.size })
 
@@ -114,30 +196,79 @@ internal fun DrillPager(
             }
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        DrillTopBar(
-            bookName = bookName,
-            index = pagerState.currentPage,
-            total = cards.size,
-            locked = locked,
-            onToggleLock = onToggleLock,
-            isReviewBook = isReviewBook,
-            onAction = { page ->
-                if (isReviewBook) onRestore(page) else onSkip(page)
-            },
-            currentPage = pagerState.currentPage,
-        )
+    // Auto-advance flips execute as programmatic animated scrolls; the settle they
+    // produce flows through the same onPageSettled path as a manual swipe, so swipe
+    // logging and resume writes stay completely unchanged.
+    LaunchedEffect(pagerState, advance) {
+        advance.collect { target -> pagerState.animateScrollToPage(target) }
+    }
 
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-        ) { pageIndex ->
-            WordCard(
-                word = cards[pageIndex],
-                hidePhonetic = hidePhonetic,
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            DrillTopBar(
+                bookName = bookName,
+                index = pagerState.currentPage,
+                total = cards.size,
+                locked = locked,
+                onToggleLock = onToggleLock,
+                isReviewBook = isReviewBook,
+                onAction = { page ->
+                    if (isReviewBook) onRestore(page) else onSkip(page)
+                },
+                currentPage = pagerState.currentPage,
+            )
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    // Double-tap on the card area toggles auto-advance. Single taps
+                    // stay inert, and a tap that turns into a drag cancels here so
+                    // the pager keeps handling the swipe.
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = { onToggleAutoAdvance(pagerState.currentPage) },
+                        )
+                    },
+            ) { pageIndex ->
+                WordCard(
+                    word = cards[pageIndex],
+                    hidePhonetic = hidePhonetic,
+                )
+            }
+        }
+
+        if (playbackState.phase != AutoAdvancePhase.Idle) {
+            AutoAdvanceHairline(
+                elapsedFraction = playbackState.elapsedFraction,
+                modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
     }
+}
+
+/** The dwell hairline: a 2 dp full-width line at the screen's very bottom edge
+ *  (approved prototype `.scratch/proto-auto-advance.html`, `edgeprog`): onSurface at
+ *  55 % opacity filling left-to-right with the elapsed fraction, frozen while paused,
+ *  absent while idle. It renders inside the drill content, so the capsule nav drawn
+ *  later by the navigation root always floats above it. */
+@Composable
+private fun AutoAdvanceHairline(elapsedFraction: Float, modifier: Modifier = Modifier) {
+    val fill = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(2.dp)
+            .testTag(AutoAdvanceHairlineTag)
+            .drawBehind {
+                if (elapsedFraction > 0f) {
+                    drawRect(
+                        color = fill,
+                        size = Size(size.width * elapsedFraction, size.height),
+                    )
+                }
+            },
+    )
 }
 
 @Composable

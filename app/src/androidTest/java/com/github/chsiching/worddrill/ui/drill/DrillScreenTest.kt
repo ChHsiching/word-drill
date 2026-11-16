@@ -23,6 +23,7 @@ import com.github.chsiching.worddrill.data.local.entity.Word
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -91,6 +92,9 @@ class DrillScreenTest {
                         locked = locked,
                         onToggleLock = {},
                         hidePhonetic = false,
+                        onToggleAutoAdvance = { },
+                        playbackState = AutoAdvanceState(),
+                        advance = emptyFlow(),
                     )
                 }
             }
@@ -187,6 +191,9 @@ class DrillScreenTest {
                         locked = false,
                         onToggleLock = {},
                         hidePhonetic = false,
+                        onToggleAutoAdvance = { },
+                        playbackState = AutoAdvanceState(),
+                        advance = emptyFlow(),
                     )
                 }
             }

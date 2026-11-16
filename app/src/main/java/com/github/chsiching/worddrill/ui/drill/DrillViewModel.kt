@@ -12,12 +12,16 @@ import com.github.chsiching.worddrill.data.local.dao.SwipeLogDao
 import com.github.chsiching.worddrill.data.local.dao.WordDao
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.SwipeLog
+import com.github.chsiching.worddrill.data.settings.DwellInterval
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -47,6 +51,20 @@ class DrillViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<DrillUiState>(DrillUiState.Loading)
     val uiState: StateFlow<DrillUiState> = _uiState.asStateFlow()
 
+    /** Auto-advance playback machine (GLOSSARY.md): the countdown lives here, owned by
+     *  the ViewModel, so virtual-time JVM tests can drive it; the screen only executes
+     *  advance commands and renders the hairline from the exposed state. */
+    private val autoAdvance = AutoAdvance(viewModelScope) {
+        (DwellInterval.normalize(settings.dwellInterval.first()) * 1000).toLong()
+    }
+
+    /** Playback phase plus the current card's elapsed fraction for the hairline. */
+    val playback: StateFlow<AutoAdvanceState> = autoAdvance.state
+
+    /** Pages the screen should animate to; each flip's settle flows through
+     *  [onPageSettled] unchanged, so swipe logging and resume writes are shared. */
+    val advance: Flow<Int> = autoAdvance.advance
+
     private var currentBookId: Long? = null
 
     init {
@@ -54,7 +72,17 @@ class DrillViewModel @Inject constructor(
             // Reload on either input. Deleting the current book in the Library does
             // not change the recorded id, so observing the id alone would strand the
             // drill tab on the deleted book's last state.
-            combine(settings.currentBookId, bookDao.observeAll()) { recorded, _ -> recorded }
+            // distinctUntilChanged per source, never after the combine: DataStore's
+            // .data re-emits on every edit of any key, so without it each unrelated
+            // write (dwell, and every settle's resume write) would re-fire loadBookFor,
+            // whose setReady stops playback and drains pending advance commands —
+            // auto-advance would die after its first flip. After the combine a real
+            // book-table change must still reload even when the recorded id is
+            // unchanged, so only the sources are de-duplicated.
+            combine(
+                settings.currentBookId.distinctUntilChanged(),
+                bookDao.observeAll().distinctUntilChanged(),
+            ) { recorded, _ -> recorded }
                 .collect { recorded -> loadBookFor(recorded) }
         }
     }
@@ -82,6 +110,9 @@ class DrillViewModel @Inject constructor(
             .firstOrNull { it != null }
 
     private suspend fun setReady(bookId: Long, bookName: String) {
+        // Loading a (possibly different) book always starts playback idle: the deck
+        // context the countdown belonged to is gone.
+        autoAdvance.stop()
         currentBookId = bookId
         val cards = wordDao.getWordsWithSensesByBook(bookId)
         if (cards.isEmpty()) {
@@ -103,9 +134,26 @@ class DrillViewModel @Inject constructor(
         )
     }
 
+    /** Double-tap on the card area: start auto-advance, pause it, or resume it. */
+    fun toggleAutoAdvance(currentPage: Int) {
+        val ready = _uiState.value as? DrillUiState.Ready ?: return
+        autoAdvance.toggle(currentPage, ready.cards.size)
+    }
+
+    /** Stops playback outright (never pauses): the drill screen calls this when its
+     *  composition goes away (leaving the drill route — the backstack retains this
+     *  ViewModel across tab switches, so disposal is the leave signal) and on app
+     *  ON_STOP. Re-entering the drill screen always starts idle. */
+    fun stopAutoAdvance() {
+        autoAdvance.stop()
+    }
+
     fun onPageSettled(previousPage: Int, currentPage: Int) {
         val bookId = currentBookId ?: return
         val ready = _uiState.value as? DrillUiState.Ready ?: return
+        // Every settle repositions playback (manual swipe or auto flip) without
+        // pausing; the logging and resume writes below are the untouched settle path.
+        autoAdvance.reposition(currentPage, ready.cards.size)
         // The settled card is this book's resume position, saved on every settle; the
         // pager's settledPage flow already de-duplicates emissions.
         val settledWordId = ready.cards.getOrNull(currentPage)?.word?.wordId
@@ -154,13 +202,17 @@ class DrillViewModel @Inject constructor(
     private suspend fun reloadCards(bookId: Long, ready: DrillUiState.Ready, currentPage: Int) {
         val cards = wordDao.getWordsWithSensesByBook(bookId)
         if (cards.isEmpty()) {
+            autoAdvance.stop()
             _uiState.value = DrillUiState.Empty
         } else {
+            // Skip/restore swapped the word under the pager: playback continues on the
+            // new current card with a fresh countdown, never pausing.
+            val page = currentPage.coerceAtMost(cards.size - 1)
+            autoAdvance.reposition(page, cards.size)
             // The acted-on word left the deck, so the card now at the clamped page is
             // the new current card and the resume point. Saving it here (not via a
             // settle event) is deliberate: a middle-page skip shrinks the deck without
             // moving the pager, so no settle fires.
-            val page = currentPage.coerceAtMost(cards.size - 1)
             _uiState.value = ready.copy(cards = cards, initialPageIndex = page)
             settings.setResumeWordId(bookId, cards[page].word.wordId)
         }
