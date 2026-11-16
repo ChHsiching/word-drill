@@ -3,6 +3,7 @@ package com.github.chsiching.worddrill.ui.drill
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.view.Window
 import android.view.WindowManager
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -66,7 +67,6 @@ import com.github.chsiching.worddrill.ui.theme.wordDrillTypography
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
 /** Test tag of the auto-advance dwell hairline at the drill screen's bottom edge. */
@@ -87,7 +87,7 @@ private fun AutoAdvanceLifecycle(isPlaying: Boolean, onStopPlayback: () -> Unit)
     // the flag so the screen may sleep again outside an active session.
     DisposableEffect(isPlaying) {
         if (isPlaying) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+        onDispose { releaseKeepScreenOn(window) }
     }
 
     DisposableEffect(Unit) {
@@ -97,16 +97,23 @@ private fun AutoAdvanceLifecycle(isPlaying: Boolean, onStopPlayback: () -> Unit)
                 // cleared here too: recomposition is frame-driven and frames stop
                 // with the stopped window, so the effect above may not re-run promptly.
                 onStopPlayback()
-                window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                releaseKeepScreenOn(window)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            releaseKeepScreenOn(window)
             onStopPlayback()
         }
     }
+}
+
+/** The keep-screen-on invariant: the flag is held exactly while playing, so every
+ *  exit from an active session — pause/stop recomposition, app ON_STOP, or leaving
+ *  composition — must release it so the screen may sleep again. */
+private fun releaseKeepScreenOn(window: Window?) {
+    window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 }
 
 /** The hosting activity's window, walking ContextWrapper chains (themed contexts). */
@@ -172,9 +179,9 @@ internal fun DrillPager(
     onToggleLock: () -> Unit,
     hidePhonetic: Boolean,
     modifier: Modifier = Modifier,
-    onToggleAutoAdvance: (currentPage: Int) -> Unit = {},
-    playbackState: AutoAdvanceState = AutoAdvanceState(),
-    advance: Flow<Int> = emptyFlow(),
+    onToggleAutoAdvance: (currentPage: Int) -> Unit,
+    playbackState: AutoAdvanceState,
+    advance: Flow<Int>,
 ) {
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { cards.size })
 
