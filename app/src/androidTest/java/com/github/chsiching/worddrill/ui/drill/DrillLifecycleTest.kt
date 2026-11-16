@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.doubleClick
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -162,5 +163,39 @@ class DrillLifecycleTest {
         assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Paused)
         assertThat(keepScreenOnHeld()).isFalse()
         composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertIsDisplayed()
+    }
+
+    @Test
+    fun appOnStop_stopsPlayback_foregroundingDoesNotResume() {
+        val vm = runBlocking { seedViewModel(939_102L, "后台词书", "apple", "balance") }
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillScreen(viewModel = vm)
+                }
+            }
+        }
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("apple").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithText("apple").performTouchInput { doubleClick() }
+        composeRule.waitForIdle()
+        assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Playing)
+        assertThat(keepScreenOnHeld()).isTrue()
+
+        // Backgrounding the app (ON_STOP, activity still alive): cards must not flip
+        // unattended, and the keep-awake flag goes with the playback that held it.
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Idle)
+        assertThat(keepScreenOnHeld()).isFalse()
+
+        // Foregrounding never resumes playback; the screen returns idle.
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("apple").fetchSemanticsNodes().isNotEmpty()
+        }
+        assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Idle)
+        composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertDoesNotExist()
     }
 }
