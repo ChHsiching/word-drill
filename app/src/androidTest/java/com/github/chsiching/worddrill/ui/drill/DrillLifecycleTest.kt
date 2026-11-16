@@ -8,8 +8,10 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.doubleClick
 import androidx.lifecycle.Lifecycle
@@ -249,5 +251,48 @@ class DrillLifecycleTest {
         assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Idle)
         composeRule.onNodeWithText("1 / 1").assertIsDisplayed()
         assertThat(keepScreenOnHeld()).isFalse()
+    }
+
+    @Test
+    fun lockingDuringPlayback_changesNothingAboutPlaybackHairlineOrDoubleTap() {
+        val vm = runBlocking { seedViewModel(939_106L, "锁定词书", "apple", "balance", "circle") }
+        val locked = mutableStateOf(false)
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillScreen(
+                        locked = locked.value,
+                        onToggleLock = { locked.value = !locked.value },
+                        viewModel = vm,
+                    )
+                }
+            }
+        }
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("apple").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithText("apple").performTouchInput { doubleClick() }
+        composeRule.waitForIdle()
+        assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Playing)
+
+        // Hiding the navigation mid-playback is a pure immersion toggle: playback
+        // and the hairline are untouched.
+        composeRule.onNodeWithContentDescription("锁定").performClick()
+        composeRule.waitForIdle()
+        assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Playing)
+        composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertIsDisplayed()
+
+        // The double-tap gesture still works with the navigation hidden.
+        composeRule.onNodeWithText("apple").performTouchInput { doubleClick() }
+        composeRule.waitForIdle()
+        assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Paused)
+        composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertIsDisplayed()
+
+        // Unlocking changes nothing about playback either.
+        composeRule.onNodeWithContentDescription("解锁").performClick()
+        composeRule.waitForIdle()
+        assertThat(vm.playback.value.phase).isEqualTo(AutoAdvancePhase.Paused)
+        composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertIsDisplayed()
     }
 }
