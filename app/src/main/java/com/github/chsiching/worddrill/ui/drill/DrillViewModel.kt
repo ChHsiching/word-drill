@@ -29,7 +29,13 @@ import javax.inject.Inject
 
 sealed interface DrillUiState {
     data object Loading : DrillUiState
-    data object Empty : DrillUiState
+
+    /** The deck has no cards. The header still renders (book name, 0 / 0 counter,
+     *  action label, lock), so the state carries the book identity. */
+    data class Empty(
+        val bookName: String = "",
+        val isReviewBook: Boolean = false,
+    ) : DrillUiState
     data class Ready(
         val bookId: Long,
         val bookName: String,
@@ -92,7 +98,7 @@ class DrillViewModel @Inject constructor(
             ?: defaultBookOrNull()?.also { settings.setCurrentBookId(it.bookId) }
 
         if (book == null) {
-            _uiState.value = DrillUiState.Empty
+            _uiState.value = DrillUiState.Empty()
             return
         }
         setReady(book.bookId, book.name)
@@ -116,7 +122,10 @@ class DrillViewModel @Inject constructor(
         currentBookId = bookId
         val cards = wordDao.getWordsWithSensesByBook(bookId)
         if (cards.isEmpty()) {
-            _uiState.value = DrillUiState.Empty
+            _uiState.value = DrillUiState.Empty(
+                bookName = bookName,
+                isReviewBook = bookName == REVIEW_BOOK_NAME,
+            )
             return
         }
         // Resolve the saved word id to a deck index here, never at save time: skipping
@@ -203,7 +212,10 @@ class DrillViewModel @Inject constructor(
         val cards = wordDao.getWordsWithSensesByBook(bookId)
         if (cards.isEmpty()) {
             autoAdvance.stop()
-            _uiState.value = DrillUiState.Empty
+            _uiState.value = DrillUiState.Empty(
+                bookName = ready.bookName,
+                isReviewBook = ready.isReviewBook,
+            )
         } else {
             // Skip/restore swapped the word under the pager: playback continues on the
             // new current card with a fresh countdown, never pausing.

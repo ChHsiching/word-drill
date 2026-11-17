@@ -141,7 +141,32 @@ fun DrillScreen(
 
     when (val state = uiState) {
         DrillUiState.Loading -> CenterText(stringResource(R.string.drill_loading), modifier)
-        DrillUiState.Empty -> CenterText(stringResource(R.string.drill_empty), modifier)
+        // The empty deck keeps the header (book name, 0 / 0, action label, lock) with
+        // the centered message below it; skip/restore stay inert because the
+        // ViewModel guards them on the Ready state.
+        is DrillUiState.Empty -> Column(modifier = modifier.fillMaxSize()) {
+            DrillTopBar(
+                bookName = state.bookName,
+                counter = "0 / 0",
+                locked = locked,
+                onToggleLock = onToggleLock,
+                isReviewBook = state.isReviewBook,
+                onAction = {
+                    if (state.isReviewBook) {
+                        viewModel.restoreCurrentWord(0)
+                    } else {
+                        viewModel.skipCurrentWord(0)
+                    }
+                },
+            )
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = stringResource(R.string.drill_empty),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
         // Keyed on the book id so switching books rebuilds the pager at the new book's
         // resume position; within one book the pager state (and the user's page)
         // survives deck reloads from skip/restore.
@@ -207,15 +232,13 @@ internal fun DrillPager(
         Column(modifier = Modifier.fillMaxSize()) {
             DrillTopBar(
                 bookName = bookName,
-                index = pagerState.currentPage,
-                total = cards.size,
+                counter = "${pagerState.currentPage + 1} / ${cards.size}",
                 locked = locked,
                 onToggleLock = onToggleLock,
                 isReviewBook = isReviewBook,
-                onAction = { page ->
-                    if (isReviewBook) onRestore(page) else onSkip(page)
+                onAction = {
+                    if (isReviewBook) onRestore(pagerState.currentPage) else onSkip(pagerState.currentPage)
                 },
-                currentPage = pagerState.currentPage,
             )
 
             HorizontalPager(
@@ -274,13 +297,11 @@ private fun AutoAdvanceHairline(elapsedFraction: Float, modifier: Modifier = Mod
 @Composable
 private fun DrillTopBar(
     bookName: String,
-    index: Int,
-    total: Int,
+    counter: String,
     locked: Boolean,
     onToggleLock: () -> Unit,
     isReviewBook: Boolean,
-    onAction: (currentPage: Int) -> Unit,
-    currentPage: Int,
+    onAction: () -> Unit,
 ) {
     val actionLabel = if (isReviewBook) R.string.drill_restore else R.string.drill_skip
     Box(
@@ -319,7 +340,7 @@ private fun DrillTopBar(
                         .clickable(
                             interactionSource = actionInteraction,
                             indication = null,
-                            onClick = { onAction(currentPage) },
+                            onClick = onAction,
                         )
                         .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
                 )
@@ -328,7 +349,7 @@ private fun DrillTopBar(
             }
         }
         Text(
-            text = "${index + 1} / $total",
+            text = counter,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelSmall,
         )

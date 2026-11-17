@@ -252,4 +252,54 @@ class DrillScreenTest {
             settings = settings,
         )
     }
+
+    @Test
+    fun emptyDeck_keepsTopBarWithBookNameCounterActionAndEmptyMessage() {
+        // An emptied deck (empty custom book or emptied review book) must keep the
+        // drill header — book name, "0 / 0" counter, action label, lock — instead of
+        // replacing the whole screen with the centered empty message.
+        val vm = runBlocking { seedEmptyBookAndCreateViewModel() }
+        try {
+            composeRule.setContent {
+                WordDrillTheme {
+                    Surface {
+                        DrillScreen(viewModel = vm)
+                    }
+                }
+            }
+            composeRule.waitUntil(10_000L) {
+                composeRule.onAllNodesWithText("0 / 0").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithText("空词书").assertIsDisplayed()
+            composeRule.onNodeWithText("0 / 0").assertIsDisplayed()
+            composeRule.onNodeWithText("跳过").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("锁定").assertIsDisplayed()
+            composeRule.onNodeWithText("这个词书是空的").assertIsDisplayed()
+
+            // Skip is guarded on an empty deck: tapping it keeps the empty view.
+            composeRule.onNodeWithText("跳过").performClick()
+            composeRule.waitForIdle()
+            composeRule.onNodeWithText("这个词书是空的").assertIsDisplayed()
+        } finally {
+            vm.viewModelScope.cancel()
+        }
+    }
+
+    /** The selected book with no words, so the drill lands on the Empty state. The
+     *  book id is explicit and in this test's own range: the current-book key lives in
+     *  the process-wide DataStore while the in-memory database resets per test. */
+    private suspend fun seedEmptyBookAndCreateViewModel(): DrillViewModel {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val settings = SettingsRepository(context)
+        val bookId = 934_502L
+        db.bookDao().insert(Book(bookId = bookId, name = "空词书", isPreset = false))
+        settings.setCurrentBookId(bookId)
+        return DrillViewModel(
+            db = db,
+            bookDao = db.bookDao(),
+            wordDao = db.wordDao(),
+            swipeLogDao = db.swipeLogDao(),
+            settings = settings,
+        )
+    }
 }
