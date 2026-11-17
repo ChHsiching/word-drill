@@ -2,10 +2,13 @@ package com.github.chsiching.worddrill.ui.library
 
 import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -125,6 +128,16 @@ class LibraryScreenTest {
     fun importButton_isDisplayed() {
         setContent()
         composeRule.onNodeWithText("从文件导入").assertIsDisplayed()
+    }
+
+    @Test
+    fun createDialog_confirmDisabledUntilNameEntered() {
+        setContent()
+        composeRule.onNodeWithText("新建词书").performClick()
+        composeRule.onNodeWithText("确定").assertIsNotEnabled()
+        composeRule.onNode(hasText("词书名称")).performTextInput("X")
+        composeRule.onNodeWithText("确定").assertIsEnabled()
+        composeRule.onNodeWithText("取消").performClick()
     }
 
     @Test
