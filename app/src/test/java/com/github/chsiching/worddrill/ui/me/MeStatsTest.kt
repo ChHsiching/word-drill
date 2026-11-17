@@ -9,29 +9,45 @@ class MeStatsTest {
 
     @Test
     fun progressPercent_normalRatio() {
-        assertThat(MeStats.progressPercent(brushed = 1, total = 4)).isEqualTo(25)
-        assertThat(MeStats.progressPercent(brushed = 3, total = 4)).isEqualTo(75)
+        assertThat(MeStats.progressPercent(brushed = 1, total = 4)).isEqualTo(25.0)
+        assertThat(MeStats.progressPercent(brushed = 3, total = 4)).isEqualTo(75.0)
     }
 
     @Test
     fun progressPercent_full() {
-        assertThat(MeStats.progressPercent(brushed = 10, total = 10)).isEqualTo(100)
+        assertThat(MeStats.progressPercent(brushed = 10, total = 10)).isEqualTo(100.0)
     }
 
     @Test
-    fun progressPercent_zeroDenominator_returnsZero_notCrash() {
-        assertThat(MeStats.progressPercent(brushed = 0, total = 0)).isEqualTo(0)
-        assertThat(MeStats.progressPercent(brushed = 3, total = 0)).isEqualTo(0)
+    fun progressPercent_emptyDeck_brushedWordsCountAsComplete() {
+        // A deck emptied by skipping every word is finished, not reset to zero.
+        assertThat(MeStats.progressPercent(brushed = 3, total = 0)).isEqualTo(100.0)
     }
 
     @Test
-    fun progressPercent_truncatesNotRounds() {
-        assertThat(MeStats.progressPercent(brushed = 1, total = 3)).isEqualTo(33)
+    fun progressPercent_noWordsNoBrushes_returnsZero_notCrash() {
+        assertThat(MeStats.progressPercent(brushed = 0, total = 0)).isEqualTo(0.0)
+    }
+
+    @Test
+    fun formatPercent_oneDecimalWithinBounds() {
+        assertThat(MeStats.formatPercent(MeStats.progressPercent(brushed = 1, total = 1000))).isEqualTo("0.1%")
+        assertThat(MeStats.formatPercent(MeStats.progressPercent(brushed = 3, total = 1000))).isEqualTo("0.3%")
+        assertThat(MeStats.formatPercent(MeStats.progressPercent(brushed = 1, total = 8))).isEqualTo("12.5%")
+        assertThat(MeStats.formatPercent(MeStats.progressPercent(brushed = 1, total = 3))).isEqualTo("33.3%")
+    }
+
+    @Test
+    fun formatPercent_exactBounds_renderAsIntegers() {
+        assertThat(MeStats.formatPercent(MeStats.progressPercent(brushed = 0, total = 3))).isEqualTo("0%")
+        assertThat(MeStats.formatPercent(MeStats.progressPercent(brushed = 3, total = 3))).isEqualTo("100%")
+        assertThat(MeStats.formatPercent(MeStats.progressPercent(brushed = 3, total = 0))).isEqualTo("100%")
+        assertThat(MeStats.formatPercent(MeStats.progressPercent(brushed = 0, total = 0))).isEqualTo("0%")
     }
 
     @Test
     fun progressPercent_defensiveAgainstOverflow() {
-        assertThat(MeStats.progressPercent(brushed = 1_000_000, total = 4_000_000)).isEqualTo(25)
+        assertThat(MeStats.progressPercent(brushed = 1_000_000, total = 4_000_000)).isEqualTo(25.0)
     }
 
     @Test

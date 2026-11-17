@@ -23,7 +23,7 @@ data class MeStatsUiState(
     val bookName: String = "",
     val brushed: Int = 0,
     val total: Int = 0,
-    val percent: Int = 0,
+    val percent: Double = 0.0,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)

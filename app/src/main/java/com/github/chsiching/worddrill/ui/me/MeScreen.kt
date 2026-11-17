@@ -248,12 +248,12 @@ private fun ProgressBar(
     bookName: String,
     done: Int,
     total: Int,
-    percent: Int,
+    percent: Double,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
     val animatedFraction by animateFloatAsState(
-        targetValue = (percent / 100f).coerceIn(0f, 1f),
+        targetValue = (percent / 100.0).toFloat().coerceIn(0f, 1f),
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow,
@@ -292,7 +292,7 @@ private fun ProgressBar(
             )
         }
         Text(
-            text = "$percent%",
+            text = MeStats.formatPercent(percent),
             style = MaterialTheme.typography.labelSmall,
             color = colors.onSurfaceVariant,
             textAlign = TextAlign.End,
