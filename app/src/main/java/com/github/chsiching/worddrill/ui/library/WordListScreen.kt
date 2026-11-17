@@ -96,7 +96,9 @@ fun WordListScreen(
             state.words.isEmpty() -> EmptyState(if (readOnly) stringResource(R.string.word_list_preset_readonly) else state.bookName)
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
+                // Same bottom inset as the Library so the floating capsule nav
+                // cannot cover the last entries when scrolled to the end.
+                contentPadding = PaddingValues(start = 24.dp, top = 8.dp, end = 24.dp, bottom = 120.dp),
             ) {
                 items(state.words, key = { it.word.wordId }) { wordWithSenses ->
                     WordRow(
@@ -347,14 +349,14 @@ private fun DeleteWordDialog(
         message = stringResource(R.string.word_list_delete_message, wordText),
         buttons = {
             DialogButton(
-                text = stringResource(R.string.word_list_delete_confirm),
-                onClick = onConfirm,
-                style = DialogButtonStyle.Destructive,
-            )
-            DialogButton(
                 text = stringResource(R.string.library_cancel),
                 onClick = onDismiss,
                 style = DialogButtonStyle.Cancel,
+            )
+            DialogButton(
+                text = stringResource(R.string.word_list_delete_confirm),
+                onClick = onConfirm,
+                style = DialogButtonStyle.Destructive,
             )
         },
     )

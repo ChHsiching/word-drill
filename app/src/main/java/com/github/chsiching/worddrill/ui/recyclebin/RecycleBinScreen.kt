@@ -239,14 +239,14 @@ private fun PurgeConfirmDialog(
         message = stringResource(R.string.recycle_bin_purge_message, displayName),
         buttons = {
             DialogButton(
-                text = stringResource(R.string.recycle_bin_purge_confirm),
-                onClick = onConfirm,
-                style = DialogButtonStyle.Destructive,
-            )
-            DialogButton(
                 text = stringResource(R.string.library_cancel),
                 onClick = onDismiss,
                 style = DialogButtonStyle.Cancel,
+            )
+            DialogButton(
+                text = stringResource(R.string.recycle_bin_purge_confirm),
+                onClick = onConfirm,
+                style = DialogButtonStyle.Destructive,
             )
         },
     )
