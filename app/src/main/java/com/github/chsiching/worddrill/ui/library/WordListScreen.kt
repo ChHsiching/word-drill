@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -80,13 +81,26 @@ fun WordListScreen(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                if (!readOnly) {
-                    IconButton(onClick = viewModel::openAddDialog) {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.word_list_add),
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!readOnly) {
+                        IconButton(onClick = viewModel::openAddDialog) {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = stringResource(R.string.word_list_add),
+                                tint = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                    // Reset makes no sense for the 复习 book: it holds no skipped
+                    // words of its own, so there is no progress to reset.
+                    if (!state.isReviewBook) {
+                        IconButton(onClick = viewModel::openResetDialog) {
+                            Icon(
+                                imageVector = Icons.Outlined.RestartAlt,
+                                contentDescription = stringResource(R.string.word_list_reset),
+                                tint = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
                     }
                 }
             }
@@ -144,6 +158,11 @@ fun WordListScreen(
         is WordListDialog.Delete -> DeleteWordDialog(
             wordText = dialog.wordText,
             onConfirm = viewModel::submitDelete,
+            onDismiss = viewModel::dismissDialog,
+        )
+        WordListDialog.Reset -> ResetProgressDialog(
+            bookName = state.bookName,
+            onConfirm = viewModel::submitReset,
             onDismiss = viewModel::dismissDialog,
         )
     }
@@ -355,6 +374,31 @@ private fun DeleteWordDialog(
             )
             DialogButton(
                 text = stringResource(R.string.word_list_delete_confirm),
+                onClick = onConfirm,
+                style = DialogButtonStyle.Destructive,
+            )
+        },
+    )
+}
+
+@Composable
+private fun ResetProgressDialog(
+    bookName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    WordDrillDialog(
+        onDismissRequest = onDismiss,
+        title = stringResource(R.string.word_list_reset_title),
+        message = stringResource(R.string.word_list_reset_message, bookName),
+        buttons = {
+            DialogButton(
+                text = stringResource(R.string.library_cancel),
+                onClick = onDismiss,
+                style = DialogButtonStyle.Cancel,
+            )
+            DialogButton(
+                text = stringResource(R.string.word_list_reset_confirm),
                 onClick = onConfirm,
                 style = DialogButtonStyle.Destructive,
             )

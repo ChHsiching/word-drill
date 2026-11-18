@@ -5,9 +5,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
+import com.github.chsiching.worddrill.data.ProgressResetter
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.WordWithSenses
 import com.github.chsiching.worddrill.data.local.dao.BookDao
+import com.github.chsiching.worddrill.data.local.dao.REVIEW_BOOK_NAME
 import com.github.chsiching.worddrill.data.local.dao.DictionaryDao
 import com.github.chsiching.worddrill.data.local.dao.WordDao
 import com.github.chsiching.worddrill.data.local.entity.BookWord
@@ -52,11 +54,13 @@ sealed interface WordListDialog {
     ) : WordListDialog
 
     data class Delete(val wordId: Long, val wordText: String) : WordListDialog
+    data object Reset : WordListDialog
 }
 
 data class WordListUiState(
     val bookName: String = "",
     val isPreset: Boolean = false,
+    val isReviewBook: Boolean = false,
     val words: List<WordWithSenses> = emptyList(),
     val dialog: WordListDialog = WordListDialog.None,
 )
@@ -68,6 +72,7 @@ class WordListViewModel @Inject constructor(
     private val wordDao: WordDao,
     private val bookDao: BookDao,
     private val dictionaryDao: DictionaryDao,
+    private val progressResetter: ProgressResetter,
 ) : ViewModel() {
 
     private val bookId: Long = checkNotNull(savedStateHandle.get<String>("bookId")?.toLongOrNull()) {
@@ -79,6 +84,7 @@ class WordListViewModel @Inject constructor(
 
     private val _bookName = MutableStateFlow("")
     private val _isPreset = MutableStateFlow(false)
+    private val _isReviewBook = MutableStateFlow(false)
 
     private var dictLookupJob: Job? = null
 
@@ -88,6 +94,7 @@ class WordListViewModel @Inject constructor(
             if (book != null) {
                 _bookName.value = book.name
                 _isPreset.value = book.isPreset
+                _isReviewBook.value = book.name == REVIEW_BOOK_NAME
             }
         }
     }
@@ -96,11 +103,13 @@ class WordListViewModel @Inject constructor(
         wordDao.observeWordsWithSensesByBook(bookId),
         _bookName,
         _isPreset,
+        _isReviewBook,
         _dialog,
-    ) { words, bookName, isPreset, dialog ->
+    ) { words, bookName, isPreset, isReviewBook, dialog ->
         WordListUiState(
             bookName = bookName,
             isPreset = isPreset,
+            isReviewBook = isReviewBook,
             words = words,
             dialog = dialog,
         )
@@ -208,6 +217,20 @@ class WordListViewModel @Inject constructor(
         val d = _dialog.value as? WordListDialog.Delete ?: return
         viewModelScope.launch {
             bookDao.setDeleted(bookId, d.wordId, deleted = true)
+            _dialog.value = WordListDialog.None
+        }
+    }
+
+    /** Progress reset (GLOSSARY.md), first entry point (#52): the reusable engine
+     *  restores the deck, clears the resume position and trims the review book. */
+    fun openResetDialog() {
+        _dialog.value = WordListDialog.Reset
+    }
+
+    fun submitReset() {
+        if (_dialog.value !is WordListDialog.Reset) return
+        viewModelScope.launch {
+            progressResetter.reset(bookId)
             _dialog.value = WordListDialog.None
         }
     }

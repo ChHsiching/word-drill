@@ -70,6 +70,12 @@ class WordListScreenTest {
             wordDao = db.wordDao(),
             bookDao = db.bookDao(),
             dictionaryDao = db.dictionaryDao(),
+            progressResetter = com.github.chsiching.worddrill.data.ProgressResetter(
+                db, db.bookDao(),
+                com.github.chsiching.worddrill.data.settings.SettingsRepository(
+                    ApplicationProvider.getApplicationContext()
+                ),
+            ),
         )
         composeRule.setContent {
             WordDrillTheme {

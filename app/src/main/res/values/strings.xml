@@ -29,6 +29,10 @@
     <string name="word_list_delete_title">删除词条</string>
     <string name="word_list_delete_message">确定删除「%1$s」？可从回收站恢复。</string>
     <string name="word_list_delete_confirm">删除</string>
+    <string name="word_list_reset">重置进度</string>
+    <string name="word_list_reset_title">重置进度</string>
+    <string name="word_list_reset_message">确定重置「%1$s」的进度？将回到第一张卡片，跳过的单词全部回到牌组并从复习移除；刷卡记录和统计保留。</string>
+    <string name="word_list_reset_confirm">重置</string>
     <string name="recycle_bin_title">回收站</string>
     <string name="recycle_bin_section_books">词书</string>
     <string name="recycle_bin_section_entries">词条</string>
