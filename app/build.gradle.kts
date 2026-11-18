@@ -1,8 +1,45 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+}
+
+// Release signing. Sources, highest precedence first:
+//   1. RELEASE_KEYSTORE / RELEASE_KEYSTORE_PASSWORD / RELEASE_KEY_ALIAS /
+//      RELEASE_KEY_PASSWORD environment variables (GitHub Actions).
+//   2. signing.properties in the repo root, gitignored (local builds):
+//      keystore.file / keystore.password / key.alias / key.password.
+// With none of these set, assembleRelease produces an unsigned APK so CI on
+// fork PRs can still exercise the release build.
+val releaseSigning = run {
+    val props = Properties()
+    val propsFile = rootProject.file("signing.properties")
+    if (propsFile.exists()) propsFile.inputStream().use { props.load(it) }
+
+    fun value(envVar: String, key: String): String? =
+        providers.environmentVariable(envVar).orNull?.takeIf { it.isNotBlank() }
+            ?: props.getProperty(key)?.takeIf { it.isNotBlank() }
+
+    listOf(
+        value("RELEASE_KEYSTORE", "keystore.file"),
+        value("RELEASE_KEYSTORE_PASSWORD", "keystore.password"),
+        value("RELEASE_KEY_ALIAS", "key.alias"),
+        value("RELEASE_KEY_PASSWORD", "key.password")
+    )
+}
+when (releaseSigning.count { it != null }) {
+    0 -> {} // no credentials configured: unsigned release build
+    4 -> require(file(releaseSigning[0]!!).isFile) {
+        "Release signing: keystore file not found: ${releaseSigning[0]}"
+    }
+    else -> throw GradleException(
+        "Release signing is partially configured. Set all of RELEASE_KEYSTORE, " +
+            "RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD " +
+            "(or all four signing.properties keys), or none to build unsigned."
+    )
 }
 
 android {
@@ -19,6 +56,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    if (releaseSigning[0] != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(releaseSigning[0]!!)
+                storePassword = releaseSigning[1]
+                keyAlias = releaseSigning[2]
+                keyPassword = releaseSigning[3]
+                // keytool -printcert -jarfile only reads v1 (JAR) signatures;
+                // keep v1 enabled so the certificate stays inspectable that way.
+                enableV1Signing = true
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
@@ -29,6 +80,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (releaseSigning[0] != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
