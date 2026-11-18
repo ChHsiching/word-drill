@@ -83,6 +83,12 @@ class SettingsRepository @Inject constructor(
         context.appDataStore.edit { it[resumeWordKey(bookId)] = wordId }
     }
 
+    /** Progress reset: removing the key makes the book open at its first card
+     *  (the drill falls back to index 0 when no resume word is recorded). */
+    suspend fun clearResumeWordId(bookId: Long) {
+        context.appDataStore.edit { it.remove(resumeWordKey(bookId)) }
+    }
+
     val themePreference: Flow<ThemeMode> =
         context.appDataStore.data.map { ThemeMode.fromStorageName(it[themeKey]) }
 

@@ -164,8 +164,9 @@ fun DrillScreen(
         }
         // Keyed on the book id so switching books rebuilds the pager at the new book's
         // resume position; within one book the pager state (and the user's page)
-        // survives deck reloads from skip/restore.
-        is DrillUiState.Ready -> key(state.bookId) {
+        // survives deck reloads from skip/restore. deckGeneration only advances on a
+        // progress reset, which rebuilds the pager at the restored first card.
+        is DrillUiState.Ready -> key(state.bookId, state.deckGeneration) {
             DrillPager(
                 bookName = state.bookName,
                 cards = state.cards,
