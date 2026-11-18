@@ -18,7 +18,6 @@ import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
-import com.github.chsiching.worddrill.data.local.entity.Word
 import com.github.chsiching.worddrill.data.settings.DeckOrdering
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
 import com.google.common.truth.Truth.assertThat
@@ -62,7 +61,10 @@ class WordListScreenTest {
 
     private fun seedOneWord(bookId: Long, text: String, pos: String, meaning: String) =
         runBlocking {
-            val wId = db.wordDao().insert(Word(text = text))
+            // Reuse an existing word row: text is UNIQUE and a plain insert would
+            // conflict-IGNORE to -1, breaking the sense's foreign key (#60 tests
+            // seed "apple" on top of setUp's).
+            val wId = db.wordDao().findOrInsertWord(text, null)
             db.wordDao().insertSense(Sense(wordId = wId, pos = pos, meaning = meaning))
             db.bookDao().linkBookWord(BookWord(bookId, wId))
             Unit
