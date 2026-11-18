@@ -102,6 +102,7 @@ class DeckOrderingFlowTest {
             wordDao = db.wordDao(),
             bookDao = db.bookDao(),
             dictionaryDao = db.dictionaryDao(),
+            settings = settings,
             progressResetter = resetter,
             deckSequence = deckSequence,
         ).also { wordList = it }

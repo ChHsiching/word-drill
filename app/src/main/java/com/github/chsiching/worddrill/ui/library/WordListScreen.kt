@@ -111,6 +111,22 @@ fun WordListScreen(
             }
         }
 
+        // Progress header (issue #60): completion count, resume position, deck size.
+        // Lives above the search bar — it describes the book, not the filtered view.
+        Text(
+            text = stringResource(
+                R.string.word_list_progress_header,
+                state.completionCount,
+                state.resumePosition,
+                state.deckSize,
+            ),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, top = 2.dp, end = 24.dp, bottom = 8.dp),
+        )
+
         SearchBar(
             query = state.searchQuery,
             onQueryChange = viewModel::onSearchInput,

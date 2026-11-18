@@ -88,6 +88,7 @@ class ProgressResetFlowTest {
             wordDao = db.wordDao(),
             bookDao = db.bookDao(),
             dictionaryDao = db.dictionaryDao(),
+            settings = settings,
             progressResetter = resetter,
             deckSequence = DeckSequenceState(),
         )

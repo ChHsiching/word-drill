@@ -14,6 +14,7 @@ import com.github.chsiching.worddrill.data.local.dao.DictionaryDao
 import com.github.chsiching.worddrill.data.local.dao.WordDao
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
+import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.ui.DeckSequenceState
 import com.github.chsiching.worddrill.ui.WordOrdering
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -87,6 +88,22 @@ data class WordListUiState(
     val words: List<WordWithSenses> = emptyList(),
     val searchQuery: String = "",
     val dialog: WordListDialog = WordListDialog.None,
+    /** Progress header (issue #60). [resumePosition] is 1-based like the drill's
+     *  card counter; 0 only when the deck is empty. [deckSize] is the book's whole
+     *  deck — the search filter narrows [words], never these numbers. */
+    val completionCount: Int = 0,
+    val deckSize: Int = 0,
+    val resumePosition: Int = 0,
+)
+
+/** Book-level inputs of the header, nested so the outer combine stays within the
+ *  five-flow overload. */
+private data class BookHeaderInputs(
+    val bookName: String,
+    val isPreset: Boolean,
+    val isReviewBook: Boolean,
+    val completionCount: Int,
+    val resumeWordId: Long?,
 )
 
 @HiltViewModel
@@ -96,6 +113,7 @@ class WordListViewModel @Inject constructor(
     private val wordDao: WordDao,
     private val bookDao: BookDao,
     private val dictionaryDao: DictionaryDao,
+    private val settings: SettingsRepository,
     private val progressResetter: ProgressResetter,
     private val deckSequence: DeckSequenceState,
 ) : ViewModel() {
@@ -130,9 +148,16 @@ class WordListViewModel @Inject constructor(
 
     val uiState: StateFlow<WordListUiState> = combine(
         wordDao.observeWordsWithSensesByBook(bookId),
-        // Book meta nested so the outer combine stays within the five-flow overload.
-        combine(_bookName, _isPreset, _isReviewBook) { bookName, isPreset, isReviewBook ->
-            Triple(bookName, isPreset, isReviewBook)
+        // Book meta plus the live header inputs (issue #60) nested so the outer
+        // combine stays within the five-flow overload.
+        combine(
+            _bookName,
+            _isPreset,
+            _isReviewBook,
+            bookDao.observeCompletionCount(bookId),
+            settings.resumeWordIdFlow(bookId),
+        ) { bookName, isPreset, isReviewBook, completionCount, resumeWordId ->
+            BookHeaderInputs(bookName, isPreset, isReviewBook, completionCount, resumeWordId)
         },
         _searchQuery,
         _dialog,
@@ -140,14 +165,19 @@ class WordListViewModel @Inject constructor(
         // sorting on its own, so the two surfaces show one order. The lookup is
         // de-duplicated: another book's publish must not re-deal this list.
         deckSequence.sequences.map { it[bookId] }.distinctUntilChanged(),
-    ) { words, (bookName, isPreset, isReviewBook), searchQuery, dialog, deckWordIds ->
+    ) { words, headerInputs, searchQuery, dialog, deckWordIds ->
+        val ordered = WordOrdering.byDeckSequence(words, deckWordIds)
         WordListUiState(
-            bookName = bookName,
-            isPreset = isPreset,
-            isReviewBook = isReviewBook,
-            words = filterWords(WordOrdering.byDeckSequence(words, deckWordIds), searchQuery),
+            bookName = headerInputs.bookName,
+            isPreset = headerInputs.isPreset,
+            isReviewBook = headerInputs.isReviewBook,
+            words = filterWords(ordered, searchQuery),
             searchQuery = searchQuery,
             dialog = dialog,
+            completionCount = headerInputs.completionCount,
+            deckSize = ordered.size,
+            resumePosition = if (ordered.isEmpty()) 0
+            else WordOrdering.resumeIndex(headerInputs.resumeWordId, ordered) + 1,
         )
     }.stateIn(
         scope = viewModelScope,

@@ -33,6 +33,9 @@ class WordListScreenTest {
     val composeRule = createComposeRule()
 
     private lateinit var db: WordDrillDatabase
+    private val settings = com.github.chsiching.worddrill.data.settings.SettingsRepository(
+        ApplicationProvider.getApplicationContext()
+    )
     private var customBookId: Long = 0L
     private var presetBookId: Long = 0L
 
@@ -70,11 +73,9 @@ class WordListScreenTest {
             wordDao = db.wordDao(),
             bookDao = db.bookDao(),
             dictionaryDao = db.dictionaryDao(),
+            settings = settings,
             progressResetter = com.github.chsiching.worddrill.data.ProgressResetter(
-                db, db.bookDao(),
-                com.github.chsiching.worddrill.data.settings.SettingsRepository(
-                    ApplicationProvider.getApplicationContext()
-                ),
+                db, db.bookDao(), settings,
             ),
             deckSequence = com.github.chsiching.worddrill.ui.DeckSequenceState(),
         )
@@ -269,5 +270,43 @@ class WordListScreenTest {
 
         composeRule.onNodeWithText("没有匹配「zzz」的单词").assertIsDisplayed()
         composeRule.onNodeWithText("apple", substring = false).assertDoesNotExist()
+    }
+
+    // --- Progress header and letter index bar (#60) ---
+
+    @Test
+    fun progressHeader_showsCompletionCount_resumePosition_deckSize() {
+        val bookId = runBlocking {
+            db.bookDao().insert(Book(name = "进度词书", isPreset = false, completionCount = 3))
+        }
+        seedOneWord(bookId, "apple", "n.", "苹果")
+        seedOneWord(bookId, "banana", "n.", "香蕉")
+        seedOneWord(bookId, "cherry", "n.", "樱桃")
+        runBlocking { settings.setResumeWordId(bookId, db.wordDao().getByText("banana")!!.wordId) }
+        setContentFor(bookId)
+
+        composeRule.onNodeWithText("刷过 3 遍 · 2 / 3 词", substring = false).assertIsDisplayed()
+    }
+
+    @Test
+    fun progressHeader_updatesLive_onResumeWriteAndCompletionIncrement() {
+        val bookId = runBlocking {
+            db.bookDao().insert(Book(name = "进度直播词书", isPreset = false, completionCount = 1))
+        }
+        seedOneWord(bookId, "apple", "n.", "苹果")
+        seedOneWord(bookId, "banana", "n.", "香蕉")
+        runBlocking { settings.setResumeWordId(bookId, db.wordDao().getByText("apple")!!.wordId) }
+        setContentFor(bookId)
+
+        composeRule.onNodeWithText("刷过 1 遍 · 1 / 2 词", substring = false).assertIsDisplayed()
+        runBlocking {
+            settings.setResumeWordId(bookId, db.wordDao().getByText("banana")!!.wordId)
+            db.bookDao().incrementCompletionCount(bookId)
+        }
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(
+                androidx.compose.ui.test.hasText("刷过 2 遍 · 2 / 2 词", substring = false)
+            ).fetchSemanticsNodes().size == 1
+        }
     }
 }
