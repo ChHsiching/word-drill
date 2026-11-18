@@ -41,6 +41,9 @@ captures/
 *.jks
 *.keystore
 
+# Local release signing credentials
+/signing.properties
+
 # Scratch / temp / design files (not app code)
 .scratch/
 .zcode/
