@@ -3,6 +3,7 @@ package com.github.chsiching.worddrill.ui.drill
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
+import com.github.chsiching.worddrill.data.ProgressResetter
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.WordWithSenses
 import com.github.chsiching.worddrill.data.local.entity.Book
@@ -42,6 +43,10 @@ sealed interface DrillUiState {
         val cards: List<WordWithSenses>,
         val isReviewBook: Boolean = false,
         val initialPageIndex: Int = 0,
+        /** Bumped only when a progress reset rebuilt this deck. The pager keys on it
+         *  so the restored deck starts at the first card instead of restoring the
+         *  pre-reset page. */
+        val deckGeneration: Int = 0,
     ) : DrillUiState
 }
 
@@ -53,6 +58,7 @@ class DrillViewModel @Inject constructor(
     private val swipeLogDao: SwipeLogDao,
     private val settings: SettingsRepository,
     private val overlayState: AutoAdvanceOverlayState,
+    private val progressResetter: ProgressResetter,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<DrillUiState>(DrillUiState.Loading)
@@ -74,6 +80,10 @@ class DrillViewModel @Inject constructor(
     val advance: Flow<Int> = autoAdvance.advance
 
     private var currentBookId: Long? = null
+
+    /** Monotonic counter handed to Ready.deckGeneration; only progress resets
+     *  advance it (skip/restore reloads deliberately keep the pager's page). */
+    private var resetGeneration = 0
 
     init {
         // Mirror playback into the app-wide overlay state so the navigation root
@@ -99,6 +109,19 @@ class DrillViewModel @Inject constructor(
             ) { recorded, _ -> recorded }
                 .collect { recorded -> loadBookFor(recorded) }
         }
+        // A progress reset (#52) runs on the word-list page while this retained
+        // ViewModel sits in the nav backstack; without this reload the drill would
+        // keep showing the shrunken pre-reset deck at the pre-reset page. Resets of
+        // other books need nothing: switching back to them reloads via currentBookId.
+        viewModelScope.launch {
+            progressResetter.resetBookIds.collect { resetBookId ->
+                val bookId = currentBookId
+                if (resetBookId == bookId && bookId != null) {
+                    val book = bookDao.getById(bookId)?.takeIf { !it.deleted } ?: return@collect
+                    setReady(book.bookId, book.name, deckGeneration = ++resetGeneration)
+                }
+            }
+        }
     }
 
     private suspend fun loadBookFor(recorded: Long?) {
@@ -123,7 +146,7 @@ class DrillViewModel @Inject constructor(
             .map { books -> books.firstOrNull { it.isPreset && it.name != REVIEW_BOOK_NAME } }
             .firstOrNull { it != null }
 
-    private suspend fun setReady(bookId: Long, bookName: String) {
+    private suspend fun setReady(bookId: Long, bookName: String, deckGeneration: Int = 0) {
         // Loading a (possibly different) book always starts playback idle: the deck
         // context the countdown belonged to is gone.
         autoAdvance.stop()
@@ -148,6 +171,7 @@ class DrillViewModel @Inject constructor(
             cards = cards,
             isReviewBook = bookName == REVIEW_BOOK_NAME,
             initialPageIndex = initialPageIndex,
+            deckGeneration = deckGeneration,
         )
     }
 

@@ -6,6 +6,7 @@ import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.github.chsiching.worddrill.data.ProgressResetter
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.dao.REVIEW_BOOK_NAME
 import com.github.chsiching.worddrill.data.local.entity.Book
@@ -32,6 +33,7 @@ class DrillViewModelTest {
 
     private lateinit var db: WordDrillDatabase
     private lateinit var settings: SettingsRepository
+    private lateinit var resetter: ProgressResetter
     private val viewModels = mutableListOf<DrillViewModel>()
 
     @Before
@@ -40,6 +42,7 @@ class DrillViewModelTest {
             .allowMainThreadQueries()
             .build()
         settings = SettingsRepository(context)
+        resetter = ProgressResetter(db, db.bookDao(), settings)
         Unit
     }
 
@@ -65,6 +68,7 @@ class DrillViewModelTest {
             swipeLogDao = db.swipeLogDao(),
             settings = settings,
             overlayState = AutoAdvanceOverlayState(),
+            progressResetter = resetter,
         ).also { viewModels.add(it) }
 
     private suspend fun insertBookWithWord(name: String, isPreset: Boolean, wordText: String): Long {
@@ -370,6 +374,34 @@ class DrillViewModelTest {
         val ready = vm.uiState.first { it is DrillUiState.Ready && it.bookName == "CET-4" } as DrillUiState.Ready
         assertThat(ready.bookName).isEqualTo("CET-4")
         assertThat(settings.currentBookId.first()).isEqualTo(ready.bookId)
+        Unit
+    }
+
+    @Test
+    fun resetWhileBookCurrent_reloadsFullDeckAtFirstCard() = runBlocking {
+        val bookId = 934_601L
+        insertBookWithWords(bookId, "重置进度书", isPreset = false, "apple", "balance", "circle")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+        val before = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+        assertThat(before.deckGeneration).isEqualTo(0)
+
+        // Drill into the book and skip the middle card: the deck shrinks and the
+        // resume position moves off the first card.
+        vm.skipCurrentWord(currentPage = 1)
+        vm.uiState.first { it is DrillUiState.Ready && it.cards.size == 2 }
+        vm.onPageSettled(previousPage = 1, currentPage = 1)
+        assertThat(awaitSavedResumeWordId(bookId)).isNotNull()
+
+        // The resetter runs on the word-list page; the retained drill ViewModel must
+        // reload the restored deck and land on the first card again.
+        resetter.reset(bookId)
+        val after = vm.uiState
+            .first { it is DrillUiState.Ready && it.deckGeneration > before.deckGeneration }
+            as DrillUiState.Ready
+        assertThat(after.cards.map { it.word.text }).containsExactly("apple", "balance", "circle").inOrder()
+        assertThat(after.initialPageIndex).isEqualTo(0)
+        assertThat(settings.resumeWordId(bookId)).isNull()
         Unit
     }
 
