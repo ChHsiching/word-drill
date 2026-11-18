@@ -100,16 +100,28 @@ class ProgressResetFlowTest {
     }
 
     @Test
-    fun resetAction_offeredForNormalBooks_hiddenForReviewBook() = runBlocking {
+    fun resetAction_offeredForCustomBook() = runBlocking {
         seedBook(801_101L, "流程词书", isPreset = false, "apple")
-        seedBook(801_102L, "CET-4", isPreset = true, "balance")
-        db.bookDao().insert(Book(name = REVIEW_BOOK_NAME, isPreset = true))
-
         setContentFor(801_101L)
         composeRule.onNodeWithContentDescription("重置进度").assertIsDisplayed()
+        Unit
+    }
+
+    @Test
+    fun resetAction_offeredForPresetBook() = runBlocking {
+        seedBook(801_102L, "CET-4", isPreset = true, "balance")
         setContentFor(801_102L)
         composeRule.onNodeWithContentDescription("重置进度").assertIsDisplayed()
-        setContentFor(db.bookDao().getByName(REVIEW_BOOK_NAME)!!.bookId)
+        Unit
+    }
+
+    @Test
+    fun resetAction_hiddenForReviewBook() = runBlocking {
+        // Explicit review id: an auto id right after a large explicit book id lands
+        // on the adjacent number and any later use of it would REPLACE the row.
+        seedBook(801_103L, "CET-4", isPreset = true, "circle")
+        val reviewId = db.bookDao().insert(Book(bookId = 801_903L, name = REVIEW_BOOK_NAME, isPreset = true))
+        setContentFor(reviewId)
         composeRule.onNodeWithContentDescription("重置进度").assertDoesNotExist()
         Unit
     }
@@ -118,7 +130,7 @@ class ProgressResetFlowTest {
     fun reset_confirmDialog_showsAndResetOnConfirm() = runBlocking {
         val bookId = 801_201L
         seedBook(bookId, "确认词书", isPreset = false, "apple", "balance", "circle")
-        val reviewId = db.bookDao().insert(Book(name = REVIEW_BOOK_NAME, isPreset = true))
+        val reviewId = db.bookDao().insert(Book(bookId = 801_901L, name = REVIEW_BOOK_NAME, isPreset = true))
         val skipped = db.wordDao().findIdByText("apple")!!
         db.bookDao().setSkipped(bookId, skipped, skipped = true)
         db.bookDao().linkBookWord(BookWord(bookId = reviewId, wordId = skipped))
@@ -155,7 +167,7 @@ class ProgressResetFlowTest {
     fun reset_partiallyDrilledBookWithSkips_producesStartingState() = runBlocking {
         val bookId = 801_301L
         seedBook(bookId, "半程词书", isPreset = false, "apple", "balance", "circle", "duty")
-        val reviewId = db.bookDao().insert(Book(name = REVIEW_BOOK_NAME, isPreset = true))
+        val reviewId = db.bookDao().insert(Book(bookId = 801_902L, name = REVIEW_BOOK_NAME, isPreset = true))
         val apple = db.wordDao().findIdByText("apple")!!
         val circle = db.wordDao().findIdByText("circle")!!
         listOf(apple, circle).forEach { wordId ->
