@@ -15,11 +15,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -27,6 +29,8 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -92,7 +97,17 @@ fun WordListScreen(
             }
         }
 
+        SearchBar(
+            query = state.searchQuery,
+            onQueryChange = viewModel::onSearchInput,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, end = 24.dp, bottom = 4.dp),
+        )
+
         when {
+            state.words.isEmpty() && state.searchQuery.isNotBlank() ->
+                EmptyState(stringResource(R.string.word_list_search_empty, state.searchQuery))
             state.words.isEmpty() -> EmptyState(if (readOnly) stringResource(R.string.word_list_preset_readonly) else state.bookName)
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -374,4 +389,34 @@ private fun EmptyState(text: String) {
             textAlign = TextAlign.Center,
         )
     }
+}
+
+@Composable
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = modifier.fillMaxWidth(),
+        singleLine = true,
+        placeholder = { Text(stringResource(R.string.word_list_search_hint)) },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.wordDrillColors.chipBg,
+            unfocusedContainerColor = MaterialTheme.wordDrillColors.chipBg,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = Color.Transparent,
+            cursorColor = MaterialTheme.colorScheme.primary,
+        ),
+        shape = RoundedCornerShape(10.dp),
+    )
 }
