@@ -3,6 +3,7 @@ package com.github.chsiching.worddrill.update
 import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -17,6 +18,10 @@ import org.junit.runner.RunWith
 /**
  * Dialog-path coverage of the update flow with a fake checker and installer:
  * no real network or DownloadManager is touched on the emulator.
+ *
+ * Compose dialogs compose in their own window, whose attachment races with
+ * waitForIdle; every presence/absence check therefore goes through the
+ * awaitShown/awaitGone waitUntil helpers instead of a bare assert.
  */
 @RunWith(AndroidJUnit4::class)
 class UpdateFlowTest {
@@ -66,27 +71,43 @@ class UpdateFlowTest {
         return vm
     }
 
+    private fun awaitShown(text: String, substring: Boolean = true) {
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithText(text, substring = substring)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText(text, substring = substring).assertIsDisplayed()
+    }
+
+    private fun awaitGone(text: String, substring: Boolean = true) {
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithText(text, substring = substring)
+                .fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithText(text, substring = substring).assertDoesNotExist()
+    }
+
     @Test
     fun newerRelease_showsDialogWithVersionAndNotes() {
         setContentWith(UpdateCheckResult.UpdateAvailable(release), FakeInstaller())
 
-        composeRule.onNodeWithText("发现新版本").assertIsDisplayed()
-        composeRule.onNodeWithText("版本 0.3.0", substring = false).assertIsDisplayed()
-        composeRule.onNodeWithText("修复与改进").assertIsDisplayed()
-        composeRule.onNodeWithText("立即更新").assertIsDisplayed()
-        composeRule.onNodeWithText("暂不更新").assertIsDisplayed()
+        awaitShown("发现新版本", substring = false)
+        awaitShown("版本 0.3.0", substring = false)
+        awaitShown("修复与改进")
+        awaitShown("立即更新", substring = false)
+        awaitShown("暂不更新", substring = false)
     }
 
     @Test
     fun updateNow_withInstallPermission_closesDialogAndStartsDownload() {
         val installer = FakeInstaller(canInstall = true)
         setContentWith(UpdateCheckResult.UpdateAvailable(release), installer)
+        awaitShown("立即更新", substring = false)
 
         composeRule.onNodeWithText("立即更新").performClick()
-        composeRule.waitForIdle()
 
         assertThat(installer.downloads).containsExactly(release.apkUrl to release.version)
-        composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
+        awaitGone("发现新版本", substring = false)
     }
 
     @Test
@@ -98,37 +119,36 @@ class UpdateFlowTest {
             installer,
             onPermissionRequest = { permissionRequests++ },
         )
+        awaitShown("立即更新", substring = false)
 
         composeRule.onNodeWithText("立即更新").performClick()
-        composeRule.waitForIdle()
 
         // The dialog stays while the system permission screen is up; nothing downloads.
         assertThat(permissionRequests).isEqualTo(1)
         assertThat(installer.downloads).isEmpty()
-        composeRule.onNodeWithText("发现新版本").assertIsDisplayed()
+        awaitShown("发现新版本", substring = false)
 
         // User granted in settings and came back; production wires this to the
         // activity result, tests call it directly.
         installer.canInstall = true
         composeRule.runOnIdle { vm.onInstallPermissionResult() }
-        composeRule.waitForIdle()
 
         assertThat(installer.downloads).containsExactly(release.apkUrl to release.version)
-        composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
+        awaitGone("发现新版本", substring = false)
     }
 
     @Test
     fun later_dismissesDialog_andDoesNotReappearOnRecheck() {
         val vm = setContentWith(UpdateCheckResult.UpdateAvailable(release), FakeInstaller())
+        awaitShown("暂不更新", substring = false)
 
         composeRule.onNodeWithText("暂不更新").performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
+
+        awaitGone("发现新版本", substring = false)
 
         // Same session: a re-check must not reopen the dialog.
         vm.checkForUpdate()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
+        awaitGone("发现新版本", substring = false)
     }
 
     @Test
@@ -140,18 +160,28 @@ class UpdateFlowTest {
     }
 
     @Test
-    fun checkFailures_showInlineMappedMessages() {
-        val cases = listOf(
-            R.string.update_error_dns to "无法解析域名",
-            R.string.update_error_interrupted to "连接被中断，可能是网络限制",
-            R.string.update_error_generic to "无法连接 GitHub",
-        )
-        for ((errorRes, message) in cases) {
-            setContentWith(UpdateCheckResult.CheckFailed(errorRes), FakeInstaller())
+    fun dnsFailure_showsInlineMappedMessage() {
+        setContentWith(UpdateCheckResult.CheckFailed(R.string.update_error_dns), FakeInstaller())
 
-            composeRule.onNodeWithText(message, substring = false).assertIsDisplayed()
-            composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
-        }
+        awaitShown("无法解析域名", substring = false)
+        composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
+    }
+
+    @Test
+    fun connectionInterrupted_showsInlineMappedMessage() {
+        setContentWith(
+            UpdateCheckResult.CheckFailed(R.string.update_error_interrupted),
+            FakeInstaller(),
+        )
+
+        awaitShown("连接被中断，可能是网络限制", substring = false)
+    }
+
+    @Test
+    fun genericFailure_showsInlineMappedMessage() {
+        setContentWith(UpdateCheckResult.CheckFailed(R.string.update_error_generic), FakeInstaller())
+
+        awaitShown("无法连接 GitHub", substring = false)
     }
 
     @Test
@@ -160,11 +190,10 @@ class UpdateFlowTest {
             UpdateCheckResult.CheckFailed(R.string.update_error_dns),
             FakeInstaller(),
         )
-        composeRule.onNodeWithText("无法解析域名", substring = false).assertIsDisplayed()
+        awaitShown("无法解析域名", substring = false)
 
         composeRule.onNodeWithContentDescription("关闭").performClick()
-        composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("无法解析域名", substring = false).assertDoesNotExist()
+        awaitGone("无法解析域名", substring = false)
     }
 }
