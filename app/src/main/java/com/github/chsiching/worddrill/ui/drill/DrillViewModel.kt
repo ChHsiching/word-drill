@@ -13,10 +13,12 @@ import com.github.chsiching.worddrill.data.local.dao.WordDao
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.SwipeLog
 import com.github.chsiching.worddrill.data.settings.DwellInterval
+import com.github.chsiching.worddrill.data.settings.NavStyle
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
+
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -24,7 +26,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
 sealed interface DrillUiState {
@@ -66,6 +70,14 @@ class DrillViewModel @Inject constructor(
 
     /** Playback phase plus the current card's elapsed fraction for the hairline. */
     val playback: StateFlow<AutoAdvanceState> = autoAdvance.state
+
+    /** Navigation style: in bar mode the bottom nav covers the screen's bottom edge,
+     *  so the drill screen lifts the hairline above it. */
+    val navStyle: StateFlow<NavStyle> = settings.navStyle.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = NavStyle.PILL,
+    )
 
     /** Pages the screen should animate to; each flip's settle flows through
      *  [onPageSettled] unchanged, so swipe logging and resume writes are shared. */

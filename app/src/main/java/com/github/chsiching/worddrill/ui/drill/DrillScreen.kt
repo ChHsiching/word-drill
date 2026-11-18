@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -63,6 +64,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.local.WordWithSenses
+import com.github.chsiching.worddrill.data.settings.NavStyle
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 import com.github.chsiching.worddrill.ui.theme.wordDrillTypography
 import kotlinx.coroutines.flow.Flow
@@ -134,6 +136,10 @@ fun DrillScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val playback by viewModel.playback.collectAsStateWithLifecycle()
+    val navStyle by viewModel.navStyle.collectAsStateWithLifecycle()
+    // The bar nav covers the screen's very bottom edge (full-width surface through
+    // the gesture-bar zone); lift the hairline above it so it stays visible.
+    val hairlineLift = if (navStyle == NavStyle.BAR) 96.dp else 0.dp
 
     AutoAdvanceLifecycle(
         isPlaying = playback.phase == AutoAdvancePhase.Playing,
@@ -187,6 +193,7 @@ fun DrillScreen(
                 onToggleAutoAdvance = viewModel::toggleAutoAdvance,
                 playbackState = playback,
                 advance = viewModel.advance,
+                hairlineLift = hairlineLift,
             )
         }
     }
@@ -208,6 +215,7 @@ internal fun DrillPager(
     onToggleAutoAdvance: (currentPage: Int) -> Unit,
     playbackState: AutoAdvanceState,
     advance: Flow<Int>,
+    hairlineLift: Dp = 0.dp,
 ) {
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { cards.size })
 
@@ -278,7 +286,9 @@ internal fun DrillPager(
         if (playbackState.phase != AutoAdvancePhase.Idle) {
             AutoAdvanceHairline(
                 elapsedFraction = playbackState.elapsedFraction,
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = hairlineLift),
             )
         }
     }
