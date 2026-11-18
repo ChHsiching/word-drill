@@ -355,6 +355,7 @@ class MeScreenTest {
                         viewModel = vm(),
                         settingsViewModel = settingsHolder.value,
                         exportImportViewModel = exportImportVm(),
+                        updateViewModel = updateVm(),
                     )
                 }
             }
@@ -418,7 +419,14 @@ class MeScreenTest {
 
         composeRule.onNodeWithText("检查更新", substring = false).performScrollTo().performClick()
 
-        awaitShown("已是最新版本", substring = false)
+        // The inline line lands below the tapped row; scroll it into view before
+        // asserting display (scroll-order independence on the CI viewport).
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("已是最新版本", substring = false)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("已是最新版本", substring = false)
+            .performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
     }
 
@@ -454,7 +462,12 @@ class MeScreenTest {
 
         composeRule.onNodeWithText("检查更新", substring = false).performScrollTo().performClick()
 
-        awaitShown("无法连接 GitHub", substring = false)
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("无法连接 GitHub", substring = false)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("无法连接 GitHub", substring = false)
+            .performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
     }
 
@@ -467,7 +480,12 @@ class MeScreenTest {
         renderWithVm(vm(), updateViewModel = updateVm(checker, cache))
 
         composeRule.onNodeWithText("检查更新", substring = false).performScrollTo().performClick()
-        awaitShown("已是最新版本", substring = false)
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("已是最新版本", substring = false)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("已是最新版本", substring = false)
+            .performScrollTo().assertIsDisplayed()
 
         assertThat(checker.calls).isEqualTo(1)
         Unit
