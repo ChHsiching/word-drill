@@ -99,6 +99,9 @@
     <string name="me_setting_dwell_hint_min">1s</string>
     <string name="me_setting_dwell_hint_max">30s</string>
     <string name="me_setting_dwell_caption">在学习页双击卡片开始或暂停</string>
+    <string name="me_setting_deck_ordering">单词顺序</string>
+    <string name="me_setting_deck_ordering_alphabetical">按字母</string>
+    <string name="me_setting_deck_ordering_shuffled">乱序</string>
     <string name="me_setting_nav_style">导航栏风格</string>
     <string name="me_setting_nav_style_pill">浮动胶囊</string>
     <string name="me_setting_nav_style_bar">底部栏</string>
