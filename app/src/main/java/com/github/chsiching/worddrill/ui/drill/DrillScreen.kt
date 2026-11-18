@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -246,11 +247,24 @@ internal fun DrillPager(
                 modifier = Modifier
                     .fillMaxSize()
                     // Double-tap on the card area toggles auto-advance. Single taps
-                    // stay inert, and a tap that turns into a drag cancels here so
-                    // the pager keeps handling the swipe.
-                    .pointerInput(Unit) {
+                    // stay inert, so the pair window is generous (600 ms) — injected
+                    // input (emulator mouse, adb) arrives with per-tap latency that
+                    // can push two taps past the 300 ms platform default.
+                    .pointerInput(onToggleAutoAdvance) {
+                        var lastTapAt = 0L
+                        var lastTapOffset = Offset.Zero
                         detectTapGestures(
-                            onDoubleTap = { onToggleAutoAdvance(pagerState.currentPage) },
+                            onTap = { offset ->
+                                val now = System.currentTimeMillis()
+                                if (now - lastTapAt < 600 &&
+                                    (offset - lastTapOffset).getDistance() < 96f) {
+                                    lastTapAt = 0L
+                                    onToggleAutoAdvance(pagerState.currentPage)
+                                } else {
+                                    lastTapAt = now
+                                    lastTapOffset = offset
+                                }
+                            },
                         )
                     },
             ) { pageIndex ->

@@ -145,6 +145,20 @@ class DrillPlaybackTest {
     }
 
     @Test
+    fun slowDoubleTap_twoClicks450msApart_stillStartsPlayback() {
+        composePlaybackPager()
+
+        composeRule.onNodeWithText("apple").performTouchInput { click() }
+        Thread.sleep(450L)
+        composeRule.onNodeWithText("apple").performTouchInput { click() }
+        composeRule.waitForIdle()
+        // Injected input (emulator mouse, adb) carries per-tap latency past the
+        // 300 ms platform double-tap timeout; the pair window is 600 ms.
+        assertThat(machine.state.value.phase).isEqualTo(AutoAdvancePhase.Playing)
+        composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertIsDisplayed()
+    }
+
+    @Test
     fun dwellElapsed_flipsToNextCard_throughExistingSettlePath() {
         composePlaybackPager(dwellMillis = 1_000L)
 
