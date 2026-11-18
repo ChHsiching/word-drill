@@ -373,6 +373,20 @@ class DrillViewModelTest {
         Unit
     }
 
+    @Test
+    fun deck_ordersMixedCase_caseInsensitive() = runBlocking {
+        // The deck consumes the shared ordering seam (issue #51): lowercase words
+        // interleave with uppercase ones, "core" landing in the C section.
+        val bookId = 934_107L
+        insertBookWithWords(bookId, "大小写词书", isPreset = false, "Zebra", "core", "Apple")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+
+        val ready = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+        assertThat(ready.cards.map { it.word.text }).containsExactly("Apple", "core", "Zebra").inOrder()
+        Unit
+    }
+
     private companion object {
         const val NO_BOOK_ID = 999_999L
     }

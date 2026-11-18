@@ -29,6 +29,8 @@
     <string name="word_list_delete_title">删除词条</string>
     <string name="word_list_delete_message">确定删除「%1$s」？可从回收站恢复。</string>
     <string name="word_list_delete_confirm">删除</string>
+    <string name="word_list_search_hint">搜索单词</string>
+    <string name="word_list_search_empty">没有匹配「%1$s」的单词</string>
     <string name="recycle_bin_title">回收站</string>
     <string name="recycle_bin_section_books">词书</string>
     <string name="recycle_bin_section_entries">词条</string>

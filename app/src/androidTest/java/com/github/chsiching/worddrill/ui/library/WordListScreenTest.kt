@@ -147,9 +147,11 @@ class WordListScreenTest {
         setContentFor(customBookId)
         composeRule.onNodeWithText("苹果").performClick()
         composeRule.waitForIdle()
-        composeRule.onAllNodes(androidx.compose.ui.test.hasSetTextAction())[0].performTextReplacement("v.")
+        // Target by label, not by hasSetTextAction index: the screen's search bar
+        // is also a text field and shifts positional indexes.
+        composeRule.onNodeWithText("词性").performTextReplacement("v.")
         composeRule.waitForIdle()
-        composeRule.onAllNodes(androidx.compose.ui.test.hasSetTextAction())[1].performTextReplacement("囤积")
+        composeRule.onNodeWithText("释义").performTextReplacement("囤积")
         composeRule.waitForIdle()
         composeRule.onNodeWithText("确定").performClick()
         composeRule.waitForIdle()
@@ -215,5 +217,50 @@ class WordListScreenTest {
             val matches = composeRule.onAllNodes(androidx.compose.ui.test.hasText(pos, substring = false))
             assertThat(matches.fetchSemanticsNodes().size).isAtLeast(1)
         }
+    }
+
+    @Test
+    fun wordList_ordersMixedCase_interleaved() {
+        seedOneWord(customBookId, "Zebra", "n.", "斑马")
+        seedOneWord(customBookId, "core", "n.", "核心")
+        seedOneWord(customBookId, "Apple", "n.", "苹果树")
+        setContentFor(customBookId)
+
+        val yApple = composeRule.onNodeWithText("Apple", substring = false).fetchSemanticsNode().positionInRoot.y
+        val yAppleLower = composeRule.onNodeWithText("apple", substring = false).fetchSemanticsNode().positionInRoot.y
+        val yCore = composeRule.onNodeWithText("core", substring = false).fetchSemanticsNode().positionInRoot.y
+        val yZebra = composeRule.onNodeWithText("Zebra", substring = false).fetchSemanticsNode().positionInRoot.y
+        assertThat(yApple).isLessThan(yAppleLower)
+        assertThat(yAppleLower).isLessThan(yCore)
+        assertThat(yCore).isLessThan(yZebra)
+    }
+
+    @Test
+    fun search_filtersCaseInsensitively_live() {
+        seedOneWord(customBookId, "Zebra", "n.", "斑马")
+        seedOneWord(customBookId, "core", "n.", "核心")
+        setContentFor(customBookId)
+
+        composeRule.onNodeWithText("搜索单词").performTextInput("COR")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("core").assertIsDisplayed()
+        composeRule.onNodeWithText("apple", substring = false).assertDoesNotExist()
+        composeRule.onNodeWithText("Zebra").assertDoesNotExist()
+
+        composeRule.onNodeWithText("COR", substring = false).performTextReplacement("zeb")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Zebra").assertIsDisplayed()
+        composeRule.onNodeWithText("core").assertDoesNotExist()
+    }
+
+    @Test
+    fun search_noMatch_showsEmptyResultState() {
+        setContentFor(customBookId)
+
+        composeRule.onNodeWithText("搜索单词").performTextInput("zzz")
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("没有匹配「zzz」的单词").assertIsDisplayed()
+        composeRule.onNodeWithText("apple", substring = false).assertDoesNotExist()
     }
 }

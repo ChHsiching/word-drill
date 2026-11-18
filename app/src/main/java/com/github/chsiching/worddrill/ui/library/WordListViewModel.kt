@@ -12,6 +12,7 @@ import com.github.chsiching.worddrill.data.local.dao.DictionaryDao
 import com.github.chsiching.worddrill.data.local.dao.WordDao
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
+import com.github.chsiching.worddrill.ui.WordOrdering
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -54,10 +55,17 @@ sealed interface WordListDialog {
     data class Delete(val wordId: Long, val wordText: String) : WordListDialog
 }
 
+/** Case-insensitive substring filter behind the word-list search bar (issue #51);
+ *  an empty query keeps every word. */
+internal fun filterWords(words: List<WordWithSenses>, query: String): List<WordWithSenses> =
+    if (query.isEmpty()) words
+    else words.filter { it.word.text.contains(query, ignoreCase = true) }
+
 data class WordListUiState(
     val bookName: String = "",
     val isPreset: Boolean = false,
     val words: List<WordWithSenses> = emptyList(),
+    val searchQuery: String = "",
     val dialog: WordListDialog = WordListDialog.None,
 )
 
@@ -76,6 +84,10 @@ class WordListViewModel @Inject constructor(
 
     private val _dialog = MutableStateFlow<WordListDialog>(WordListDialog.None)
     val dialog: StateFlow<WordListDialog> = _dialog.asStateFlow()
+
+    // ViewModel state, so the search survives tab switches within the app session
+    // (saveState/restoreState navigation) but not process death (issue #51).
+    private val _searchQuery = MutableStateFlow("")
 
     private val _bookName = MutableStateFlow("")
     private val _isPreset = MutableStateFlow(false)
@@ -96,12 +108,14 @@ class WordListViewModel @Inject constructor(
         wordDao.observeWordsWithSensesByBook(bookId),
         _bookName,
         _isPreset,
+        _searchQuery,
         _dialog,
-    ) { words, bookName, isPreset, dialog ->
+    ) { words, bookName, isPreset, searchQuery, dialog ->
         WordListUiState(
             bookName = bookName,
             isPreset = isPreset,
-            words = words,
+            words = filterWords(WordOrdering.alphabetical(words), searchQuery),
+            searchQuery = searchQuery,
             dialog = dialog,
         )
     }.stateIn(
@@ -109,6 +123,10 @@ class WordListViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = WordListUiState(),
     )
+
+    fun onSearchInput(query: String) {
+        _searchQuery.value = query
+    }
 
     fun openAddDialog() { _dialog.value = WordListDialog.Add() }
 
