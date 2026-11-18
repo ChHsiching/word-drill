@@ -54,7 +54,7 @@ class UpdateFlowTest {
         installer: FakeInstaller,
         onPermissionRequest: () -> Unit = {},
     ): UpdateViewModel {
-        val vm = UpdateViewModel(FakeChecker(checkerResult), installer)
+        val vm = UpdateViewModel(FakeChecker(checkerResult), installer, UpdateCheckCache())
         composeRule.setContent {
             WordDrillTheme {
                 Surface {

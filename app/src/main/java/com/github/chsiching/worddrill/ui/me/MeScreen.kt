@@ -74,6 +74,9 @@ import com.github.chsiching.worddrill.ui.theme.LocalThemeRevealTrigger
 import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 import com.github.chsiching.worddrill.ui.theme.wordDrillTypography
+import com.github.chsiching.worddrill.update.UpdateDialogHost
+import com.github.chsiching.worddrill.update.UpdateUiState
+import com.github.chsiching.worddrill.update.UpdateViewModel
 import kotlinx.coroutines.delay
 
 @Composable
@@ -83,6 +86,7 @@ fun MeScreen(
     viewModel: MeViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel(),
     exportImportViewModel: ExportImportViewModel = hiltViewModel(),
+    updateViewModel: UpdateViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
@@ -91,6 +95,7 @@ fun MeScreen(
     val compactNav by settingsViewModel.compactNav.collectAsStateWithLifecycle()
     val dwellInterval by settingsViewModel.dwellInterval.collectAsStateWithLifecycle()
     val exportStatus by exportImportViewModel.status.collectAsStateWithLifecycle()
+    val updateState by updateViewModel.state.collectAsStateWithLifecycle()
     var showAbout by remember { mutableStateOf(false) }
 
     Column(
@@ -168,9 +173,33 @@ fun MeScreen(
                 onClick = onNavigateToRecycleBin,
             )
             InGroupSeparator()
+            DataRow(
+                label = stringResource(R.string.me_setting_check_update),
+                onClick = updateViewModel::manualCheck,
+            )
+            when (val current = updateState) {
+                is UpdateUiState.UpToDate -> UpdateCheckStatusLine(
+                    text = stringResource(R.string.update_up_to_date),
+                    color = MaterialTheme.colorScheme.primary,
+                    clearAfterMs = 2_000,
+                    onClear = updateViewModel::dismissNotice,
+                )
+                is UpdateUiState.Notice -> UpdateCheckStatusLine(
+                    text = stringResource(current.messageRes),
+                    color = MaterialTheme.colorScheme.error,
+                    clearAfterMs = 4_000,
+                    onClear = updateViewModel::dismissNotice,
+                )
+                else -> Unit
+            }
+            InGroupSeparator()
             AboutRow(onClick = { showAbout = true })
         }
     }
+
+    // The update dialog for a manual check with something to install; the launch
+    // check's dialog still comes from UpdateGate in MainActivity.
+    UpdateDialogHost(viewModel = updateViewModel)
 
     if (showAbout) {
         AboutDialog(onDismiss = { showAbout = false })
@@ -698,6 +727,26 @@ private fun AboutRow(onClick: () -> Unit) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/** Inline result under the 检查更新 row; mirrors the export/import StatusLine style. */
+@Composable
+private fun UpdateCheckStatusLine(
+    text: String,
+    color: Color,
+    clearAfterMs: Long,
+    onClear: () -> Unit,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = color,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+    LaunchedEffect(text) {
+        delay(clearAfterMs)
+        onClear()
     }
 }
 

@@ -43,24 +43,57 @@ import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 @Composable
 fun UpdateGate(modifier: Modifier = Modifier) {
     val viewModel: UpdateViewModel = hiltViewModel()
+    LaunchedEffect(viewModel) {
+        viewModel.checkForUpdate()
+    }
+    UpdateContent(
+        viewModel = viewModel,
+        onRequestInstallPermission = rememberInstallPermissionRequest(viewModel),
+        modifier = modifier,
+    )
+}
+
+/**
+ * Me-tab host for the manual 检查更新 row (#59): renders the shared update dialog
+ * while an update is available and bridges the install-permission event. The inline
+ * results (已是最新版本 / errors) stay in MeScreen, which owns that group's
+ * status-line style.
+ */
+@Composable
+fun UpdateDialogHost(viewModel: UpdateViewModel) {
+    val requestPermission = rememberInstallPermissionRequest(viewModel)
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                UpdateEvent.RequestInstallPermission -> requestPermission()
+            }
+        }
+    }
+    (state as? UpdateUiState.Available)?.let { available ->
+        UpdateDialog(
+            state = available,
+            onUpdateNow = viewModel::updateNow,
+            onDismiss = viewModel::dismissDialog,
+        )
+    }
+}
+
+/** Launcher for the unknown-app-sources settings screen; routes the activity result
+ *  back into [UpdateViewModel.onInstallPermissionResult]. */
+@Composable
+private fun rememberInstallPermissionRequest(viewModel: UpdateViewModel): () -> Unit {
     val context = androidx.compose.ui.platform.LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
         viewModel.onInstallPermissionResult()
     }
-    LaunchedEffect(viewModel) {
-        viewModel.checkForUpdate()
+    return {
+        permissionLauncher.launch(
+            DownloadManagerApkInstaller.installPermissionIntent(context)
+        )
     }
-    UpdateContent(
-        viewModel = viewModel,
-        onRequestInstallPermission = {
-            permissionLauncher.launch(
-                DownloadManagerApkInstaller.installPermissionIntent(context)
-            )
-        },
-        modifier = modifier,
-    )
 }
 
 /**
@@ -84,6 +117,8 @@ fun UpdateContent(
     }
     when (val current = state) {
         UpdateUiState.Idle -> Unit
+        // Only the Me tab's manual check sets this; MeScreen renders the inline line.
+        UpdateUiState.UpToDate -> Unit
         is UpdateUiState.Available -> UpdateDialog(
             state = current,
             onUpdateNow = viewModel::updateNow,
