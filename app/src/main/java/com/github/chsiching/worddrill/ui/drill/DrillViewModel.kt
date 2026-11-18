@@ -14,6 +14,7 @@ import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.SwipeLog
 import com.github.chsiching.worddrill.data.settings.DwellInterval
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
+import com.github.chsiching.worddrill.ui.WordOrdering
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -128,7 +129,7 @@ class DrillViewModel @Inject constructor(
         // context the countdown belonged to is gone.
         autoAdvance.stop()
         currentBookId = bookId
-        val cards = wordDao.getWordsWithSensesByBook(bookId)
+        val cards = WordOrdering.alphabetical(wordDao.getWordsWithSensesByBook(bookId))
         if (cards.isEmpty()) {
             _uiState.value = DrillUiState.Empty(
                 bookName = bookName,
@@ -217,7 +218,7 @@ class DrillViewModel @Inject constructor(
     }
 
     private suspend fun reloadCards(bookId: Long, ready: DrillUiState.Ready, currentPage: Int) {
-        val cards = wordDao.getWordsWithSensesByBook(bookId)
+        val cards = WordOrdering.alphabetical(wordDao.getWordsWithSensesByBook(bookId))
         if (cards.isEmpty()) {
             autoAdvance.stop()
             _uiState.value = DrillUiState.Empty(
