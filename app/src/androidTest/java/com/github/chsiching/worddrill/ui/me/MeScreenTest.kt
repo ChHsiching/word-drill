@@ -24,6 +24,7 @@ import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.SwipeLog
 import com.github.chsiching.worddrill.data.local.entity.Word
+import com.github.chsiching.worddrill.data.settings.DeckOrdering
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.data.settings.ThemeMode
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
@@ -83,6 +84,9 @@ class MeScreenTest {
         delay(200)
         db.close()
         settings.setDwellInterval(5f)
+        // Deck ordering is process-global; other classes in this process assume
+        // the 按字母 default.
+        settings.setDeckOrdering(DeckOrdering.ALPHABETICAL)
         Unit
     }
 
@@ -217,6 +221,24 @@ class MeScreenTest {
         composeRule.onNodeWithText("导出数据")
         composeRule.onNodeWithText("导入数据")
         composeRule.onNodeWithText("关于", substring = false)
+    }
+
+    @Test
+    fun deckOrderingRow_inDisplayGroup_defaultsToAlphabetical_thenCyclesToShuffled() = runBlocking {
+        settings.setDeckOrdering(DeckOrdering.ALPHABETICAL)
+        renderWithVm(vm())
+        composeRule.onNodeWithText("单词顺序").performScrollTo().assertIsDisplayed()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("按字母", substring = false).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Tapping cycles to 乱序 and persists the global setting (ADR 0002).
+        composeRule.onNodeWithText("单词顺序").performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("乱序", substring = false).fetchSemanticsNodes().isNotEmpty()
+        }
+        assertThat(runBlocking { settings.deckOrdering.first() }).isEqualTo(DeckOrdering.SHUFFLED)
+        Unit
     }
 
     @Test

@@ -76,6 +76,7 @@ class WordListScreenTest {
                     ApplicationProvider.getApplicationContext()
                 ),
             ),
+            deckSequence = com.github.chsiching.worddrill.ui.DeckSequenceState(),
         )
         composeRule.setContent {
             WordDrillTheme {
