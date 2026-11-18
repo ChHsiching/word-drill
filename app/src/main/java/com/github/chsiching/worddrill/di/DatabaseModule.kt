@@ -31,6 +31,7 @@ object DatabaseModule {
                 WordDrillDatabase.MIGRATION_2_3,
                 WordDrillDatabase.MIGRATION_3_4,
                 WordDrillDatabase.MIGRATION_4_5,
+                WordDrillDatabase.MIGRATION_5_6,
             )
             .build()
 

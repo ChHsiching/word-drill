@@ -16,7 +16,7 @@ import com.github.chsiching.worddrill.data.local.entity.SwipeLog
 import com.github.chsiching.worddrill.data.local.entity.Word
 
 @Database(
-    entities = [
+        entities = [
         Word::class,
         Sense::class,
         Book::class,
@@ -24,7 +24,7 @@ import com.github.chsiching.worddrill.data.local.entity.Word
         SwipeLog::class,
         DictionaryEntry::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class WordDrillDatabase : RoomDatabase() {
@@ -81,6 +81,16 @@ abstract class WordDrillDatabase : RoomDatabase() {
                 )
                 db.execSQL(
                     "ALTER TABLE book ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
+        // Same Room schema-match constraint: INTEGER NOT NULL DEFAULT 0 must match
+        // codegen for a non-null Int.
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE book ADD COLUMN completionCount INTEGER NOT NULL DEFAULT 0"
                 )
             }
         }

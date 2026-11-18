@@ -245,6 +245,17 @@ private fun StatsCard(state: MeStatsUiState, modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(top = 28.dp),
             )
 
+            // Per-book completion count (GLOSSARY.md); only a book with at least one
+            // finished pass has anything to say here.
+            if (state.completionCount > 0) {
+                Text(
+                    text = stringResource(R.string.me_completion_count, state.completionCount),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .padding(top = 24.dp)

@@ -50,6 +50,9 @@ sealed interface DrillUiState {
          *  so the restored deck starts at the first card instead of restoring the
          *  pre-reset page. */
         val deckGeneration: Int = 0,
+        /** Completed passes of this book (GLOSSARY.md, completion count), bumped by one
+         *  each time the completion card appears. Progress resets never clear it. */
+        val completionCount: Int = 0,
     ) : DrillUiState
 }
 
@@ -89,6 +92,12 @@ class DrillViewModel @Inject constructor(
      *  advance it (skip/restore reloads deliberately keep the pager's page). */
     private var resetGeneration = 0
 
+    /** deckGeneration the CURRENT book's pager was built with. A book-table reload
+     *  of the same book — a skip inserting the review book, a completion-count
+     *  increment — must reuse it, or the pager key (bookId, deckGeneration) would
+     *  change and rebuild the pager mid-session, throwing away the user's page. */
+    private var currentDeckGeneration = 0
+
     init {
         // Mirror playback into the app-wide overlay state so the navigation root
         // can draw the dwell hairline above both nav modes; the drill screen
@@ -122,7 +131,7 @@ class DrillViewModel @Inject constructor(
                 val bookId = currentBookId
                 if (resetBookId == bookId && bookId != null) {
                     val book = bookDao.getById(bookId)?.takeIf { !it.deleted } ?: return@collect
-                    setReady(book.bookId, book.name, deckGeneration = ++resetGeneration)
+                    setReady(book, deckGeneration = ++resetGeneration)
                 }
             }
         }
@@ -136,7 +145,7 @@ class DrillViewModel @Inject constructor(
             _uiState.value = DrillUiState.Empty()
             return
         }
-        setReady(book.bookId, book.name)
+        setReady(book, deckGeneration = if (book.bookId == currentBookId) currentDeckGeneration else 0)
     }
 
     // The default book is the first preset, non-review book in the library ordering
@@ -150,26 +159,27 @@ class DrillViewModel @Inject constructor(
             .map { books -> books.firstOrNull { it.isPreset && it.name != REVIEW_BOOK_NAME } }
             .firstOrNull { it != null }
 
-    private suspend fun setReady(bookId: Long, bookName: String, deckGeneration: Int = 0) {
+    private suspend fun setReady(book: Book, deckGeneration: Int = 0) {
         // Loading a (possibly different) book always starts playback idle: the deck
         // context the countdown belonged to is gone.
         autoAdvance.stop()
-        currentBookId = bookId
+        currentBookId = book.bookId
+        currentDeckGeneration = deckGeneration
         // Deck ordering (issue #54) is sampled once per book open, not observed:
         // changing the setting must leave the running session alone and take
         // effect on the next open. SHUFFLED draws a fresh Random here, so every
         // open re-deals and no pattern can be memorized.
-        val words = wordDao.getWordsWithSensesByBook(bookId)
+        val words = wordDao.getWordsWithSensesByBook(book.bookId)
         val cards = when (settings.deckOrdering.first()) {
             DeckOrdering.ALPHABETICAL -> WordOrdering.alphabetical(words)
             DeckOrdering.SHUFFLED -> WordOrdering.shuffled(words)
         }
         // The dealt sequence is the one ordering source the word list consumes.
-        deckSequence.publish(bookId, cards.map { it.word.wordId })
+        deckSequence.publish(book.bookId, cards.map { it.word.wordId })
         if (cards.isEmpty()) {
             _uiState.value = DrillUiState.Empty(
-                bookName = bookName,
-                isReviewBook = bookName == REVIEW_BOOK_NAME,
+                bookName = book.name,
+                isReviewBook = book.name == REVIEW_BOOK_NAME,
             )
             return
         }
@@ -177,21 +187,24 @@ class DrillViewModel @Inject constructor(
         // and reshuffles shift indices, and a word that left the deck (skipped,
         // deleted, restored away) falls back to the first card (GLOSSARY.md, resume
         // position).
-        val savedWordId = settings.resumeWordId(bookId)
+        val savedWordId = settings.resumeWordId(book.bookId)
         val initialPageIndex = WordOrdering.resumeIndex(savedWordId, cards)
         _uiState.value = DrillUiState.Ready(
-            bookId = bookId,
-            bookName = bookName,
+            bookId = book.bookId,
+            bookName = book.name,
             cards = cards,
-            isReviewBook = bookName == REVIEW_BOOK_NAME,
+            isReviewBook = book.name == REVIEW_BOOK_NAME,
             initialPageIndex = initialPageIndex,
             deckGeneration = deckGeneration,
+            completionCount = book.completionCount,
         )
     }
 
-    /** Double-tap on the card area: start auto-advance, pause it, or resume it. */
+    /** Double-tap on the card area: start auto-advance, pause it, or resume it.
+     *  Inert on the completion card: playback never starts there. */
     fun toggleAutoAdvance(currentPage: Int) {
         val ready = _uiState.value as? DrillUiState.Ready ?: return
+        if (currentPage >= ready.cards.size) return
         autoAdvance.toggle(currentPage, ready.cards.size)
     }
 
@@ -204,8 +217,22 @@ class DrillViewModel @Inject constructor(
     }
 
     fun onPageSettled(previousPage: Int, currentPage: Int) {
+        // The pager's settledPage flow already de-duplicates, but this is the write
+        // path: a settle that did not move pages must not double-write (resume word,
+        // swipe log, completion count).
+        if (currentPage == previousPage) return
         val bookId = currentBookId ?: return
         val ready = _uiState.value as? DrillUiState.Ready ?: return
+        // Settling on the virtual completion page (index == deck size) records one
+        // finished pass. Playback stops — the deck's end is reached — and no resume
+        // word exists under this page, so the card under the last real card stays the
+        // resume position.
+        if (currentPage == ready.cards.size) {
+            autoAdvance.stop()
+            _uiState.value = ready.copy(completionCount = ready.completionCount + 1)
+            viewModelScope.launch { bookDao.incrementCompletionCount(bookId) }
+            return
+        }
         // Every settle repositions playback (manual swipe or auto flip) without
         // pausing; the logging and resume writes below are the untouched settle path.
         autoAdvance.reposition(currentPage, ready.cards.size)
@@ -222,6 +249,15 @@ class DrillViewModel @Inject constructor(
                 SwipeLog(bookId = bookId, wordId = wordId, timestamp = System.currentTimeMillis())
             )
         }
+    }
+
+    /** 重新刷 on the completion card: the shared reset engine (GLOSSARY.md, progress
+     *  reset) returns the book to its first card with every skipped word back in the
+     *  deck. The reset listener above reloads the deck (deckGeneration bump), landing
+     *  on the first card; the completion count is history and survives. */
+    fun restartBook() {
+        val bookId = currentBookId ?: return
+        viewModelScope.launch { progressResetter.reset(bookId) }
     }
 
     fun skipCurrentWord(currentPage: Int) {

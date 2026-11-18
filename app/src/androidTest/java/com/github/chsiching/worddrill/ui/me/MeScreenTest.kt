@@ -168,6 +168,8 @@ class MeScreenTest {
         composeRule.onNodeWithText("今日刷卡").assertIsDisplayed()
         composeRule.onNodeWithText("累计刷卡").assertIsDisplayed()
         composeRule.onNodeWithText("测试词书").assertIsDisplayed()
+        // A book with no finished pass yet shows no completion line.
+        composeRule.onNodeWithText("已刷完 0 遍").assertDoesNotExist()
     }
 
     @Test
@@ -233,6 +235,20 @@ class MeScreenTest {
         assertThat(state.total).isEqualTo(2)
         assertThat(state.percent).isEqualTo(50.0)
         assertThat(state.bookName).isEqualTo("另一本")
+    }
+
+    // --- Completion count in the stats card (#57) ---
+
+    @Test
+    fun statsCard_showsCompletionCount_ofCurrentBook() = runBlocking {
+        repeat(2) { db.bookDao().incrementCompletionCount(bookId) }
+
+        val state = stableState(vm())
+        assertThat(state.completionCount).isEqualTo(2)
+
+        renderWithVm(vm())
+        composeRule.onNodeWithText("已刷完 2 遍").assertIsDisplayed()
+        Unit
     }
 
     @Test

@@ -174,4 +174,30 @@ class DatabaseJsonSerializerTest {
         val restored = DatabaseJsonSerializer.deserialize(json)
         assertThat(restored.bookWords.single().skipped).isFalse()
     }
+
+    @Test
+    fun roundTrip_preservesCompletionCount() {
+        val withCount = snapshot.copy(
+            books = listOf(
+                Book(bookId = 1, name = "CET-4", isPreset = true, completionCount = 3),
+                Book(bookId = 2, name = "我的词书", isPreset = false),
+            )
+        )
+        val restored = DatabaseJsonSerializer.deserialize(
+            DatabaseJsonSerializer.serialize(withCount)
+        )
+        assertThat(restored.books.first { it.name == "CET-4" }.completionCount).isEqualTo(3)
+        assertThat(restored.books.first { it.name == "我的词书" }.completionCount).isEqualTo(0)
+    }
+
+    @Test
+    fun deserialize_completionCount_defaultsZero_whenMissing() {
+        // A backup written before the completion count existed.
+        val json = """
+            {"version":1,"books":[{"bookId":1,"name":"CET-4","isPreset":true}],
+             "words":[],"senses":[],"bookWords":[],"swipeLogs":[]}
+        """.trimIndent()
+        val restored = DatabaseJsonSerializer.deserialize(json)
+        assertThat(restored.books.single().completionCount).isEqualTo(0)
+    }
 }

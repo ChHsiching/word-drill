@@ -190,4 +190,24 @@ class ProgressResetterTest {
         assertThat(emitted).containsExactly(bookId)
         Unit
     }
+
+    @Test
+    fun reset_preservesCompletionCount() = runBlocking {
+        // The completion count is cumulative history (GLOSSARY.md, progress reset):
+        // resetting a book's progress never clears its finished passes.
+        val bookId = 800_601L
+        seedDrilledBook(
+            bookId = bookId,
+            reviewBookId = 810_601L,
+            name = "重置F",
+            wordTexts = listOf("apple", "balance"),
+            skippedTexts = listOf("apple"),
+        )
+        repeat(2) { db.bookDao().incrementCompletionCount(bookId) }
+
+        resetter.reset(bookId)
+
+        assertThat(db.bookDao().getById(bookId)!!.completionCount).isEqualTo(2)
+        Unit
+    }
 }

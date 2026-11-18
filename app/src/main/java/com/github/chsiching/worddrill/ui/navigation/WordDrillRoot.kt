@@ -119,6 +119,7 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
                     locked = drillLocked,
                     onToggleLock = { drillLocked = !drillLocked },
                     hidePhonetic = hidePhonetic,
+                    onSwitchBook = { navigateTo(TopDestination.Library.route) },
                 )
             }
             composable(TopDestination.Library.route) {

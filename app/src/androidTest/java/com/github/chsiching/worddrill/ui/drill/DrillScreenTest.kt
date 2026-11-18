@@ -1,6 +1,10 @@
 package com.github.chsiching.worddrill.ui.drill
 
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -296,6 +300,204 @@ class DrillScreenTest {
         val settings = SettingsRepository(context)
         val bookId = 934_502L
         db.bookDao().insert(Book(bookId = bookId, name = "空词书", isPreset = false))
+        settings.setCurrentBookId(bookId)
+        return DrillViewModel(
+            db = db,
+            bookDao = db.bookDao(),
+            wordDao = db.wordDao(),
+            swipeLogDao = db.swipeLogDao(),
+            settings = settings,
+            overlayState = AutoAdvanceOverlayState(),
+            progressResetter = ProgressResetter(db, db.bookDao(), settings),
+            deckSequence = DeckSequenceState(),
+        )
+    }
+
+    // --- Completion card (#57) ---
+
+    @Test
+    fun swipingPastLastCard_showsCompletionCardAsVirtualPage() {
+        // The pager's contract: the state holds the completed-pass count, and the
+        // settle handler bumps it when the completion page is reached — exactly what
+        // DrillViewModel.onPageSettled does, modeled here without a ViewModel.
+        val cards = cards()
+        var completionCount by mutableStateOf(0)
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillPager(
+                        bookName = "测试词书",
+                        cards = cards,
+                        completionCount = completionCount,
+                        onPageSettled = { _, current ->
+                            if (current == cards.size) completionCount += 1
+                        },
+                        onSkip = { },
+                        isReviewBook = false,
+                        onRestore = { },
+                        locked = false,
+                        onToggleLock = {},
+                        hidePhonetic = false,
+                        onToggleAutoAdvance = { },
+                        advance = emptyFlow(),
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        // Three swipes: the last one lands on the virtual page after the deck.
+        repeat(3) {
+            composeRule.onRoot().performTouchInput { swipeLeft() }
+            composeRule.waitForIdle()
+        }
+
+        composeRule.onNodeWithText("🎉 刷完了").assertIsDisplayed()
+        // The book name shows twice while the completion card is up: the top bar and
+        // the card itself.
+        composeRule.onAllNodesWithText("测试词书").assertCountEquals(2)
+        composeRule.onNodeWithText("这是你第 1 遍刷完这本书").assertIsDisplayed()
+        composeRule.onNodeWithText("重新刷").assertIsDisplayed()
+        composeRule.onNodeWithText("换一本书").assertIsDisplayed()
+        // The completion page is not a card position: the counter stays at N / N.
+        composeRule.onNodeWithText("3 / 3").assertIsDisplayed()
+    }
+
+    @Test
+    fun completionCard_passCount_followsCompletedCount() {
+        // Post-settle contract: the card reads the completed-pass count carried by the
+        // state, so a book with one recorded pass shows 第 1 遍 while settled.
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillPager(
+                        bookName = "测试词书",
+                        cards = cards(),
+                        completionCount = 1,
+                        onPageSettled = { _, _ -> },
+                        onSkip = { },
+                        isReviewBook = false,
+                        onRestore = { },
+                        locked = false,
+                        onToggleLock = {},
+                        hidePhonetic = false,
+                        onToggleAutoAdvance = { },
+                        advance = emptyFlow(),
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        repeat(3) {
+            composeRule.onRoot().performTouchInput { swipeLeft() }
+            composeRule.waitForIdle()
+        }
+        composeRule.onNodeWithText("这是你第 1 遍刷完这本书").assertIsDisplayed()
+    }
+
+    @Test
+    fun completionCard_switchBook_invokesCallback() {
+        var switchRequested = false
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillPager(
+                        bookName = "测试词书",
+                        cards = cards(),
+                        onPageSettled = { _, _ -> },
+                        onSkip = { },
+                        isReviewBook = false,
+                        onRestore = { },
+                        onSwitchBook = { switchRequested = true },
+                        locked = false,
+                        onToggleLock = {},
+                        hidePhonetic = false,
+                        onToggleAutoAdvance = { },
+                        advance = emptyFlow(),
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        repeat(3) {
+            composeRule.onRoot().performTouchInput { swipeLeft() }
+            composeRule.waitForIdle()
+        }
+
+        composeRule.onNodeWithText("换一本书").performClick()
+        composeRule.waitForIdle()
+        assertThat(switchRequested).isTrue()
+    }
+
+    @Test
+    fun completionCard_restart_resetsDeckToFirstCard_incrementsShownPerPass() {
+        val vm = runBlocking { seedCompletionBookAndCreateViewModel() }
+        try {
+            composeRule.setContent {
+                WordDrillTheme {
+                    Surface {
+                        DrillScreen(onSwitchBook = {}, viewModel = vm)
+                    }
+                }
+            }
+            composeRule.waitUntil(10_000L) {
+                composeRule.onAllNodesWithText("1 / 3").fetchSemanticsNodes().isNotEmpty()
+            }
+
+            // Skip the middle card through the drill's own write path, so the reset
+            // below has a skip to undo; the deck shrinks to two cards.
+            composeRule.onRoot().performTouchInput { swipeLeft() }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithText("跳过").performClick()
+            composeRule.waitUntil(10_000L) {
+                composeRule.onAllNodesWithText("2 / 2").fetchSemanticsNodes().isNotEmpty()
+            }
+
+            // Finish the shrunken deck (two cards, so the completion page is one
+            // swipe away): the completion card appears with the first pass.
+            composeRule.onRoot().performTouchInput { swipeLeft() }
+            composeRule.waitForIdle()
+            composeRule.waitUntil(10_000L) {
+                composeRule.onAllNodesWithText("🎉 刷完了").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithText("这是你第 1 遍刷完这本书").assertIsDisplayed()
+
+            // 重新刷 runs the shared reset engine: the skipped word is back, the deck
+            // is whole again, and the pager lands on the first card.
+            composeRule.onNodeWithText("重新刷").performClick()
+            composeRule.waitUntil(10_000L) {
+                composeRule.onAllNodesWithText("1 / 3").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithText("apple").assertIsDisplayed()
+            composeRule.onNodeWithText("🎉 刷完了").assertDoesNotExist()
+
+            // Finishing again is the second pass: 第 2 遍.
+            repeat(3) {
+                composeRule.onRoot().performTouchInput { swipeLeft() }
+                composeRule.waitForIdle()
+            }
+            composeRule.waitUntil(10_000L) {
+                composeRule.onAllNodesWithText("🎉 刷完了").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithText("这是你第 2 遍刷完这本书").assertIsDisplayed()
+        } finally {
+            vm.viewModelScope.cancel()
+        }
+    }
+
+    /** The book the restart flow drives: three words with senses. The book id is
+     *  explicit and in this test's own range (resume and current-book keys live in the
+     *  process-wide DataStore while the in-memory database resets per test). */
+    private suspend fun seedCompletionBookAndCreateViewModel(): DrillViewModel {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val settings = SettingsRepository(context)
+        val bookId = 934_520L
+        db.bookDao().insert(Book(bookId = bookId, name = "完成流程词书", isPreset = false))
+        listOf("apple", "balance", "circle").forEach {
+            val wordId = db.wordDao().findOrInsertWord(it, null)
+            db.wordDao().insertSense(Sense(wordId = wordId, pos = "n.", meaning = "测试释义"))
+            db.bookDao().linkBookWord(BookWord(bookId = bookId, wordId = wordId))
+        }
         settings.setCurrentBookId(bookId)
         return DrillViewModel(
             db = db,
