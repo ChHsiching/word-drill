@@ -18,6 +18,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.backup.BackupService
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.entity.Book
@@ -27,6 +28,12 @@ import com.github.chsiching.worddrill.data.local.entity.Word
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.data.settings.ThemeMode
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
+import com.github.chsiching.worddrill.update.ApkInstaller
+import com.github.chsiching.worddrill.update.ReleaseInfo
+import com.github.chsiching.worddrill.update.UpdateCheckCache
+import com.github.chsiching.worddrill.update.UpdateChecker
+import com.github.chsiching.worddrill.update.UpdateCheckResult
+import com.github.chsiching.worddrill.update.UpdateViewModel
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -106,6 +113,26 @@ class MeScreenTest {
             .also { viewModels.add(it) }
     }
 
+    /** Update-flow fakes mirror UpdateFlowTest: no network, no DownloadManager. */
+    private class FakeUpdateChecker(var result: UpdateCheckResult) : UpdateChecker {
+        var calls = 0
+        override suspend fun checkForUpdate(): UpdateCheckResult {
+            calls++
+            return result
+        }
+    }
+
+    private class FakeUpdateInstaller : ApkInstaller {
+        override fun canInstallApk() = true
+        override fun downloadAndInstall(apkUrl: String, version: String, onFailed: () -> Unit) = Unit
+    }
+
+    private fun updateVm(
+        checker: FakeUpdateChecker = FakeUpdateChecker(UpdateCheckResult.UpToDate),
+        cache: UpdateCheckCache = UpdateCheckCache(),
+    ): UpdateViewModel = UpdateViewModel(checker, FakeUpdateInstaller(), cache)
+        .also { viewModels.add(it) }
+
     private suspend fun stableState(viewModel: MeViewModel): MeStatsUiState =
         viewModel.uiState.first { it.bookName.isNotEmpty() }
 
@@ -113,6 +140,7 @@ class MeScreenTest {
         viewModel: MeViewModel,
         settingsViewModel: SettingsViewModel = settingsVm(),
         exportImportViewModel: ExportImportViewModel = exportImportVm(),
+        updateViewModel: UpdateViewModel = updateVm(),
     ) {
         composeRule.setContent {
             WordDrillTheme {
@@ -122,6 +150,7 @@ class MeScreenTest {
                         viewModel = viewModel,
                         settingsViewModel = settingsViewModel,
                         exportImportViewModel = exportImportViewModel,
+                        updateViewModel = updateViewModel,
                     )
                 }
             }
@@ -326,6 +355,7 @@ class MeScreenTest {
                         viewModel = vm(),
                         settingsViewModel = settingsHolder.value,
                         exportImportViewModel = exportImportVm(),
+                        updateViewModel = updateVm(),
                     )
                 }
             }
@@ -357,5 +387,107 @@ class MeScreenTest {
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText("30.0 秒").fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    // --- Manual 检查更新 row (#59) ---
+
+    private fun awaitShown(text: String, substring: Boolean = true) {
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithText(text, substring = substring)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText(text, substring = substring).assertIsDisplayed()
+    }
+
+    private fun awaitGone(text: String, substring: Boolean = true) {
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithText(text, substring = substring)
+                .fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithText(text, substring = substring).assertDoesNotExist()
+    }
+
+    @Test
+    fun checkUpdateRow_rendersInGeneralGroup() {
+        renderWithVm(vm())
+        composeRule.onNodeWithText("检查更新", substring = false).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun checkUpdateRow_noUpdate_showsUpToDateInline() {
+        renderWithVm(vm(), updateViewModel = updateVm(FakeUpdateChecker(UpdateCheckResult.UpToDate)))
+
+        composeRule.onNodeWithText("检查更新", substring = false).performScrollTo().performClick()
+
+        // The inline line lands below the tapped row; scroll it into view before
+        // asserting display (scroll-order independence on the CI viewport).
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("已是最新版本", substring = false)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("已是最新版本", substring = false)
+            .performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
+    }
+
+    @Test
+    fun checkUpdateRow_updateAvailable_opensUpdateDialog() {
+        val release = ReleaseInfo(
+            version = "0.3.0",
+            notes = "修复与改进",
+            apkUrl = "https://example.com/worddrill-v0.3.0.apk",
+        )
+        renderWithVm(
+            vm(),
+            updateViewModel = updateVm(FakeUpdateChecker(UpdateCheckResult.UpdateAvailable(release))),
+        )
+
+        composeRule.onNodeWithText("检查更新", substring = false).performScrollTo().performClick()
+
+        awaitShown("发现新版本", substring = false)
+        awaitShown("版本 0.3.0", substring = false)
+        awaitShown("立即更新", substring = false)
+        composeRule.onNodeWithText("暂不更新", substring = false).performClick()
+        awaitGone("发现新版本", substring = false)
+    }
+
+    @Test
+    fun checkUpdateRow_failure_showsErrorInline() {
+        renderWithVm(
+            vm(),
+            updateViewModel = updateVm(
+                FakeUpdateChecker(UpdateCheckResult.CheckFailed(R.string.update_error_generic)),
+            ),
+        )
+
+        composeRule.onNodeWithText("检查更新", substring = false).performScrollTo().performClick()
+
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("无法连接 GitHub", substring = false)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("无法连接 GitHub", substring = false)
+            .performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
+    }
+
+    @Test
+    fun checkUpdateRow_tapAfterLaunchCheck_replaysCachedResultWithoutRefetch() = runBlocking {
+        val checker = FakeUpdateChecker(UpdateCheckResult.UpToDate)
+        val cache = UpdateCheckCache()
+        // The activity-scoped launch ViewModel fetched first; the Me tab shares the cache.
+        updateVm(checker, cache).checkForUpdate()
+        renderWithVm(vm(), updateViewModel = updateVm(checker, cache))
+
+        composeRule.onNodeWithText("检查更新", substring = false).performScrollTo().performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("已是最新版本", substring = false)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("已是最新版本", substring = false)
+            .performScrollTo().assertIsDisplayed()
+
+        assertThat(checker.calls).isEqualTo(1)
+        Unit
     }
 }
