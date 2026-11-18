@@ -38,10 +38,12 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -134,7 +136,6 @@ fun WordListScreen(
         )
 
         SearchBar(
-            query = state.searchQuery,
             onQueryChange = viewModel::onSearchInput,
             modifier = Modifier
                 .fillMaxWidth()
@@ -512,13 +513,25 @@ private fun LetterIndexBar(
 
 @Composable
 private fun SearchBar(
-    query: String,
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The field owns its text so the value round trip stays synchronous. A
+    // value fed from the async uiState flow lags the editor by one frame and
+    // the value-based TextField then resets the editor to the stale value,
+    // wiping the typed query. The text is saved with the nav entry so it
+    // survives tab switches along with the ViewModel; the one-shot effect
+    // re-applies a restored query to keep the filter consistent.
+    var text by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        if (text.isNotEmpty()) onQueryChange(text)
+    }
     OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
+        value = text,
+        onValueChange = {
+            text = it
+            onQueryChange(it)
+        },
         modifier = modifier.fillMaxWidth(),
         singleLine = true,
         placeholder = { Text(stringResource(R.string.word_list_search_hint)) },
