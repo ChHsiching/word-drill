@@ -19,6 +19,9 @@ sealed interface UpdateUiState {
 
     data class Available(val release: ReleaseInfo) : UpdateUiState
 
+    /** Manual 检查更新 found nothing newer: inline 已是最新版本 in the Me tab. */
+    data object UpToDate : UpdateUiState
+
     /** Inline diagnostic banner (check or download failure). */
     data class Notice(val messageRes: Int) : UpdateUiState
 }
@@ -32,6 +35,7 @@ sealed interface UpdateEvent {
 class UpdateViewModel @Inject constructor(
     private val checker: UpdateChecker,
     private val installer: ApkInstaller,
+    private val cache: UpdateCheckCache,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<UpdateUiState>(UpdateUiState.Idle)
@@ -49,12 +53,32 @@ class UpdateViewModel @Inject constructor(
         if (checkStarted) return
         checkStarted = true
         viewModelScope.launch {
-            when (val result = checker.checkForUpdate()) {
+            when (val result = cache.getOrFetch(checker)) {
                 is UpdateCheckResult.UpdateAvailable ->
                     if (!dismissed) _state.value = UpdateUiState.Available(result.release)
                 UpdateCheckResult.UpToDate -> Unit // completely silent
                 is UpdateCheckResult.CheckFailed ->
                     if (!dismissed) _state.value = UpdateUiState.Notice(result.messageRes)
+            }
+        }
+    }
+
+    /**
+     * Me tab's 检查更新 row. Replays the once-per-launch cached result (so a manual
+     * check right after the automatic one never re-fetches) and surfaces every
+     * outcome, unlike the silent launch check.
+     */
+    fun manualCheck() {
+        viewModelScope.launch {
+            when (val result = cache.getOrFetch(checker)) {
+                is UpdateCheckResult.UpdateAvailable -> {
+                    // An explicit check overrides an earlier 暂不更新.
+                    dismissed = false
+                    _state.value = UpdateUiState.Available(result.release)
+                }
+                UpdateCheckResult.UpToDate -> _state.value = UpdateUiState.UpToDate
+                is UpdateCheckResult.CheckFailed ->
+                    _state.value = UpdateUiState.Notice(result.messageRes)
             }
         }
     }

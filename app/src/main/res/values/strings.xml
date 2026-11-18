@@ -109,6 +109,7 @@
     <string name="me_setting_export">导出数据</string>
     <string name="me_setting_import">导入数据</string>
     <string name="me_setting_about">关于</string>
+    <string name="me_setting_check_update">检查更新</string>
     <string name="library_import">从文件导入</string>
     <string name="library_import_title">从文件导入词书</string>
     <string name="library_import_message">支持 xlsx / txt / csv / pdf。列结构：序号、单词、音标、词性释义。词优先查内置词典补全释义。</string>
@@ -131,4 +132,5 @@
     <string name="update_download_failed">下载失败</string>
     <string name="update_notification_title">WordDrill %1$s</string>
     <string name="update_notice_dismiss">关闭</string>
+    <string name="update_up_to_date">已是最新版本</string>
 </resources>
