@@ -67,6 +67,19 @@ internal fun filterWords(words: List<WordWithSenses>, query: String): List<WordW
     if (query.isEmpty()) words
     else words.filter { it.word.text.contains(query, ignoreCase = true) }
 
+/** Letter index bar jump map (issue #60): first displayed index per A–Z section,
+ *  case-insensitive. Words with a non-A–Z initial belong to no section. */
+internal fun letterAnchors(words: List<WordWithSenses>): Map<Char, Int> {
+    val anchors = linkedMapOf<Char, Int>()
+    words.forEachIndexed { index, wordWithSenses ->
+        val initial = wordWithSenses.word.text.firstOrNull()?.uppercaseChar()
+        if (initial != null && initial in 'A'..'Z') {
+            anchors.putIfAbsent(initial, index)
+        }
+    }
+    return anchors
+}
+
 data class WordListUiState(
     val bookName: String = "",
     val isPreset: Boolean = false,
