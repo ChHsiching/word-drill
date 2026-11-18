@@ -1,0 +1,112 @@
+# Chunked Youdao crawl for the self-built dictionary (ADR 0001, issue #49).
+#
+# One job may run at most 6 hours on hosted runners; at the locked rate of
+# 1 request/second that caps a chunk at ~21k words, so the full ~100k-word
+# inventory needs several runs. Each run downloads the crawl state (raw cache
+# + checkpoint) carried forward as the `crawl-state` artifact from the latest
+# successful chunk, crawls for --max-seconds, then re-uploads the state plus
+# an advisory build. Re-dispatch until the progress summary reports 100%.
+#
+# Raw cache location: the gitignored .scratch/youdao-crawl/ directory (never
+# committed; lives only in workflow artifacts between chunks).
+
+name: Crawl dictionary (chunked)
+
+on:
+  workflow_dispatch:
+    inputs:
+      max-seconds:
+        description: 'Crawl budget for this chunk, in seconds'
+        required: false
+        default: '18000'
+      limit:
+        description: 'Max fetches this chunk (0 = no limit)'
+        required: false
+        default: '0'
+      state-run-id:
+        description: 'Run ID to resume state from (0 = latest successful chunk)'
+        required: false
+        default: '0'
+
+concurrency:
+  group: crawl-dictionary
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350 # under the 6h job cap so state still uploads on a slow chunk
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Resolve previous chunk run
+        id: prev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_ID='${{ inputs.state-run-id }}'
+          if [ "$RUN_ID" = '0' ]; then
+            RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" \
+              --workflow crawl-dictionary.yml --status success --limit 1 \
+              --json databaseId --jq '.[0].databaseId // 0')
+          fi
+          echo "run-id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      # First chunk has no state; an expired artifact restarts from scratch.
+      - name: Download crawl state
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: crawl-state
+          path: .scratch/youdao-crawl
+          run-id: ${{ steps.prev.outputs.run-id }}
+          github-token: ${{ github.token }}
+
+      # Exit 1 means some fetches errored (state is still valid); anything
+      # else is a real failure.
+      - name: Crawl chunk
+        run: |
+          set +e
+          python tools/youdao_crawler.py \
+            --max-seconds '${{ inputs.max-seconds }}' \
+            $( [ '${{ inputs.limit }}' != '0' ] && echo --limit '${{ inputs.limit }}' )
+          code=$?
+          [ "$code" -le 1 ] || exit "$code"
+
+      # Advisory while the crawl is incomplete: the phonetic-coverage gate is
+      # only meaningful on the full inventory. The final chunk's summary is
+      # the place to check it; a strict local build gates the shipped asset.
+      - name: Build and validate current cache
+        run: python tools/build_youdao_dictionary.py --allow-validation-errors
+
+      - name: Write progress summary
+        run: |
+          TOTAL=$(python -c \
+            "import json; print(len({e['word'] for e in json.load(open('app/src/main/assets/dictionary.json'))['words']}))")
+          DONE=$(wc -l < .scratch/youdao-crawl/checkpoint.jsonl || echo 0)
+          {
+            echo "## Dictionary crawl progress"
+            echo "Crawled $DONE / $TOTAL words ($(( DONE * 100 / TOTAL ))%)"
+            echo "Re-dispatch this workflow until 100%, then build strictly:"
+            echo '```'
+            echo "python tools/build_youdao_dictionary.py --out app/src/main/assets/dictionary.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload crawl state
+        uses: actions/upload-artifact@v4
+        with:
+          name: crawl-state
+          path: |
+            .scratch/youdao-crawl/checkpoint.jsonl
+            .scratch/youdao-crawl/raw.jsonl
+            .scratch/youdao-crawl/dictionary.youdao.json
+          retention-days: 90
+          if-no-files-found: error
