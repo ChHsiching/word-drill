@@ -79,6 +79,22 @@ interface BookDao {
     @Query("UPDATE book_word SET skipped = 0 WHERE wordId = :wordId")
     suspend fun unskipWordEverywhere(wordId: Long)
 
+    @Query("UPDATE book_word SET skipped = 0 WHERE bookId = :bookId")
+    suspend fun unskipAllInBook(bookId: Long)
+
+    /** Drops the review book's links to [bookId]'s words that are no longer skipped
+     *  anywhere; a word still skipped in another book must stay in the review book
+     *  (GLOSSARY.md, review book). Run after [unskipAllInBook], inside the caller's
+     *  transaction, so the NOT IN subquery sees the un-skipped state. */
+    @Query(
+        """
+        DELETE FROM book_word WHERE bookId = :reviewBookId
+        AND wordId IN (SELECT wordId FROM book_word WHERE bookId = :bookId)
+        AND wordId NOT IN (SELECT wordId FROM book_word WHERE skipped = 1)
+        """
+    )
+    suspend fun removeReviewLinksOfBookWords(reviewBookId: Long, bookId: Long)
+
     @Query("UPDATE book_word SET deleted = :deleted WHERE bookId = :bookId AND wordId = :wordId")
     suspend fun setDeleted(bookId: Long, wordId: Long, deleted: Boolean)
 

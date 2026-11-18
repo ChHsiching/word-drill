@@ -15,6 +15,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.github.chsiching.worddrill.data.ProgressResetter
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
@@ -249,6 +250,7 @@ class DrillScreenTest {
             swipeLogDao = db.swipeLogDao(),
             settings = settings,
             overlayState = AutoAdvanceOverlayState(),
+            progressResetter = ProgressResetter(db, db.bookDao(), settings),
         )
     }
 
@@ -300,6 +302,7 @@ class DrillScreenTest {
             swipeLogDao = db.swipeLogDao(),
             settings = settings,
             overlayState = AutoAdvanceOverlayState(),
+            progressResetter = ProgressResetter(db, db.bookDao(), settings),
         )
     }
 }
