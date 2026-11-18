@@ -44,13 +44,11 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -68,9 +66,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
-
-/** Test tag of the auto-advance dwell hairline at the drill screen's bottom edge. */
-internal const val AutoAdvanceHairlineTag = "auto_advance_hairline"
 
 /** Auto-advance lifecycle integration (#39). The keep-screen-on window flag is held
  *  exactly while the phase is Playing, and playback stops when this screen leaves
@@ -141,7 +136,32 @@ fun DrillScreen(
 
     when (val state = uiState) {
         DrillUiState.Loading -> CenterText(stringResource(R.string.drill_loading), modifier)
-        DrillUiState.Empty -> CenterText(stringResource(R.string.drill_empty), modifier)
+        // The empty deck keeps the header (book name, 0 / 0, action label, lock) with
+        // the centered message below it; skip/restore stay inert because the
+        // ViewModel guards them on the Ready state.
+        is DrillUiState.Empty -> Column(modifier = modifier.fillMaxSize()) {
+            DrillTopBar(
+                bookName = state.bookName,
+                counter = "0 / 0",
+                locked = locked,
+                onToggleLock = onToggleLock,
+                isReviewBook = state.isReviewBook,
+                onAction = {
+                    if (state.isReviewBook) {
+                        viewModel.restoreCurrentWord(0)
+                    } else {
+                        viewModel.skipCurrentWord(0)
+                    }
+                },
+            )
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = stringResource(R.string.drill_empty),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
         // Keyed on the book id so switching books rebuilds the pager at the new book's
         // resume position; within one book the pager state (and the user's page)
         // survives deck reloads from skip/restore.
@@ -159,7 +179,6 @@ fun DrillScreen(
                 hidePhonetic = hidePhonetic,
                 modifier = modifier,
                 onToggleAutoAdvance = viewModel::toggleAutoAdvance,
-                playbackState = playback,
                 advance = viewModel.advance,
             )
         }
@@ -180,7 +199,6 @@ internal fun DrillPager(
     hidePhonetic: Boolean,
     modifier: Modifier = Modifier,
     onToggleAutoAdvance: (currentPage: Int) -> Unit,
-    playbackState: AutoAdvanceState,
     advance: Flow<Int>,
 ) {
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { cards.size })
@@ -207,15 +225,13 @@ internal fun DrillPager(
         Column(modifier = Modifier.fillMaxSize()) {
             DrillTopBar(
                 bookName = bookName,
-                index = pagerState.currentPage,
-                total = cards.size,
+                counter = "${pagerState.currentPage + 1} / ${cards.size}",
                 locked = locked,
                 onToggleLock = onToggleLock,
                 isReviewBook = isReviewBook,
-                onAction = { page ->
-                    if (isReviewBook) onRestore(page) else onSkip(page)
+                onAction = {
+                    if (isReviewBook) onRestore(pagerState.currentPage) else onSkip(pagerState.currentPage)
                 },
-                currentPage = pagerState.currentPage,
             )
 
             HorizontalPager(
@@ -223,11 +239,24 @@ internal fun DrillPager(
                 modifier = Modifier
                     .fillMaxSize()
                     // Double-tap on the card area toggles auto-advance. Single taps
-                    // stay inert, and a tap that turns into a drag cancels here so
-                    // the pager keeps handling the swipe.
-                    .pointerInput(Unit) {
+                    // stay inert, so the pair window is generous (600 ms) — injected
+                    // input (emulator mouse, adb) arrives with per-tap latency that
+                    // can push two taps past the 300 ms platform default.
+                    .pointerInput(onToggleAutoAdvance) {
+                        var lastTapAt = 0L
+                        var lastTapOffset = Offset.Zero
                         detectTapGestures(
-                            onDoubleTap = { onToggleAutoAdvance(pagerState.currentPage) },
+                            onTap = { offset ->
+                                val now = System.currentTimeMillis()
+                                if (now - lastTapAt < 600 &&
+                                    (offset - lastTapOffset).getDistance() < 96f) {
+                                    lastTapAt = 0L
+                                    onToggleAutoAdvance(pagerState.currentPage)
+                                } else {
+                                    lastTapAt = now
+                                    lastTapOffset = offset
+                                }
+                            },
                         )
                     },
             ) { pageIndex ->
@@ -238,49 +267,17 @@ internal fun DrillPager(
             }
         }
 
-        if (playbackState.phase != AutoAdvancePhase.Idle) {
-            AutoAdvanceHairline(
-                elapsedFraction = playbackState.elapsedFraction,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
-        }
     }
-}
-
-/** The dwell hairline: a 2 dp full-width line at the screen's very bottom edge
- *  (approved prototype `.scratch/proto-auto-advance.html`, `edgeprog`): onSurface at
- *  55 % opacity filling left-to-right with the elapsed fraction, frozen while paused,
- *  absent while idle. It renders inside the drill content, so the capsule nav drawn
- *  later by the navigation root always floats above it. */
-@Composable
-private fun AutoAdvanceHairline(elapsedFraction: Float, modifier: Modifier = Modifier) {
-    val fill = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(2.dp)
-            .testTag(AutoAdvanceHairlineTag)
-            .drawBehind {
-                if (elapsedFraction > 0f) {
-                    drawRect(
-                        color = fill,
-                        size = Size(size.width * elapsedFraction, size.height),
-                    )
-                }
-            },
-    )
 }
 
 @Composable
 private fun DrillTopBar(
     bookName: String,
-    index: Int,
-    total: Int,
+    counter: String,
     locked: Boolean,
     onToggleLock: () -> Unit,
     isReviewBook: Boolean,
-    onAction: (currentPage: Int) -> Unit,
-    currentPage: Int,
+    onAction: () -> Unit,
 ) {
     val actionLabel = if (isReviewBook) R.string.drill_restore else R.string.drill_skip
     Box(
@@ -319,7 +316,7 @@ private fun DrillTopBar(
                         .clickable(
                             interactionSource = actionInteraction,
                             indication = null,
-                            onClick = { onAction(currentPage) },
+                            onClick = onAction,
                         )
                         .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
                 )
@@ -328,7 +325,7 @@ private fun DrillTopBar(
             }
         }
         Text(
-            text = "${index + 1} / $total",
+            text = counter,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelSmall,
         )

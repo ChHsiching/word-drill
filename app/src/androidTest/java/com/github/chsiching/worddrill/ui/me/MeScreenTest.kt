@@ -150,7 +150,7 @@ class MeScreenTest {
         assertThat(state.todayCount).isEqualTo(3)
         assertThat(state.brushed).isEqualTo(3)
         assertThat(state.total).isEqualTo(3)
-        assertThat(state.percent).isEqualTo(100)
+        assertThat(state.percent).isEqualTo(100.0)
     }
 
     @Test
@@ -163,7 +163,7 @@ class MeScreenTest {
         renderWithVm(vm())
         composeRule.onNodeWithText("测试词书").assertIsDisplayed()
         composeRule.onNodeWithText("2 / 3").assertIsDisplayed()
-        composeRule.onNodeWithText("66%").assertIsDisplayed()
+        composeRule.onNodeWithText("66.7%").assertIsDisplayed()
         composeRule.onNodeWithText("今日刷卡").assertIsDisplayed()
         composeRule.onNodeWithText("累计刷卡").assertIsDisplayed()
     }
@@ -185,7 +185,7 @@ class MeScreenTest {
         val now = System.currentTimeMillis()
         seedSwipe(wordId = 1, timestamp = now)
         seedSwipe(wordId = 2, timestamp = now)
-        assertThat(stableState(vm()).percent).isEqualTo(66)
+        assertThat(stableState(vm()).percent).isEqualTo(66.7)
 
         val other = db.bookDao().insert(Book(name = "另一本", isPreset = false))
         val ow1 = db.wordDao().insert(Word(text = "dog"))
@@ -198,7 +198,7 @@ class MeScreenTest {
         val state = stableState(vm())
         assertThat(state.brushed).isEqualTo(1)
         assertThat(state.total).isEqualTo(2)
-        assertThat(state.percent).isEqualTo(50)
+        assertThat(state.percent).isEqualTo(50.0)
         assertThat(state.bookName).isEqualTo("另一本")
     }
 

@@ -1,8 +1,11 @@
 package com.github.chsiching.worddrill.ui.drill
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -95,7 +98,9 @@ class DrillPlaybackTest {
 
     /** Composes the pager wired to a real AutoAdvance machine exactly the way the
      *  ViewModel wires it: double-tap toggles, the advance flow drives animated
-     *  scrolls, and every settle feeds the machine back. */
+     *  scrolls, and every settle feeds the machine back. The hairline is no longer
+     *  rendered by the drill screen — the navigation root draws it above the nav —
+     *  so the harness hosts the shared composable bound to the machine's state. */
     private fun composePlaybackPager(dwellMillis: Long = 1_000L) {
         machine = AutoAdvance(machineScope) { dwellMillis }
         val deckSize = cards().size
@@ -103,23 +108,30 @@ class DrillPlaybackTest {
             WordDrillTheme {
                 Surface {
                     val playback by machine.state.collectAsState()
-                    DrillPager(
-                        bookName = "测试词书",
-                        cards = cards(),
-                        onPageSettled = { previous, current ->
-                            settleLog += previous to current
-                            machine.reposition(current, deckSize)
-                        },
-                        onSkip = {},
-                        isReviewBook = false,
-                        onRestore = {},
-                        locked = false,
-                        onToggleLock = {},
-                        hidePhonetic = false,
-                        onToggleAutoAdvance = { page -> machine.toggle(page, deckSize) },
-                        playbackState = playback,
-                        advance = machine.advance,
-                    )
+                    Box {
+                        DrillPager(
+                            bookName = "测试词书",
+                            cards = cards(),
+                            onPageSettled = { previous, current ->
+                                settleLog += previous to current
+                                machine.reposition(current, deckSize)
+                            },
+                            onSkip = {},
+                            isReviewBook = false,
+                            onRestore = {},
+                            locked = false,
+                            onToggleLock = {},
+                            hidePhonetic = false,
+                            onToggleAutoAdvance = { page -> machine.toggle(page, deckSize) },
+                            advance = machine.advance,
+                        )
+                        if (playback.phase != AutoAdvancePhase.Idle) {
+                            AutoAdvanceHairline(
+                                elapsedFraction = playback.elapsedFraction,
+                                modifier = Modifier.align(Alignment.BottomCenter),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -141,6 +153,20 @@ class DrillPlaybackTest {
         composeRule.waitForIdle()
         assertThat(machine.state.value.phase).isEqualTo(AutoAdvancePhase.Paused)
         // Paused keeps the hairline, frozen in place.
+        composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertIsDisplayed()
+    }
+
+    @Test
+    fun slowDoubleTap_twoClicks450msApart_stillStartsPlayback() {
+        composePlaybackPager()
+
+        composeRule.onNodeWithText("apple").performTouchInput { click() }
+        Thread.sleep(450L)
+        composeRule.onNodeWithText("apple").performTouchInput { click() }
+        composeRule.waitForIdle()
+        // Injected input (emulator mouse, adb) carries per-tap latency past the
+        // 300 ms platform double-tap timeout; the pair window is 600 ms.
+        assertThat(machine.state.value.phase).isEqualTo(AutoAdvancePhase.Playing)
         composeRule.onNodeWithTag(AutoAdvanceHairlineTag).assertIsDisplayed()
     }
 

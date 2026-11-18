@@ -2,8 +2,14 @@ package com.github.chsiching.worddrill.ui.drill
 
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -97,7 +103,25 @@ class DrillLifecycleTest {
             wordDao = db.wordDao(),
             swipeLogDao = db.swipeLogDao(),
             settings = settings,
+            overlayState = AutoAdvanceOverlayState(),
         ).also { viewModels.add(it) }
+    }
+
+    /** Hosts [content] under the dwell hairline bound to the ViewModel's playback
+     *  state, mirroring the navigation root's overlay drawing: the drill screen no
+     *  longer renders the line itself. */
+    @Composable
+    private fun WithHairlineOverlay(vm: DrillViewModel, content: @Composable () -> Unit) {
+        Box {
+            content()
+            val playback by vm.playback.collectAsState()
+            if (playback.phase != AutoAdvancePhase.Idle) {
+                AutoAdvanceHairline(
+                    elapsedFraction = playback.elapsedFraction,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
+        }
     }
 
     @Test
@@ -111,7 +135,9 @@ class DrillLifecycleTest {
         composeRule.setContent {
             WordDrillTheme {
                 Surface {
-                    if (showDrill.value) DrillScreen(viewModel = vm)
+                    WithHairlineOverlay(vm) {
+                        if (showDrill.value) DrillScreen(viewModel = vm)
+                    }
                 }
             }
         }
@@ -144,7 +170,9 @@ class DrillLifecycleTest {
         composeRule.setContent {
             WordDrillTheme {
                 Surface {
-                    DrillScreen(viewModel = vm)
+                    WithHairlineOverlay(vm) {
+                        DrillScreen(viewModel = vm)
+                    }
                 }
             }
         }
@@ -173,7 +201,9 @@ class DrillLifecycleTest {
         composeRule.setContent {
             WordDrillTheme {
                 Surface {
-                    DrillScreen(viewModel = vm)
+                    WithHairlineOverlay(vm) {
+                        DrillScreen(viewModel = vm)
+                    }
                 }
             }
         }
@@ -208,7 +238,9 @@ class DrillLifecycleTest {
         composeRule.setContent {
             WordDrillTheme {
                 Surface {
-                    DrillScreen(viewModel = vm)
+                    WithHairlineOverlay(vm) {
+                        DrillScreen(viewModel = vm)
+                    }
                 }
             }
         }
@@ -230,7 +262,9 @@ class DrillLifecycleTest {
         composeRule.setContent {
             WordDrillTheme {
                 Surface {
-                    DrillScreen(viewModel = vm)
+                    WithHairlineOverlay(vm) {
+                        DrillScreen(viewModel = vm)
+                    }
                 }
             }
         }
@@ -260,11 +294,13 @@ class DrillLifecycleTest {
         composeRule.setContent {
             WordDrillTheme {
                 Surface {
-                    DrillScreen(
-                        locked = locked.value,
-                        onToggleLock = { locked.value = !locked.value },
-                        viewModel = vm,
-                    )
+                    WithHairlineOverlay(vm) {
+                        DrillScreen(
+                            locked = locked.value,
+                            onToggleLock = { locked.value = !locked.value },
+                            viewModel = vm,
+                        )
+                    }
                 }
             }
         }

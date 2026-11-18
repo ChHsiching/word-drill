@@ -449,14 +449,14 @@ private fun DeleteBookDialog(
         message = stringResource(R.string.library_delete_message, name),
         buttons = {
             DialogButton(
-                text = stringResource(R.string.library_delete_confirm),
-                onClick = onConfirm,
-                style = DialogButtonStyle.Destructive,
-            )
-            DialogButton(
                 text = stringResource(R.string.library_cancel),
                 onClick = onDismiss,
                 style = DialogButtonStyle.Cancel,
+            )
+            DialogButton(
+                text = stringResource(R.string.library_delete_confirm),
+                onClick = onConfirm,
+                style = DialogButtonStyle.Destructive,
             )
         },
     )

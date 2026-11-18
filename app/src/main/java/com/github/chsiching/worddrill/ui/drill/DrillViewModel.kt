@@ -29,7 +29,13 @@ import javax.inject.Inject
 
 sealed interface DrillUiState {
     data object Loading : DrillUiState
-    data object Empty : DrillUiState
+
+    /** The deck has no cards. The header still renders (book name, 0 / 0 counter,
+     *  action label, lock), so the state carries the book identity. */
+    data class Empty(
+        val bookName: String = "",
+        val isReviewBook: Boolean = false,
+    ) : DrillUiState
     data class Ready(
         val bookId: Long,
         val bookName: String,
@@ -46,6 +52,7 @@ class DrillViewModel @Inject constructor(
     private val wordDao: WordDao,
     private val swipeLogDao: SwipeLogDao,
     private val settings: SettingsRepository,
+    private val overlayState: AutoAdvanceOverlayState,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<DrillUiState>(DrillUiState.Loading)
@@ -53,7 +60,8 @@ class DrillViewModel @Inject constructor(
 
     /** Auto-advance playback machine (GLOSSARY.md): the countdown lives here, owned by
      *  the ViewModel, so virtual-time JVM tests can drive it; the screen only executes
-     *  advance commands and renders the hairline from the exposed state. */
+     *  advance commands, and the hairline is drawn by the navigation root from the
+     *  mirrored overlay state. */
     private val autoAdvance = AutoAdvance(viewModelScope) {
         (DwellInterval.normalize(settings.dwellInterval.first()) * 1000).toLong()
     }
@@ -68,6 +76,12 @@ class DrillViewModel @Inject constructor(
     private var currentBookId: Long? = null
 
     init {
+        // Mirror playback into the app-wide overlay state so the navigation root
+        // can draw the dwell hairline above both nav modes; the drill screen
+        // itself no longer renders the line.
+        viewModelScope.launch {
+            autoAdvance.state.collect { overlayState.update(it) }
+        }
         viewModelScope.launch {
             // Reload on either input. Deleting the current book in the Library does
             // not change the recorded id, so observing the id alone would strand the
@@ -92,7 +106,7 @@ class DrillViewModel @Inject constructor(
             ?: defaultBookOrNull()?.also { settings.setCurrentBookId(it.bookId) }
 
         if (book == null) {
-            _uiState.value = DrillUiState.Empty
+            _uiState.value = DrillUiState.Empty()
             return
         }
         setReady(book.bookId, book.name)
@@ -116,7 +130,10 @@ class DrillViewModel @Inject constructor(
         currentBookId = bookId
         val cards = wordDao.getWordsWithSensesByBook(bookId)
         if (cards.isEmpty()) {
-            _uiState.value = DrillUiState.Empty
+            _uiState.value = DrillUiState.Empty(
+                bookName = bookName,
+                isReviewBook = bookName == REVIEW_BOOK_NAME,
+            )
             return
         }
         // Resolve the saved word id to a deck index here, never at save time: skipping
@@ -203,7 +220,10 @@ class DrillViewModel @Inject constructor(
         val cards = wordDao.getWordsWithSensesByBook(bookId)
         if (cards.isEmpty()) {
             autoAdvance.stop()
-            _uiState.value = DrillUiState.Empty
+            _uiState.value = DrillUiState.Empty(
+                bookName = ready.bookName,
+                isReviewBook = ready.isReviewBook,
+            )
         } else {
             // Skip/restore swapped the word under the pager: playback continues on the
             // new current card with a fresh countdown, never pausing.
