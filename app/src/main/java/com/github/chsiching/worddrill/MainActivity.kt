@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
@@ -22,6 +23,7 @@ import com.github.chsiching.worddrill.ui.navigation.WordDrillRoot
 import com.github.chsiching.worddrill.ui.splash.AnimatedSplashOverlay
 import com.github.chsiching.worddrill.ui.theme.ThemeRevealContent
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
+import com.github.chsiching.worddrill.update.UpdateGate
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -72,6 +74,11 @@ class MainActivity : Hilt_MainActivity() {
                     var splashDone by remember { mutableStateOf(false) }
                     Box(Modifier.fillMaxSize()) {
                         WordDrillRoot()
+                        // Silent update check starts only after the splash, so the
+                        // dialog can never draw over it.
+                        if (splashDone) {
+                            UpdateGate(Modifier.align(Alignment.TopCenter))
+                        }
                         if (!splashDone) {
                             AnimatedSplashOverlay(
                                 darkTheme = darkBg,
