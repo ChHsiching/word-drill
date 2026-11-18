@@ -114,4 +114,14 @@
     <string name="library_import_failed_file_type">不支持的文件类型（仅支持 xlsx/txt/csv/pdf）</string>
     <string name="library_import_failed_open">无法打开所选文件</string>
     <string name="word_list_pos_dropdown_label">词性</string>
+    <string name="update_dialog_title">发现新版本</string>
+    <string name="update_dialog_version">版本 %1$s</string>
+    <string name="update_action_now">立即更新</string>
+    <string name="update_action_later">暂不更新</string>
+    <string name="update_error_dns">无法解析域名</string>
+    <string name="update_error_interrupted">连接被中断，可能是网络限制</string>
+    <string name="update_error_generic">无法连接 GitHub</string>
+    <string name="update_download_failed">下载失败</string>
+    <string name="update_notification_title">WordDrill %1$s</string>
+    <string name="update_notice_dismiss">关闭</string>
 </resources>
