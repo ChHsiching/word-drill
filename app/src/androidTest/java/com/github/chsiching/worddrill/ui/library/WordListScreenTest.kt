@@ -1,6 +1,8 @@
 package com.github.chsiching.worddrill.ui.library
 
 import androidx.compose.material3.Surface
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onFirst
@@ -16,7 +18,7 @@ import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
-import com.github.chsiching.worddrill.data.local.entity.Word
+import com.github.chsiching.worddrill.data.settings.DeckOrdering
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.runBlocking
@@ -33,6 +35,10 @@ class WordListScreenTest {
     val composeRule = createComposeRule()
 
     private lateinit var db: WordDrillDatabase
+    private val settings = com.github.chsiching.worddrill.data.settings.SettingsRepository(
+        ApplicationProvider.getApplicationContext()
+    )
+    private val deckSequence = com.github.chsiching.worddrill.ui.DeckSequenceState()
     private var customBookId: Long = 0L
     private var presetBookId: Long = 0L
 
@@ -55,7 +61,10 @@ class WordListScreenTest {
 
     private fun seedOneWord(bookId: Long, text: String, pos: String, meaning: String) =
         runBlocking {
-            val wId = db.wordDao().insert(Word(text = text))
+            // Reuse an existing word row: text is UNIQUE and a plain insert would
+            // conflict-IGNORE to -1, breaking the sense's foreign key (#60 tests
+            // seed "apple" on top of setUp's).
+            val wId = db.wordDao().findOrInsertWord(text, null)
             db.wordDao().insertSense(Sense(wordId = wId, pos = pos, meaning = meaning))
             db.bookDao().linkBookWord(BookWord(bookId, wId))
             Unit
@@ -70,13 +79,11 @@ class WordListScreenTest {
             wordDao = db.wordDao(),
             bookDao = db.bookDao(),
             dictionaryDao = db.dictionaryDao(),
+            settings = settings,
             progressResetter = com.github.chsiching.worddrill.data.ProgressResetter(
-                db, db.bookDao(),
-                com.github.chsiching.worddrill.data.settings.SettingsRepository(
-                    ApplicationProvider.getApplicationContext()
-                ),
+                db, db.bookDao(), settings,
             ),
-            deckSequence = com.github.chsiching.worddrill.ui.DeckSequenceState(),
+            deckSequence = deckSequence,
         )
         composeRule.setContent {
             WordDrillTheme {
@@ -269,5 +276,111 @@ class WordListScreenTest {
 
         composeRule.onNodeWithText("没有匹配「zzz」的单词").assertIsDisplayed()
         composeRule.onNodeWithText("apple", substring = false).assertDoesNotExist()
+    }
+
+    // --- Progress header and letter index bar (#60) ---
+
+    @Test
+    fun progressHeader_showsCompletionCount_resumePosition_deckSize() {
+        val bookId = runBlocking {
+            db.bookDao().insert(Book(name = "进度词书", isPreset = false, completionCount = 3))
+        }
+        seedOneWord(bookId, "apple", "n.", "苹果")
+        seedOneWord(bookId, "banana", "n.", "香蕉")
+        seedOneWord(bookId, "cherry", "n.", "樱桃")
+        runBlocking { settings.setResumeWordId(bookId, db.wordDao().getByText("banana")!!.wordId) }
+        setContentFor(bookId)
+
+        composeRule.onNodeWithText("刷过 3 遍 · 2 / 3 词", substring = false).assertIsDisplayed()
+    }
+
+    @Test
+    fun progressHeader_updatesLive_onResumeWriteAndCompletionIncrement() {
+        val bookId = runBlocking {
+            db.bookDao().insert(Book(name = "进度直播词书", isPreset = false, completionCount = 1))
+        }
+        seedOneWord(bookId, "apple", "n.", "苹果")
+        seedOneWord(bookId, "banana", "n.", "香蕉")
+        runBlocking { settings.setResumeWordId(bookId, db.wordDao().getByText("apple")!!.wordId) }
+        setContentFor(bookId)
+
+        composeRule.onNodeWithText("刷过 1 遍 · 1 / 2 词", substring = false).assertIsDisplayed()
+        runBlocking {
+            settings.setResumeWordId(bookId, db.wordDao().getByText("banana")!!.wordId)
+            db.bookDao().incrementCompletionCount(bookId)
+        }
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(
+                androidx.compose.ui.test.hasText("刷过 2 遍 · 2 / 2 词", substring = false)
+            ).fetchSemanticsNodes().size == 1
+        }
+    }
+
+    @Test
+    fun letterBar_tap_jumpsToLetterSection() {
+        val bookId = runBlocking {
+            db.bookDao().insert(Book(name = "字母条词书", isPreset = false))
+        }
+        seedOneWord(bookId, "apple", "n.", "苹果")
+        seedOneWord(bookId, "banana", "n.", "香蕉")
+        seedOneWord(bookId, "cherry", "n.", "樱桃")
+        for (i in 1..30) seedOneWord(bookId, "m%02d".format(i), "n.", "词条")
+        seedOneWord(bookId, "water", "n.", "水")
+        setContentFor(bookId)
+
+        // 'water' sits far below the fold: not composed before the jump.
+        composeRule.onNodeWithText("water").assertDoesNotExist()
+        composeRule.onNodeWithText("W", substring = false).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("water").assertIsDisplayed()
+    }
+
+    @Test
+    fun letterBar_hiddenInShuffleMode_visibleInAlphabetical() {
+        setContentFor(customBookId)
+        // No deal published this session: the list falls back to alphabetical,
+        // so sections are meaningful and the bar shows.
+        composeRule.onNodeWithText("A", substring = false).assertIsDisplayed()
+
+        val appleId = runBlocking { db.wordDao().getByText("apple")!!.wordId }
+        runBlocking {
+            deckSequence.publish(customBookId, listOf(appleId), DeckOrdering.SHUFFLED)
+        }
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(
+                androidx.compose.ui.test.hasText("A", substring = false)
+            ).fetchSemanticsNodes().isEmpty()
+        }
+
+        runBlocking {
+            deckSequence.publish(customBookId, listOf(appleId), DeckOrdering.ALPHABETICAL)
+        }
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(
+                androidx.compose.ui.test.hasText("A", substring = false)
+            ).fetchSemanticsNodes().size == 1
+        }
+    }
+
+    @Test
+    fun letterBar_overFilteredResults_lettersWithoutMatchesAreInert_emptyResultsHideBar() {
+        seedOneWord(customBookId, "banana", "n.", "香蕉")
+        seedOneWord(customBookId, "cherry", "n.", "樱桃")
+        setContentFor(customBookId)
+
+        // Search keeps the bar over the filtered list: B stays anchored, C has
+        // no match left and neither jumps nor disappears.
+        composeRule.onNodeWithText("搜索单词").performTextInput("an")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("B", substring = false).assertIsDisplayed()
+            .assertHasClickAction()
+        composeRule.onNodeWithText("C", substring = false).assertIsDisplayed()
+            .assertHasNoClickAction()
+
+        // No results at all: nothing to navigate, the bar goes away.
+        composeRule.onNodeWithText("an").performTextReplacement("zzz")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("没有匹配「zzz」的单词").assertIsDisplayed()
+        composeRule.onNodeWithText("A", substring = false).assertDoesNotExist()
     }
 }

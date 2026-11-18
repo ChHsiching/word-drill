@@ -80,6 +80,11 @@ class SettingsRepository @Inject constructor(
     suspend fun resumeWordId(bookId: Long): Long? =
         context.appDataStore.data.first()[resumeWordKey(bookId)]
 
+    /** Live view of the resume word (issue #60): the word-list progress header
+     *  follows every drill settle without re-sampling. */
+    fun resumeWordIdFlow(bookId: Long): Flow<Long?> =
+        context.appDataStore.data.map { it[resumeWordKey(bookId)] }
+
     suspend fun setResumeWordId(bookId: Long, wordId: Long) {
         context.appDataStore.edit { it[resumeWordKey(bookId)] = wordId }
     }

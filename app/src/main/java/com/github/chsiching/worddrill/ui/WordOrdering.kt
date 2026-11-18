@@ -1,6 +1,7 @@
 package com.github.chsiching.worddrill.ui
 
 import com.github.chsiching.worddrill.data.local.WordWithSenses
+import com.github.chsiching.worddrill.data.settings.DeckOrdering
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,12 +63,23 @@ object WordOrdering {
 @Singleton
 class DeckSequenceState @Inject constructor() {
 
-    private val _sequences = MutableStateFlow<Map<Long, List<Long>>>(emptyMap())
+    private val _sequences = MutableStateFlow<Map<Long, DealtDeck>>(emptyMap())
 
-    /** Sequences keyed by book id, in deck order. */
-    val sequences: StateFlow<Map<Long, List<Long>>> = _sequences.asStateFlow()
+    /** Dealt decks keyed by book id, in deck order. */
+    val sequences: StateFlow<Map<Long, DealtDeck>> = _sequences.asStateFlow()
 
-    fun publish(bookId: Long, wordIds: List<Long>) {
-        _sequences.value = _sequences.value + (bookId to wordIds)
+    fun publish(bookId: Long, wordIds: List<Long>, ordering: DeckOrdering) {
+        _sequences.value = _sequences.value +
+            (bookId to DealtDeck(wordIds = wordIds, ordering = ordering))
     }
 }
+
+/** One book's dealt deck as published by the drill: the card sequence plus the
+ *  deck ordering that dealt it (issue #60). The word list's letter bar follows
+ *  this dealt mode, not the live setting — the setting only takes effect on the
+ *  next book open (#54), so between a setting change and the next open the bar
+ *  must keep matching the list the user actually sees. */
+data class DealtDeck(
+    val wordIds: List<Long>,
+    val ordering: DeckOrdering,
+)
