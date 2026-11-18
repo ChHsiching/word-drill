@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DownloadManager writes update APKs via setDestinationInExternalFilesDir(DIRECTORY_DOWNLOADS),
+     i.e. Android/data/<pkg>/files/Download; external-files-path maps exactly that root. -->
+<paths>
+    <external-files-path name="updates" path="Download/" />
+</paths>
