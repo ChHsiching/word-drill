@@ -24,6 +24,8 @@ data class MeStatsUiState(
     val brushed: Int = 0,
     val total: Int = 0,
     val percent: Double = 0.0,
+    /** Completed passes of the current book (GLOSSARY.md, completion count). */
+    val completionCount: Int = 0,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -44,7 +46,10 @@ class MeViewModel @Inject constructor(
                     flow { emit(BookProgress(bookName = bookDao.getById(bookId)?.name ?: "")) },
                     bookDao.observeWordCountInBook(bookId),
                     swipeLogDao.observeDistinctWordCountForBook(bookId),
-                ) { seeded, total, brushed -> seeded.copy(brushed = brushed, total = total) }
+                    bookDao.observeCompletionCount(bookId),
+                ) { seeded, total, brushed, completionCount ->
+                    seeded.copy(brushed = brushed, total = total, completionCount = completionCount)
+                }
             }
         }
 
@@ -60,6 +65,7 @@ class MeViewModel @Inject constructor(
             brushed = progress.brushed,
             total = progress.total,
             percent = MeStats.progressPercent(progress.brushed, progress.total),
+            completionCount = progress.completionCount,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -72,4 +78,5 @@ private data class BookProgress(
     val bookName: String = "",
     val brushed: Int = 0,
     val total: Int = 0,
+    val completionCount: Int = 0,
 )

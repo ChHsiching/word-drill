@@ -32,6 +32,7 @@ object DatabaseJsonSerializer {
                     put("name", b.name)
                     put("isPreset", b.isPreset)
                     put("deleted", b.deleted)
+                    put("completionCount", b.completionCount)
                 })
             }
         })
@@ -88,6 +89,8 @@ object DatabaseJsonSerializer {
                 name = b.getString("name"),
                 isPreset = b.getBoolean("isPreset"),
                 deleted = b.optBoolean("deleted", false),
+                // Backups written before the completion count existed carry no field.
+                completionCount = b.optInt("completionCount", 0),
             )
         }
         val words = root.getJSONArray("words").toList { w ->

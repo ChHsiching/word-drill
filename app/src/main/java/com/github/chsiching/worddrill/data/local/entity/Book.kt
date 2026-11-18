@@ -13,4 +13,8 @@ data class Book(
     // DEFAULT, and it must match the migration's DEFAULT 0 or schema validation
     // (TableInfo.Column.defaultVal) throws.
     @ColumnInfo(name = "deleted", defaultValue = "0") val deleted: Boolean = false,
+    // Completed passes of this book (GLOSSARY.md, completion count); incremented when
+    // the completion card appears, never cleared by a progress reset. Same
+    // DEFAULT-match constraint as `deleted`.
+    @ColumnInfo(name = "completionCount", defaultValue = "0") val completionCount: Int = 0,
 )

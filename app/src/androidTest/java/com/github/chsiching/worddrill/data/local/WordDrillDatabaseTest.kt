@@ -169,6 +169,23 @@ class WordDrillDatabaseTest {
     }
 
     @Test
+    fun insertBook_completionCountDefaultsZero() = runTest {
+        val bookDao = db.bookDao()
+        val id = bookDao.insert(Book(name = "b"))
+        assertThat(bookDao.getById(id)!!.completionCount).isEqualTo(0)
+        assertThat(bookDao.observeCompletionCount(id).first()).isEqualTo(0)
+    }
+
+    @Test
+    fun incrementCompletionCount_accumulates_andObserves() = runTest {
+        val bookDao = db.bookDao()
+        val id = bookDao.insert(Book(name = "b"))
+        repeat(3) { bookDao.incrementCompletionCount(id) }
+        assertThat(bookDao.getById(id)!!.completionCount).isEqualTo(3)
+        assertThat(bookDao.observeCompletionCount(id).first()).isEqualTo(3)
+    }
+
+    @Test
     fun rename_refusesPresetBook() = runTest {
         val bookDao = db.bookDao()
         val id = bookDao.insert(Book(name = "CET-4", isPreset = true))

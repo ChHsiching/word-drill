@@ -419,6 +419,124 @@ class DrillViewModelTest {
         Unit
     }
 
+    // --- Completion card and completion count (#57) ---
+
+    /** The persisted count once it reaches [expected], or -1 on timeout. The settle
+     *  handler writes it from the ViewModel's own scope, so the test polls. */
+    private suspend fun awaitDbCompletionCount(bookId: Long, expected: Int, timeoutMs: Long = 5_000): Int {
+        var count = -1
+        withTimeoutOrNull(timeoutMs) {
+            while (true) {
+                count = db.bookDao().getById(bookId)?.completionCount ?: -1
+                if (count == expected) break
+                delay(50)
+            }
+        }
+        return count
+    }
+
+    @Test
+    fun settlingOnCompletionPage_incrementsCountOncePerAppearance() = runBlocking {
+        val bookId = 934_610L
+        val wordIds = insertBookWithWords(bookId, "完成词书", isPreset = false, "apple", "balance", "circle")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+        val ready0 = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+        assertThat(ready0.completionCount).isEqualTo(0)
+
+        // Drill to the last card, then one more settle onto the virtual completion
+        // page (index == deck size): one finished pass.
+        vm.onPageSettled(previousPage = 0, currentPage = 2)
+        assertThat(awaitSavedResumeWordId(bookId)).isEqualTo(wordIds[2])
+        vm.onPageSettled(previousPage = 2, currentPage = 3)
+        val ready1 = vm.uiState.value as DrillUiState.Ready
+        assertThat(ready1.completionCount).isEqualTo(1)
+        assertThat(awaitDbCompletionCount(bookId, 1)).isEqualTo(1)
+
+        // The completion page is not a word: the resume position stays on the last
+        // card, and a re-emitted settle of the same page must not double-increment.
+        assertThat(settings.resumeWordId(bookId)).isEqualTo(wordIds[2])
+        vm.onPageSettled(previousPage = 3, currentPage = 3)
+        assertThat((vm.uiState.value as DrillUiState.Ready).completionCount).isEqualTo(1)
+        assertThat(awaitDbCompletionCount(bookId, 1)).isEqualTo(1)
+
+        // Bouncing back and returning is a second appearance: pass two.
+        vm.onPageSettled(previousPage = 3, currentPage = 2)
+        vm.onPageSettled(previousPage = 2, currentPage = 3)
+        assertThat((vm.uiState.value as DrillUiState.Ready).completionCount).isEqualTo(2)
+        assertThat(awaitDbCompletionCount(bookId, 2)).isEqualTo(2)
+        Unit
+    }
+
+    @Test
+    fun completionCount_persistsAcrossViewModelRecreation() = runBlocking {
+        val bookId = 934_611L
+        insertBookWithWords(bookId, "重启词书", isPreset = false, "apple", "balance", "circle")
+        settings.setCurrentBookId(bookId)
+        val first = newViewModel()
+        first.uiState.first { it is DrillUiState.Ready }
+        first.onPageSettled(previousPage = 2, currentPage = 3)
+        assertThat(awaitDbCompletionCount(bookId, 1)).isEqualTo(1)
+
+        // A relaunch (new ViewModel over the same database) reloads the book with its
+        // accumulated count.
+        val restarted = newViewModel()
+        val ready = restarted.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+        assertThat(ready.completionCount).isEqualTo(1)
+        Unit
+    }
+
+    @Test
+    fun restartFromCompletion_resetsDeck_landsOnFirstCard_keepsCount() = runBlocking {
+        val bookId = 934_612L
+        insertBookWithWords(bookId, "重刷词书", isPreset = false, "apple", "balance", "circle")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+        vm.uiState.first { it is DrillUiState.Ready }
+
+        // Skip the middle card and finish the shrunken deck: the completion card
+        // appears with pass one.
+        vm.skipCurrentWord(currentPage = 1)
+        vm.uiState.first { it is DrillUiState.Ready && it.cards.size == 2 }
+        vm.onPageSettled(previousPage = 1, currentPage = 2)
+        assertThat((vm.uiState.value as DrillUiState.Ready).completionCount).isEqualTo(1)
+
+        // 重新刷: the shared reset engine restores the full deck at the first card;
+        // the completion count is cumulative history and survives.
+        vm.restartBook()
+        val after = vm.uiState
+            .first { it is DrillUiState.Ready && it.deckGeneration > 0 } as DrillUiState.Ready
+        assertThat(after.cards.map { it.word.text }).containsExactly("apple", "balance", "circle").inOrder()
+        assertThat(after.initialPageIndex).isEqualTo(0)
+        assertThat(after.completionCount).isEqualTo(1)
+        assertThat(settings.resumeWordId(bookId)).isNull()
+        assertThat(awaitDbCompletionCount(bookId, 1)).isEqualTo(1)
+        Unit
+    }
+
+    @Test
+    fun reviewBook_settlingOnCompletionPage_incrementsCount() = runBlocking {
+        // The review book is drilled like any other book (GLOSSARY.md): its deck also
+        // ends in a completion card, and its passes count like any book's.
+        val sourceBookId = 934_613L
+        val reviewBookId = 934_614L
+        val wordIds = insertBookWithWords(sourceBookId, "复习来源词书", isPreset = false, "apple", "balance")
+        db.bookDao().insert(Book(bookId = reviewBookId, name = REVIEW_BOOK_NAME, isPreset = true))
+        wordIds.forEach {
+            db.bookDao().setSkipped(sourceBookId, it, skipped = true)
+            db.bookDao().linkBookWord(BookWord(bookId = reviewBookId, wordId = it))
+        }
+        settings.setCurrentBookId(reviewBookId)
+        val vm = newViewModel()
+        val ready = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+        assertThat(ready.isReviewBook).isTrue()
+
+        vm.onPageSettled(previousPage = 0, currentPage = 2)
+        assertThat((vm.uiState.value as DrillUiState.Ready).completionCount).isEqualTo(1)
+        assertThat(awaitDbCompletionCount(reviewBookId, 1)).isEqualTo(1)
+        Unit
+    }
+
     private companion object {
         const val NO_BOOK_ID = 999_999L
     }

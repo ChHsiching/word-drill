@@ -57,6 +57,7 @@
     <string name="me_progress">当前词书进度</string>
     <string name="me_no_current_book">未选择词书</string>
     <string name="me_progress_line">%1$s：%2$d / %3$d（%4$d%%）</string>
+    <string name="me_completion_count">已刷完 %1$d 遍</string>
     <string name="me_settings">软件设置</string>
     <string name="me_theme">主题</string>
     <string name="me_theme_light">浅色</string>
@@ -88,6 +89,10 @@
     <string name="drill_unlock">解锁</string>
     <string name="drill_restore">恢复</string>
     <string name="drill_swipe_hint">← 左右滑动切换 →</string>
+    <string name="drill_completion_title">🎉 刷完了</string>
+    <string name="drill_completion_pass_line">这是你第 %1$d 遍刷完这本书</string>
+    <string name="drill_completion_restart">重新刷</string>
+    <string name="drill_completion_switch_book">换一本书</string>
     <string name="library_large_title">词库</string>
     <string name="library_word_count_format">%1$d 词 · %2$s</string>
     <string name="me_group_display">显示</string>

@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
@@ -124,6 +125,7 @@ fun DrillScreen(
     locked: Boolean = false,
     onToggleLock: () -> Unit = {},
     hidePhonetic: Boolean = false,
+    onSwitchBook: () -> Unit = {},
     viewModel: DrillViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -171,10 +173,13 @@ fun DrillScreen(
                 bookName = state.bookName,
                 cards = state.cards,
                 initialPage = state.initialPageIndex,
+                completionCount = state.completionCount,
                 onPageSettled = viewModel::onPageSettled,
                 onSkip = { page -> viewModel.skipCurrentWord(page) },
                 isReviewBook = state.isReviewBook,
                 onRestore = { page -> viewModel.restoreCurrentWord(page) },
+                onRestartBook = viewModel::restartBook,
+                onSwitchBook = onSwitchBook,
                 locked = locked,
                 onToggleLock = onToggleLock,
                 hidePhonetic = hidePhonetic,
@@ -191,10 +196,15 @@ internal fun DrillPager(
     bookName: String,
     cards: List<WordWithSenses>,
     initialPage: Int = 0,
+    /** Completed passes before the one the completion card is showing (the settle
+     *  handler bumps it once the card is reached). */
+    completionCount: Int = 0,
     onPageSettled: (previousPage: Int, currentPage: Int) -> Unit,
     onSkip: (currentPage: Int) -> Unit,
     isReviewBook: Boolean,
     onRestore: (currentPage: Int) -> Unit,
+    onRestartBook: () -> Unit = {},
+    onSwitchBook: () -> Unit = {},
     locked: Boolean,
     onToggleLock: () -> Unit,
     hidePhonetic: Boolean,
@@ -202,7 +212,8 @@ internal fun DrillPager(
     onToggleAutoAdvance: (currentPage: Int) -> Unit,
     advance: Flow<Int>,
 ) {
-    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { cards.size })
+    // One virtual page after the deck's last card (GLOSSARY.md, completion card).
+    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { cards.size + 1 })
 
     LaunchedEffect(pagerState) {
         var previousSettled = pagerState.settledPage
@@ -226,7 +237,9 @@ internal fun DrillPager(
         Column(modifier = Modifier.fillMaxSize()) {
             DrillTopBar(
                 bookName = bookName,
-                counter = "${pagerState.currentPage + 1} / ${cards.size}",
+                // The completion page keeps the last card's counter (N / N): it is not
+                // a card position.
+                counter = "${(pagerState.currentPage + 1).coerceAtMost(cards.size)} / ${cards.size}",
                 locked = locked,
                 onToggleLock = onToggleLock,
                 isReviewBook = isReviewBook,
@@ -261,10 +274,24 @@ internal fun DrillPager(
                         )
                     },
             ) { pageIndex ->
-                WordCard(
-                    word = cards[pageIndex],
-                    hidePhonetic = hidePhonetic,
-                )
+                if (pageIndex == cards.size) {
+                    // While the swipe toward the card is still settling, the count has
+                    // not been bumped yet, so the pass shown is the one this traversal
+                    // completes (count + 1); once settled, the settle handler has
+                    // already recorded it and the card reads the count itself.
+                    CompletionCard(
+                        bookName = bookName,
+                        passCount = if (pagerState.settledPage == pageIndex) completionCount
+                        else completionCount + 1,
+                        onRestart = onRestartBook,
+                        onSwitchBook = onSwitchBook,
+                    )
+                } else {
+                    WordCard(
+                        word = cards[pageIndex],
+                        hidePhonetic = hidePhonetic,
+                    )
+                }
             }
         }
 
@@ -438,5 +465,67 @@ private fun WordCard(
 private fun CenterText(text: String, modifier: Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** The virtual card after the deck's last one (GLOSSARY.md, completion card): the
+ *  book name, the pass count, and the two ways on — 重新刷 (progress reset, back to
+ *  the first card) primary, 换一本书 (Library) secondary. */
+@Composable
+private fun CompletionCard(
+    bookName: String,
+    passCount: Int,
+    onRestart: () -> Unit,
+    onSwitchBook: () -> Unit,
+) {
+    val typography = MaterialTheme.wordDrillTypography
+    val colors = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 28.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.drill_completion_title),
+                style = typography.word.copy(color = colors.onSurface),
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = bookName,
+                style = MaterialTheme.typography.titleMedium.copy(color = colors.onSurfaceVariant),
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = stringResource(R.string.drill_completion_pass_line, passCount),
+                style = MaterialTheme.typography.bodyMedium.copy(color = colors.onSurfaceVariant),
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(24.dp))
+            Surface(
+                color = colors.onSurface,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.clickable(onClick = onRestart),
+            ) {
+                Text(
+                    text = stringResource(R.string.drill_completion_restart),
+                    style = MaterialTheme.typography.labelLarge.copy(color = colors.surface),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 36.dp, vertical = 14.dp),
+                )
+            }
+            Text(
+                text = stringResource(R.string.drill_completion_switch_book),
+                style = MaterialTheme.typography.bodyMedium.copy(color = colors.onSurfaceVariant),
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .clickable(onClick = onSwitchBook)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
     }
 }

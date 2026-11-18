@@ -120,6 +120,14 @@ interface BookDao {
     @Query("UPDATE book SET deleted = 0 WHERE bookId = :bookId")
     suspend fun restoreBook(bookId: Long)
 
+    /** One completed pass (GLOSSARY.md, completion count); callers increment once per
+     *  completion-card appearance. */
+    @Query("UPDATE book SET completionCount = completionCount + 1 WHERE bookId = :bookId")
+    suspend fun incrementCompletionCount(bookId: Long)
+
+    @Query("SELECT completionCount FROM book WHERE bookId = :bookId")
+    fun observeCompletionCount(bookId: Long): Flow<Int>
+
     @Query("SELECT * FROM book WHERE deleted = 1 ORDER BY name ASC")
     fun observeDeletedBooks(): Flow<List<Book>>
 
