@@ -19,6 +19,7 @@ import com.github.chsiching.worddrill.data.local.entity.Sense
 import com.github.chsiching.worddrill.data.local.entity.SwipeLog
 import com.github.chsiching.worddrill.data.local.entity.Word
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
+import com.github.chsiching.worddrill.ui.DeckSequenceState
 import com.github.chsiching.worddrill.ui.drill.AutoAdvanceOverlayState
 import com.github.chsiching.worddrill.ui.drill.DrillUiState
 import com.github.chsiching.worddrill.ui.drill.DrillViewModel
@@ -88,6 +89,7 @@ class ProgressResetFlowTest {
             bookDao = db.bookDao(),
             dictionaryDao = db.dictionaryDao(),
             progressResetter = resetter,
+            deckSequence = DeckSequenceState(),
         )
         composeRule.setContent {
             WordDrillTheme {
@@ -209,6 +211,7 @@ class ProgressResetFlowTest {
             settings = settings,
             overlayState = AutoAdvanceOverlayState(),
             progressResetter = resetter,
+            deckSequence = DeckSequenceState(),
         )
         try {
             val ready = drill.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready

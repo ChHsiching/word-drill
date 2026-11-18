@@ -14,7 +14,9 @@ import com.github.chsiching.worddrill.data.local.dao.WordDao
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.SwipeLog
 import com.github.chsiching.worddrill.data.settings.DwellInterval
+import com.github.chsiching.worddrill.data.settings.DeckOrdering
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
+import com.github.chsiching.worddrill.ui.DeckSequenceState
 import com.github.chsiching.worddrill.ui.WordOrdering
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -63,6 +65,7 @@ class DrillViewModel @Inject constructor(
     private val settings: SettingsRepository,
     private val overlayState: AutoAdvanceOverlayState,
     private val progressResetter: ProgressResetter,
+    private val deckSequence: DeckSequenceState,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<DrillUiState>(DrillUiState.Loading)
@@ -162,7 +165,17 @@ class DrillViewModel @Inject constructor(
         autoAdvance.stop()
         currentBookId = book.bookId
         currentDeckGeneration = deckGeneration
-        val cards = WordOrdering.alphabetical(wordDao.getWordsWithSensesByBook(book.bookId))
+        // Deck ordering (issue #54) is sampled once per book open, not observed:
+        // changing the setting must leave the running session alone and take
+        // effect on the next open. SHUFFLED draws a fresh Random here, so every
+        // open re-deals and no pattern can be memorized.
+        val words = wordDao.getWordsWithSensesByBook(book.bookId)
+        val cards = when (settings.deckOrdering.first()) {
+            DeckOrdering.ALPHABETICAL -> WordOrdering.alphabetical(words)
+            DeckOrdering.SHUFFLED -> WordOrdering.shuffled(words)
+        }
+        // The dealt sequence is the one ordering source the word list consumes.
+        deckSequence.publish(book.bookId, cards.map { it.word.wordId })
         if (cards.isEmpty()) {
             _uiState.value = DrillUiState.Empty(
                 bookName = book.name,
@@ -171,11 +184,11 @@ class DrillViewModel @Inject constructor(
             return
         }
         // Resolve the saved word id to a deck index here, never at save time: skipping
-        // shifts indices, and a word that left the deck (skipped, deleted, restored
-        // away) falls back to the first card (GLOSSARY.md, resume position).
+        // and reshuffles shift indices, and a word that left the deck (skipped,
+        // deleted, restored away) falls back to the first card (GLOSSARY.md, resume
+        // position).
         val savedWordId = settings.resumeWordId(book.bookId)
-        val initialPageIndex =
-            cards.indexOfFirst { it.word.wordId == savedWordId }.takeIf { it >= 0 } ?: 0
+        val initialPageIndex = WordOrdering.resumeIndex(savedWordId, cards)
         _uiState.value = DrillUiState.Ready(
             bookId = book.bookId,
             bookName = book.name,
@@ -278,7 +291,14 @@ class DrillViewModel @Inject constructor(
     }
 
     private suspend fun reloadCards(bookId: Long, ready: DrillUiState.Ready, currentPage: Int) {
-        val cards = WordOrdering.alphabetical(wordDao.getWordsWithSensesByBook(bookId))
+        // Skip/restore is not a book open: the remaining cards keep the sequence
+        // the deck was dealt in (a mid-session reshuffle would jump every card),
+        // so the fresh query is aligned onto the previous deck, which only ever
+        // loses the acted-on word here.
+        val freshById = wordDao.getWordsWithSensesByBook(bookId)
+            .associateBy { it.word.wordId }
+        val cards = ready.cards.mapNotNull { freshById[it.word.wordId] }
+        deckSequence.publish(bookId, cards.map { it.word.wordId })
         if (cards.isEmpty()) {
             autoAdvance.stop()
             _uiState.value = DrillUiState.Empty(

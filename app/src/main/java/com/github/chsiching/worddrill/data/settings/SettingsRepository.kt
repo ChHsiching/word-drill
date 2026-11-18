@@ -32,6 +32,7 @@ class SettingsRepository @Inject constructor(
     private val navStyleKey = stringPreferencesKey("nav_style")
     private val compactNavKey = booleanPreferencesKey("compact_nav")
     private val dwellIntervalKey = floatPreferencesKey("dwell_interval_seconds")
+    private val deckOrderingKey = stringPreferencesKey("deck_ordering")
 
     val presetImported: Flow<Boolean> = context.appDataStore.data.map { it[presetImportedKey] ?: false }
 
@@ -120,5 +121,14 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setDwellInterval(seconds: Float) {
         context.appDataStore.edit { it[dwellIntervalKey] = DwellInterval.normalize(seconds) }
+    }
+
+    /** Deck ordering (GLOSSARY.md, ADR 0002): one global mode for all books.
+     *  Sampled once per book open; a shuffled sequence itself is never stored. */
+    val deckOrdering: Flow<DeckOrdering> =
+        context.appDataStore.data.map { DeckOrdering.fromStorageName(it[deckOrderingKey]) }
+
+    suspend fun setDeckOrdering(mode: DeckOrdering) {
+        context.appDataStore.edit { it[deckOrderingKey] = mode.name }
     }
 }

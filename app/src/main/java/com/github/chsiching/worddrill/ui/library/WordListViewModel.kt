@@ -14,6 +14,7 @@ import com.github.chsiching.worddrill.data.local.dao.DictionaryDao
 import com.github.chsiching.worddrill.data.local.dao.WordDao
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
+import com.github.chsiching.worddrill.ui.DeckSequenceState
 import com.github.chsiching.worddrill.ui.WordOrdering
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -23,6 +24,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -81,6 +84,7 @@ class WordListViewModel @Inject constructor(
     private val bookDao: BookDao,
     private val dictionaryDao: DictionaryDao,
     private val progressResetter: ProgressResetter,
+    private val deckSequence: DeckSequenceState,
 ) : ViewModel() {
 
     private val bookId: Long = checkNotNull(savedStateHandle.get<String>("bookId")?.toLongOrNull()) {
@@ -119,12 +123,16 @@ class WordListViewModel @Inject constructor(
         },
         _searchQuery,
         _dialog,
-    ) { words, (bookName, isPreset, isReviewBook), searchQuery, dialog ->
+        // Issue #54: the list mirrors the deck's published card sequence instead of
+        // sorting on its own, so the two surfaces show one order. The lookup is
+        // de-duplicated: another book's publish must not re-deal this list.
+        deckSequence.sequences.map { it[bookId] }.distinctUntilChanged(),
+    ) { words, (bookName, isPreset, isReviewBook), searchQuery, dialog, deckWordIds ->
         WordListUiState(
             bookName = bookName,
             isPreset = isPreset,
             isReviewBook = isReviewBook,
-            words = filterWords(WordOrdering.alphabetical(words), searchQuery),
+            words = filterWords(WordOrdering.byDeckSequence(words, deckWordIds), searchQuery),
             searchQuery = searchQuery,
             dialog = dialog,
         )
