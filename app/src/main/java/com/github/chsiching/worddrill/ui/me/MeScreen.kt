@@ -64,6 +64,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.BuildConfig
 import com.github.chsiching.worddrill.R
+import com.github.chsiching.worddrill.data.settings.DeckOrdering
 import com.github.chsiching.worddrill.data.settings.DwellInterval
 import com.github.chsiching.worddrill.data.settings.NavStyle
 import com.github.chsiching.worddrill.data.settings.ThemeMode
@@ -94,6 +95,7 @@ fun MeScreen(
     val navStyle by settingsViewModel.navStyle.collectAsStateWithLifecycle()
     val compactNav by settingsViewModel.compactNav.collectAsStateWithLifecycle()
     val dwellInterval by settingsViewModel.dwellInterval.collectAsStateWithLifecycle()
+    val deckOrdering by settingsViewModel.deckOrdering.collectAsStateWithLifecycle()
     val exportStatus by exportImportViewModel.status.collectAsStateWithLifecycle()
     val updateState by updateViewModel.state.collectAsStateWithLifecycle()
     var showAbout by remember { mutableStateOf(false) }
@@ -142,6 +144,11 @@ fun MeScreen(
             DwellIntervalRow(
                 value = dwellInterval,
                 onValueChange = settingsViewModel::setDwellInterval,
+            )
+            InGroupSeparator()
+            DeckOrderingRow(
+                current = deckOrdering,
+                onClick = settingsViewModel::cycleDeckOrdering,
             )
         }
 
@@ -397,6 +404,43 @@ private fun NavStyleRow(current: NavStyle, onClick: () -> Unit) {
         Text(
             text = stringResource(
                 if (current == NavStyle.PILL) R.string.me_setting_nav_style_pill else R.string.me_setting_nav_style_bar
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+/** Deck ordering (GLOSSARY.md, ADR 0002): global 按字母 / 乱序 two-state row in
+ *  the 显示 group. Tapping cycles; the change takes effect on the next book open. */
+@Composable
+private fun DeckOrderingRow(current: DeckOrdering, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.me_setting_deck_ordering),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = stringResource(
+                if (current == DeckOrdering.ALPHABETICAL) {
+                    R.string.me_setting_deck_ordering_alphabetical
+                } else {
+                    R.string.me_setting_deck_ordering_shuffled
+                }
             ),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

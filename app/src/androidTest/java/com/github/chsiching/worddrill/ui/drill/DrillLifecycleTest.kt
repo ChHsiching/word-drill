@@ -32,6 +32,7 @@ import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
+import com.github.chsiching.worddrill.ui.DeckSequenceState
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -106,6 +107,7 @@ class DrillLifecycleTest {
             settings = settings,
             overlayState = AutoAdvanceOverlayState(),
             progressResetter = ProgressResetter(db, db.bookDao(), settings),
+            deckSequence = DeckSequenceState(),
         ).also { viewModels.add(it) }
     }
 

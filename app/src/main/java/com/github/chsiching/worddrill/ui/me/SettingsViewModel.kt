@@ -2,6 +2,7 @@ package com.github.chsiching.worddrill.ui.me
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.chsiching.worddrill.data.settings.DeckOrdering
 import com.github.chsiching.worddrill.data.settings.DwellInterval
 import com.github.chsiching.worddrill.data.settings.NavStyle
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
@@ -48,6 +49,12 @@ class SettingsViewModel @Inject constructor(
         initialValue = DwellInterval.DEFAULT_SECONDS,
     )
 
+    val deckOrdering: StateFlow<DeckOrdering> = settings.deckOrdering.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = DeckOrdering.ALPHABETICAL,
+    )
+
     fun setTheme(mode: ThemeMode) {
         viewModelScope.launch { settings.setTheme(mode) }
     }
@@ -80,5 +87,16 @@ class SettingsViewModel @Inject constructor(
 
     fun setDwellInterval(seconds: Float) {
         viewModelScope.launch { settings.setDwellInterval(seconds) }
+    }
+
+    fun setDeckOrdering(mode: DeckOrdering) {
+        viewModelScope.launch { settings.setDeckOrdering(mode) }
+    }
+
+    fun cycleDeckOrdering() {
+        val next =
+            if (deckOrdering.value == DeckOrdering.ALPHABETICAL) DeckOrdering.SHUFFLED
+            else DeckOrdering.ALPHABETICAL
+        setDeckOrdering(next)
     }
 }

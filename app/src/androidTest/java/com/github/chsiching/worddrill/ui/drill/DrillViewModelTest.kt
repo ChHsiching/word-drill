@@ -13,8 +13,10 @@ import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
 import com.github.chsiching.worddrill.data.local.entity.Word
+import com.github.chsiching.worddrill.data.settings.DeckOrdering
 import com.github.chsiching.worddrill.data.settings.DwellInterval
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
+import com.github.chsiching.worddrill.ui.DeckSequenceState
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -34,6 +36,7 @@ class DrillViewModelTest {
     private lateinit var db: WordDrillDatabase
     private lateinit var settings: SettingsRepository
     private lateinit var resetter: ProgressResetter
+    private val deckSequence = DeckSequenceState()
     private val viewModels = mutableListOf<DrillViewModel>()
 
     @Before
@@ -57,6 +60,9 @@ class DrillViewModelTest {
         viewModels.forEach { it.viewModelScope.cancel() }
         delay(200)
         db.close()
+        // Deck ordering is process-global; every other test in this process assumes
+        // the 按字母 default, so restore it even when a shuffle test failed midway.
+        settings.setDeckOrdering(DeckOrdering.ALPHABETICAL)
         Unit
     }
 
@@ -69,6 +75,7 @@ class DrillViewModelTest {
             settings = settings,
             overlayState = AutoAdvanceOverlayState(),
             progressResetter = resetter,
+            deckSequence = deckSequence,
         ).also { viewModels.add(it) }
 
     private suspend fun insertBookWithWord(name: String, isPreset: Boolean, wordText: String): Long {
@@ -416,6 +423,85 @@ class DrillViewModelTest {
 
         val ready = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
         assertThat(ready.cards.map { it.word.text }).containsExactly("Apple", "core", "Zebra").inOrder()
+        Unit
+    }
+
+    /** Reopens [bookId] through [detourBook] and returns the freshly dealt deck. */
+    private suspend fun reopenDeck(vm: DrillViewModel, bookId: Long, detourBook: Long): List<String> {
+        settings.setCurrentBookId(detourBook)
+        vm.uiState.first { it is DrillUiState.Ready && it.bookId == detourBook }
+        settings.setCurrentBookId(bookId)
+        val ready = vm.uiState.first { it is DrillUiState.Ready && it.bookId == bookId } as DrillUiState.Ready
+        return ready.cards.map { it.word.text }
+    }
+
+    @Test
+    fun shuffleMode_reRandomizesTheDeckOnEveryBookOpen() = runBlocking {
+        val bookId = 934_701L
+        val detourBook = 934_702L
+        insertBookWithWords(
+            bookId, "乱序词书", isPreset = false,
+            "w01", "w02", "w03", "w04", "w05", "w06",
+            "w07", "w08", "w09", "w10", "w11", "w12",
+        )
+        insertBookWithWords(detourBook, "换乘词书", isPreset = false, "apple")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+        try {
+            settings.setDeckOrdering(DeckOrdering.SHUFFLED)
+            val first = reopenDeck(vm, bookId, detourBook)
+            val second = reopenDeck(vm, bookId, detourBook)
+            // Two opens of the same book must deal different orders (issue #54: no
+            // fixed pattern to memorize). With 12 cards the collision chance is 1/12!.
+            assertThat(first).isNotEqualTo(second)
+        } finally {
+            settings.setDeckOrdering(DeckOrdering.ALPHABETICAL)
+        }
+        Unit
+    }
+
+    @Test
+    fun shuffleMode_resumeLandsOnSameWord_afterReshuffle() = runBlocking {
+        val bookId = 934_703L
+        insertBookWithWords(
+            bookId, "乱序恢复词书", isPreset = false,
+            "w01", "w02", "w03", "w04", "w05", "w06",
+            "w07", "w08", "w09", "w10", "w11", "w12",
+        )
+        settings.setCurrentBookId(bookId)
+        settings.setDeckOrdering(DeckOrdering.SHUFFLED)
+        val first = newViewModel()
+        try {
+            val firstReady = first.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+            // Drill into the book: the settled card becomes the resume position.
+            first.onPageSettled(previousPage = 0, currentPage = 5)
+            val drilledWordId = firstReady.cards[5].word.wordId
+            assertThat(awaitSavedResumeWordId(bookId)).isEqualTo(drilledWordId)
+
+            // Reopening re-deals the deck; the resume key is the word, so the
+            // reopened book lands on that same word even though its index moved.
+            val reopened = newViewModel()
+            val reopenedReady = reopened.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+            assertThat(reopenedReady.cards[reopenedReady.initialPageIndex].word.wordId)
+                .isEqualTo(drilledWordId)
+        } finally {
+            settings.setDeckOrdering(DeckOrdering.ALPHABETICAL)
+        }
+        Unit
+    }
+
+    @Test
+    fun bookOpen_publishesDealtSequenceForTheWordList() = runBlocking {
+        val bookId = 934_704L
+        insertBookWithWords(bookId, "发布词书", isPreset = false, "Zebra", "apple", "core")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+
+        val ready = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+        // The word list consumes exactly this sequence (issue #54: one ordering
+        // source for both surfaces).
+        assertThat(deckSequence.sequences.value[bookId])
+            .isEqualTo(ready.cards.map { it.word.wordId })
         Unit
     }
 
