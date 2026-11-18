@@ -44,14 +44,11 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -69,9 +66,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
-
-/** Test tag of the auto-advance dwell hairline at the drill screen's bottom edge. */
-internal const val AutoAdvanceHairlineTag = "auto_advance_hairline"
 
 /** Auto-advance lifecycle integration (#39). The keep-screen-on window flag is held
  *  exactly while the phase is Playing, and playback stops when this screen leaves
@@ -185,7 +179,6 @@ fun DrillScreen(
                 hidePhonetic = hidePhonetic,
                 modifier = modifier,
                 onToggleAutoAdvance = viewModel::toggleAutoAdvance,
-                playbackState = playback,
                 advance = viewModel.advance,
             )
         }
@@ -206,7 +199,6 @@ internal fun DrillPager(
     hidePhonetic: Boolean,
     modifier: Modifier = Modifier,
     onToggleAutoAdvance: (currentPage: Int) -> Unit,
-    playbackState: AutoAdvanceState,
     advance: Flow<Int>,
 ) {
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { cards.size })
@@ -275,37 +267,7 @@ internal fun DrillPager(
             }
         }
 
-        if (playbackState.phase != AutoAdvancePhase.Idle) {
-            AutoAdvanceHairline(
-                elapsedFraction = playbackState.elapsedFraction,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
-        }
     }
-}
-
-/** The dwell hairline: a 2 dp full-width line at the screen's very bottom edge
- *  (approved prototype `.scratch/proto-auto-advance.html`, `edgeprog`): onSurface at
- *  55 % opacity filling left-to-right with the elapsed fraction, frozen while paused,
- *  absent while idle. It renders inside the drill content, so the capsule nav drawn
- *  later by the navigation root always floats above it. */
-@Composable
-private fun AutoAdvanceHairline(elapsedFraction: Float, modifier: Modifier = Modifier) {
-    val fill = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(2.dp)
-            .testTag(AutoAdvanceHairlineTag)
-            .drawBehind {
-                if (elapsedFraction > 0f) {
-                    drawRect(
-                        color = fill,
-                        size = Size(size.width * elapsedFraction, size.height),
-                    )
-                }
-            },
-    )
 }
 
 @Composable

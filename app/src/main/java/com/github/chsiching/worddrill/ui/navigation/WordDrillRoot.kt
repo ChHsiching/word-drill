@@ -59,6 +59,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.github.chsiching.worddrill.data.settings.NavStyle
+import com.github.chsiching.worddrill.ui.drill.AutoAdvanceHairline
+import com.github.chsiching.worddrill.ui.drill.AutoAdvanceOverlayViewModel
 import com.github.chsiching.worddrill.ui.drill.DrillScreen
 import com.github.chsiching.worddrill.ui.library.LibraryScreen
 import com.github.chsiching.worddrill.ui.library.WordListScreen
@@ -83,6 +85,9 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
     val navStyle by settingsViewModel.navStyle.collectAsStateWithLifecycle()
     val compactNav by settingsViewModel.compactNav.collectAsStateWithLifecycle()
     val hidePhonetic by settingsViewModel.hidePhonetic.collectAsStateWithLifecycle()
+
+    val overlayViewModel: AutoAdvanceOverlayViewModel = hiltViewModel()
+    val dwellFraction by overlayViewModel.fraction.collectAsStateWithLifecycle()
 
     var drillLocked by remember { mutableStateOf(false) }
 
@@ -143,6 +148,16 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
             onNavigate = navigateTo,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+
+        // The dwell hairline always sits at the screen's very bottom edge, drawn on
+        // top of everything including the bottom nav (owner decision 2026-11-18):
+        // composed after the nav overlay so it floats above both nav modes.
+        if (dwellFraction > 0f) {
+            AutoAdvanceHairline(
+                elapsedFraction = dwellFraction,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
     }
 }
 

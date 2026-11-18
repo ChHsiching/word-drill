@@ -64,6 +64,7 @@ class DrillViewModelTest {
             wordDao = db.wordDao(),
             swipeLogDao = db.swipeLogDao(),
             settings = settings,
+            overlayState = AutoAdvanceOverlayState(),
         ).also { viewModels.add(it) }
 
     private suspend fun insertBookWithWord(name: String, isPreset: Boolean, wordText: String): Long {

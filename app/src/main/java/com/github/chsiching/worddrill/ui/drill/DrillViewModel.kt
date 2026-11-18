@@ -52,6 +52,7 @@ class DrillViewModel @Inject constructor(
     private val wordDao: WordDao,
     private val swipeLogDao: SwipeLogDao,
     private val settings: SettingsRepository,
+    private val overlayState: AutoAdvanceOverlayState,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<DrillUiState>(DrillUiState.Loading)
@@ -59,7 +60,8 @@ class DrillViewModel @Inject constructor(
 
     /** Auto-advance playback machine (GLOSSARY.md): the countdown lives here, owned by
      *  the ViewModel, so virtual-time JVM tests can drive it; the screen only executes
-     *  advance commands and renders the hairline from the exposed state. */
+     *  advance commands, and the hairline is drawn by the navigation root from the
+     *  mirrored overlay state. */
     private val autoAdvance = AutoAdvance(viewModelScope) {
         (DwellInterval.normalize(settings.dwellInterval.first()) * 1000).toLong()
     }
@@ -74,6 +76,12 @@ class DrillViewModel @Inject constructor(
     private var currentBookId: Long? = null
 
     init {
+        // Mirror playback into the app-wide overlay state so the navigation root
+        // can draw the dwell hairline above both nav modes; the drill screen
+        // itself no longer renders the line.
+        viewModelScope.launch {
+            autoAdvance.state.collect { overlayState.update(it) }
+        }
         viewModelScope.launch {
             // Reload on either input. Deleting the current book in the Library does
             // not change the recorded id, so observing the id alone would strand the

@@ -93,7 +93,6 @@ class DrillScreenTest {
                         onToggleLock = {},
                         hidePhonetic = false,
                         onToggleAutoAdvance = { },
-                        playbackState = AutoAdvanceState(),
                         advance = emptyFlow(),
                     )
                 }
@@ -192,7 +191,6 @@ class DrillScreenTest {
                         onToggleLock = {},
                         hidePhonetic = false,
                         onToggleAutoAdvance = { },
-                        playbackState = AutoAdvanceState(),
                         advance = emptyFlow(),
                     )
                 }
@@ -250,6 +248,7 @@ class DrillScreenTest {
             wordDao = db.wordDao(),
             swipeLogDao = db.swipeLogDao(),
             settings = settings,
+            overlayState = AutoAdvanceOverlayState(),
         )
     }
 
@@ -300,6 +299,7 @@ class DrillScreenTest {
             wordDao = db.wordDao(),
             swipeLogDao = db.swipeLogDao(),
             settings = settings,
+            overlayState = AutoAdvanceOverlayState(),
         )
     }
 }
