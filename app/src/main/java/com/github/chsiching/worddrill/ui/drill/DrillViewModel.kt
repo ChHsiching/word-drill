@@ -98,6 +98,11 @@ class DrillViewModel @Inject constructor(
      *  change and rebuild the pager mid-session, throwing away the user's page. */
     private var currentDeckGeneration = 0
 
+    /** Ordering the CURRENT deck was dealt in. Skip/restore re-publishes the
+     *  shrunken sequence in this same ordering (issue #60: the word list's letter
+     *  bar follows the dealt mode until the next book open). */
+    private var currentDeckOrdering = DeckOrdering.ALPHABETICAL
+
     init {
         // Mirror playback into the app-wide overlay state so the navigation root
         // can draw the dwell hairline above both nav modes; the drill screen
@@ -170,12 +175,13 @@ class DrillViewModel @Inject constructor(
         // effect on the next open. SHUFFLED draws a fresh Random here, so every
         // open re-deals and no pattern can be memorized.
         val words = wordDao.getWordsWithSensesByBook(book.bookId)
-        val cards = when (settings.deckOrdering.first()) {
+        currentDeckOrdering = settings.deckOrdering.first()
+        val cards = when (currentDeckOrdering) {
             DeckOrdering.ALPHABETICAL -> WordOrdering.alphabetical(words)
             DeckOrdering.SHUFFLED -> WordOrdering.shuffled(words)
         }
         // The dealt sequence is the one ordering source the word list consumes.
-        deckSequence.publish(book.bookId, cards.map { it.word.wordId })
+        deckSequence.publish(book.bookId, cards.map { it.word.wordId }, currentDeckOrdering)
         if (cards.isEmpty()) {
             _uiState.value = DrillUiState.Empty(
                 bookName = book.name,
@@ -298,7 +304,7 @@ class DrillViewModel @Inject constructor(
         val freshById = wordDao.getWordsWithSensesByBook(bookId)
             .associateBy { it.word.wordId }
         val cards = ready.cards.mapNotNull { freshById[it.word.wordId] }
-        deckSequence.publish(bookId, cards.map { it.word.wordId })
+        deckSequence.publish(bookId, cards.map { it.word.wordId }, currentDeckOrdering)
         if (cards.isEmpty()) {
             autoAdvance.stop()
             _uiState.value = DrillUiState.Empty(

@@ -16,6 +16,7 @@ import com.github.chsiching.worddrill.data.local.entity.Word
 import com.github.chsiching.worddrill.data.settings.DeckOrdering
 import com.github.chsiching.worddrill.data.settings.DwellInterval
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
+import com.github.chsiching.worddrill.ui.DealtDeck
 import com.github.chsiching.worddrill.ui.DeckSequenceState
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -499,9 +500,10 @@ class DrillViewModelTest {
 
         val ready = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
         // The word list consumes exactly this sequence (issue #54: one ordering
-        // source for both surfaces).
+        // source for both surfaces), dealt in the sampled ordering (#60: the
+        // letter bar follows it).
         assertThat(deckSequence.sequences.value[bookId])
-            .isEqualTo(ready.cards.map { it.word.wordId })
+            .isEqualTo(DealtDeck(ready.cards.map { it.word.wordId }, DeckOrdering.ALPHABETICAL))
         Unit
     }
 

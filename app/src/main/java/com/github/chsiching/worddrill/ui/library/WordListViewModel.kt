@@ -14,6 +14,7 @@ import com.github.chsiching.worddrill.data.local.dao.DictionaryDao
 import com.github.chsiching.worddrill.data.local.dao.WordDao
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
+import com.github.chsiching.worddrill.data.settings.DeckOrdering
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.ui.DeckSequenceState
 import com.github.chsiching.worddrill.ui.WordOrdering
@@ -94,6 +95,10 @@ data class WordListUiState(
     val completionCount: Int = 0,
     val deckSize: Int = 0,
     val resumePosition: Int = 0,
+    /** Ordering the displayed list is in (issue #60): the dealt mode when the
+     *  drill published a sequence this session, alphabetical otherwise. The letter
+     * bar shows only in ALPHABETICAL — shuffle has no meaningful sections. */
+    val deckOrdering: DeckOrdering = DeckOrdering.ALPHABETICAL,
 )
 
 /** Book-level inputs of the header, nested so the outer combine stays within the
@@ -165,8 +170,8 @@ class WordListViewModel @Inject constructor(
         // sorting on its own, so the two surfaces show one order. The lookup is
         // de-duplicated: another book's publish must not re-deal this list.
         deckSequence.sequences.map { it[bookId] }.distinctUntilChanged(),
-    ) { words, headerInputs, searchQuery, dialog, deckWordIds ->
-        val ordered = WordOrdering.byDeckSequence(words, deckWordIds)
+    ) { words, headerInputs, searchQuery, dialog, dealtDeck ->
+        val ordered = WordOrdering.byDeckSequence(words, dealtDeck?.wordIds)
         WordListUiState(
             bookName = headerInputs.bookName,
             isPreset = headerInputs.isPreset,
@@ -178,6 +183,7 @@ class WordListViewModel @Inject constructor(
             deckSize = ordered.size,
             resumePosition = if (ordered.isEmpty()) 0
             else WordOrdering.resumeIndex(headerInputs.resumeWordId, ordered) + 1,
+            deckOrdering = dealtDeck?.ordering ?: DeckOrdering.ALPHABETICAL,
         )
     }.stateIn(
         scope = viewModelScope,

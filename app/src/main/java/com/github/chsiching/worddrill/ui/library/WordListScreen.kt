@@ -7,14 +7,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -38,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,11 +54,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.local.WordWithSenses
+import com.github.chsiching.worddrill.data.settings.DeckOrdering
 import com.github.chsiching.worddrill.ui.theme.DialogButton
 import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
 import com.github.chsiching.worddrill.ui.theme.DialogTextField
 import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
+import kotlinx.coroutines.launch
 
 @Composable
 fun WordListScreen(
@@ -139,31 +145,48 @@ fun WordListScreen(
             state.words.isEmpty() && state.searchQuery.isNotBlank() ->
                 EmptyState(stringResource(R.string.word_list_search_empty, state.searchQuery))
             state.words.isEmpty() -> EmptyState(if (readOnly) stringResource(R.string.word_list_preset_readonly) else state.bookName)
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                // Same bottom inset as the Library so the floating capsule nav
-                // cannot cover the last entries when scrolled to the end.
-                contentPadding = PaddingValues(start = 24.dp, top = 8.dp, end = 24.dp, bottom = 120.dp),
-            ) {
-                items(state.words, key = { it.word.wordId }) { wordWithSenses ->
-                    WordRow(
-                        wordWithSenses = wordWithSenses,
-                        readOnly = readOnly,
-                        onEditSense = { sense ->
-                            viewModel.openEditDialog(
-                                senseId = sense.senseId,
-                                wordText = wordWithSenses.word.text,
-                                pos = sense.pos,
-                                meaning = sense.meaning,
+            else -> {
+                val listState = rememberLazyListState()
+                val scope = rememberCoroutineScope()
+                Row(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.weight(1f),
+                        // Same bottom inset as the Library so the floating capsule nav
+                        // cannot cover the last entries when scrolled to the end.
+                        contentPadding = PaddingValues(start = 24.dp, top = 8.dp, end = 12.dp, bottom = 120.dp),
+                    ) {
+                        items(state.words, key = { it.word.wordId }) { wordWithSenses ->
+                            WordRow(
+                                wordWithSenses = wordWithSenses,
+                                readOnly = readOnly,
+                                onEditSense = { sense ->
+                                    viewModel.openEditDialog(
+                                        senseId = sense.senseId,
+                                        wordText = wordWithSenses.word.text,
+                                        pos = sense.pos,
+                                        meaning = sense.meaning,
+                                    )
+                                },
+                                onDeleteWord = {
+                                    viewModel.openDeleteDialog(
+                                        wordId = wordWithSenses.word.wordId,
+                                        wordText = wordWithSenses.word.text,
+                                    )
+                                },
                             )
-                        },
-                        onDeleteWord = {
-                            viewModel.openDeleteDialog(
-                                wordId = wordWithSenses.word.wordId,
-                                wordText = wordWithSenses.word.text,
-                            )
-                        },
-                    )
+                        }
+                    }
+                    // Letter index bar (issue #60): alphabetical sections only. In
+                    // shuffle mode the dealt order carries no sections, so the bar
+                    // disappears while the header above stays.
+                    if (state.deckOrdering == DeckOrdering.ALPHABETICAL) {
+                        LetterIndexBar(
+                            anchors = remember(state.words) { letterAnchors(state.words) },
+                            onJump = { index -> scope.launch { listState.scrollToItem(index) } },
+                            modifier = Modifier.padding(end = 4.dp),
+                        )
+                    }
                 }
             }
         }
@@ -448,6 +471,42 @@ private fun EmptyState(text: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+@Composable
+private fun LetterIndexBar(
+    anchors: Map<Char, Int>,
+    onJump: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .width(32.dp)
+            // Mirrors the list's content insets so the bar spans exactly the
+            // scrollable region; 'Z' stays clear of the floating capsule nav.
+            .padding(top = 8.dp, bottom = 120.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        for (letter in 'A'..'Z') {
+            val anchor = anchors[letter]
+            Text(
+                text = letter.toString(),
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center,
+                color = if (anchor != null) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                // The full cell is the touch target (weight over the bar height);
+                // the glyph centers inside it. Letters with no section in the
+                // displayed list keep their slot for a stable thumb map but are inert.
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .then(if (anchor != null) Modifier.clickable { onJump(anchor) } else Modifier)
+                    .wrapContentHeight(Alignment.CenterVertically),
+            )
+        }
     }
 }
 
