@@ -510,10 +510,11 @@ class MeScreenTest {
     }
 
     @Test
-    fun checkUpdateRow_tapAfterLaunchCheck_replaysCachedResultWithoutRefetch() = runBlocking {
+    fun checkUpdateRow_tapAfterLaunchCheck_refetches() = runBlocking {
         val checker = FakeUpdateChecker(UpdateCheckResult.UpToDate)
         val cache = UpdateCheckCache()
-        // The activity-scoped launch ViewModel fetched first; the Me tab shares the cache.
+        // The activity-scoped launch ViewModel fetched first and cached its result;
+        // the manual row still bypasses the cache and fetches again (reopened #59).
         updateVm(checker, cache).checkForUpdate()
         renderWithVm(vm(), updateViewModel = updateVm(checker, cache))
 
@@ -525,7 +526,7 @@ class MeScreenTest {
         composeRule.onNodeWithText("已是最新版本", substring = false)
             .performScrollTo().assertIsDisplayed()
 
-        assertThat(checker.calls).isEqualTo(1)
+        assertThat(checker.calls).isEqualTo(2)
         Unit
     }
 }

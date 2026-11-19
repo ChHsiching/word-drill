@@ -52,7 +52,7 @@ class UpdateCheckCacheTest {
         cache.getOrFetch(checker)
         cache.getOrFetch(checker)
 
-        // The ticket throttles the checker to once per launch, failures included.
+        // The launch check throttles the checker to once per launch, failures included.
         assertThat(checker.calls).isEqualTo(1)
     }
 }

@@ -228,8 +228,11 @@ class UpdateViewModelTest {
             .isEqualTo(UpdateUiState.Notice(R.string.update_error_dns))
     }
 
+    // Reopened #59: the manual row always performs a real fetch, cached launch
+    // result or not; a previous failure never blocks a retry.
+
     @Test
-    fun manualCheck_afterAutomaticLaunchCheck_doesNotRefetch() = runTest {
+    fun manualCheck_afterAutomaticLaunchCheck_refetches() = runTest {
         val checker = FakeChecker(UpdateCheckResult.UpToDate)
         val cache = UpdateCheckCache()
         val launchVm = UpdateViewModel(checker, FakeInstaller(), cache)
@@ -240,12 +243,12 @@ class UpdateViewModelTest {
         meVm.manualCheck()
         advanceUntilIdle()
 
-        assertThat(checker.calls).isEqualTo(1)
+        assertThat(checker.calls).isEqualTo(2)
         assertThat(meVm.state.value).isEqualTo(UpdateUiState.UpToDate)
     }
 
     @Test
-    fun manualCheck_afterPreviousManualCheck_doesNotRefetch() = runTest {
+    fun manualCheck_afterPreviousManualCheck_refetches() = runTest {
         val checker = FakeChecker(UpdateCheckResult.UpdateAvailable(release))
         val vm = UpdateViewModel(checker, FakeInstaller(), UpdateCheckCache())
         vm.manualCheck()
@@ -255,7 +258,24 @@ class UpdateViewModelTest {
         vm.manualCheck()
         advanceUntilIdle()
 
-        assertThat(checker.calls).isEqualTo(1)
+        assertThat(checker.calls).isEqualTo(2)
         assertThat(vm.state.value).isEqualTo(UpdateUiState.Available(release))
+    }
+
+    @Test
+    fun manualCheck_afterFailure_refetches() = runTest {
+        val checker = FakeChecker(UpdateCheckResult.CheckFailed(R.string.update_error_dns))
+        val vm = UpdateViewModel(checker, FakeInstaller(), UpdateCheckCache())
+        vm.manualCheck()
+        advanceUntilIdle()
+        assertThat(vm.state.value).isEqualTo(UpdateUiState.Notice(R.string.update_error_dns))
+
+        // The failure was not cached; a retry fetches again and can recover.
+        checker.result = UpdateCheckResult.UpToDate
+        vm.manualCheck()
+        advanceUntilIdle()
+
+        assertThat(checker.calls).isEqualTo(2)
+        assertThat(vm.state.value).isEqualTo(UpdateUiState.UpToDate)
     }
 }

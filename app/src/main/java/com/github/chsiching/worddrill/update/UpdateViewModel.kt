@@ -64,13 +64,14 @@ class UpdateViewModel @Inject constructor(
     }
 
     /**
-     * Me tab's 检查更新 row. Replays the once-per-launch cached result (so a manual
-     * check right after the automatic one never re-fetches) and surfaces every
-     * outcome, unlike the silent launch check.
+     * Me tab's 检查更新 row. Always performs a real fetch — the launch check's
+     * cached result is never replayed and a failure is never cached, so every
+     * tap (and every retry after a failure) hits the network again. Unlike the
+     * silent launch check, every outcome is surfaced.
      */
     fun manualCheck() {
         viewModelScope.launch {
-            when (val result = cache.getOrFetch(checker)) {
+            when (val result = checker.checkForUpdate()) {
                 is UpdateCheckResult.UpdateAvailable -> {
                     // An explicit check overrides an earlier 暂不更新.
                     dismissed = false
