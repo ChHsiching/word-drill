@@ -18,10 +18,14 @@ phonetic alongside the existing (UK) phonetic:
     ]
   }
 
-Validation rules (spec, issue #49): every entry has a word and at least one
-sense; phonetic present for >=95% of words (UK or US); no duplicate words
-(each (word, pos) appears once — the Room import dedupes on that key); meaning
-punctuation normalized (normalize_meaning is idempotent on its own output).
+Validation rules (issue #49, ADR 0003): every entry has a word and at least
+one sense; no duplicate (word, pos) pairs (the Room import dedupes on that
+key); meaning punctuation normalized (normalize_meaning is idempotent on its
+own output). Hard gate: every word of the three preset-book word lists
+(tools/data/) that HAS a dictionary entry must also carry a phonetic (UK or
+US) — words Youdao genuinely gives no phonetic for may pass only via
+PHONETIC_GATE_EXCEPTIONS. Words Youdao has no entry for are excluded from the
+output. Overall phonetic coverage is reported, not gated.
 
 Youdao renders domain labels as full-width parens, e.g. （电信）切换; the app
 data uses bracket labels per ADR 0001, e.g. 【电信】切换. Only parentheticals
@@ -73,7 +77,14 @@ HALF_TO_FULL = {",": "，", ";": "；", ":": "：", "?": "？", "!": "！"}
 # <美>, <美，非正式> style region/register markers -> full-width parens.
 ANGLE_MARKER_RE = re.compile(r"<([\u4e00-\u9fff][\u4e00-\u9fff，、]{0,11})>")
 
-PHONETIC_COVERAGE_MIN = 0.95
+# ADR 0003 hard gate: the three preset-book word lists, files in tools/data/.
+PRESET_BOOK_FILES = ("cet4_2016.txt", "cet6_2016.txt", "kaoyan.txt")
+
+# Preset-book words whose Youdao entry genuinely carries no phonetic (no
+# ukphone AND no usphone, verified against live Youdao on 2026-11-20:
+# multi-word phrase entries). The gate lets exactly these through; anything
+# else failing it is an error. Growing this list is an owner decision.
+PHONETIC_GATE_EXCEPTIONS = ("according to", "owing to")
 
 
 def split_pos(line):
@@ -177,9 +188,27 @@ def extract_entries(word, trimmed):
     ]
 
 
-def validate_entries(entries):
+def load_preset_books(data_dir=None):
+    """[(file stem, {words})] for the three preset-book reference lists in
+    tools/data/ — the ADR 0003 hard gate's scope."""
+    data_dir = data_dir or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "data")
+    books = []
+    for ref_file in PRESET_BOOK_FILES:
+        with open(os.path.join(data_dir, ref_file), encoding="utf-8") as f:
+            stem = os.path.splitext(ref_file)[0]
+            books.append((stem, {w for w in f.read().splitlines() if w}))
+    return books
+
+
+def validate_entries(entries, preset_books=()):
     """Return (errors, report). errors is a list of strings; report carries
-    the counts printed by the CLI."""
+    the counts printed by the CLI.
+
+    ADR 0003 hard gate: every preset-book word that HAS a dictionary entry
+    must also carry a phonetic (UK or US); words in PHONETIC_GATE_EXCEPTIONS
+    pass without one. Overall phonetic coverage is reported, not gated.
+    """
     errors = []
     seen_pairs = set()
     words = set()
@@ -201,18 +230,33 @@ def validate_entries(entries):
         if e["phonetic_us"]:
             words_with_us.add(e["word"])
 
-    coverage = len(words_with_uk | words_with_us) / len(words) if words else 1.0
-    if coverage < PHONETIC_COVERAGE_MIN:
-        errors.append(
-            f"phonetic coverage {coverage:.1%} below {PHONETIC_COVERAGE_MIN:.0%}"
-        )
+    words_phonetic = words_with_uk | words_with_us
+    coverage = len(words_phonetic) / len(words) if words else 1.0
     report = {
         "entries": len(entries),
         "words": len(words),
         "phonetic_coverage": coverage,
         "uk_coverage": len(words_with_uk) / len(words) if words else 1.0,
         "us_coverage": len(words_with_us) / len(words) if words else 1.0,
+        "preset_books": {},
     }
+    for name, preset in preset_books:
+        with_entry = preset & words
+        no_phonetic = sorted(with_entry - words_phonetic)
+        excepted = [w for w in no_phonetic if w in PHONETIC_GATE_EXCEPTIONS]
+        report["preset_books"][name] = {
+            "with_entry": len(with_entry),
+            "with_phonetic": len(with_entry) - len(no_phonetic),
+            "both": len(with_entry & words_with_uk & words_with_us),
+            "uk_only": len((with_entry & words_with_uk) - words_with_us),
+            "us_only": len((with_entry & words_with_us) - words_with_uk),
+            "no_phonetic": [w for w in no_phonetic
+                            if w not in PHONETIC_GATE_EXCEPTIONS],
+            "excepted": excepted,
+            "without_entry": sorted(preset - words),
+        }
+        for w in report["preset_books"][name]["no_phonetic"]:
+            errors.append(f"{name}: preset word {w!r} has an entry but no phonetic")
     return errors, report
 
 
@@ -245,11 +289,23 @@ def main(argv=None):
             misses += 1
         entries.extend(word_entries)
 
-    errors, report = validate_entries(entries)
+    errors, report = validate_entries(entries, load_preset_books())
     print(f"raw words: {len(raw)} (no entries: {misses})")
     print(f"entries: {report['entries']} over {report['words']} words")
     print(f"phonetic coverage: {report['phonetic_coverage']:.1%} "
           f"(uk {report['uk_coverage']:.1%}, us {report['us_coverage']:.1%})")
+    for name, stats in report["preset_books"].items():
+        line = (f"{name}: {stats['with_phonetic']}/{stats['with_entry']} entry "
+                f"words with phonetic (both {stats['both']}, uk-only "
+                f"{stats['uk_only']}, us-only {stats['us_only']})")
+        if stats["excepted"]:
+            line += f"; excepted no-phonetic: {', '.join(stats['excepted'])}"
+        if stats["without_entry"]:
+            line += (f"; {len(stats['without_entry'])} without dictionary "
+                     f"entry: {', '.join(stats['without_entry'][:30])}")
+            if len(stats["without_entry"]) > 30:
+                line += f" (+{len(stats['without_entry']) - 30} more)"
+        print(line)
     if errors:
         for e in errors[:50]:
             print(f"VALIDATION ERROR: {e}", file=sys.stderr)

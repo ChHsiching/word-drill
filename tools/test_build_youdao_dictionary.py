@@ -12,7 +12,9 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_youdao_dictionary import (  # noqa: E402
+    PHONETIC_GATE_EXCEPTIONS,
     extract_entries,
+    load_preset_books,
     normalize_meaning,
     parse_ec,
     split_pos,
@@ -238,19 +240,70 @@ class TestValidateEntries:
         errors, _ = validate_entries(entries)
         assert any("duplicate" in e for e in errors)
 
-    def test_phonetic_coverage_below_95_fails(self):
+    def test_low_overall_coverage_alone_is_not_gated(self):
+        # ADR 0003: overall phonetic coverage is reported, not gated.
         entries = [make_entry(w, phonetic=None) for w in "abcdefghijklmnopqr"] + \
             [make_entry(w) for w in "st"]
         errors, report = validate_entries(entries)
-        assert any("phonetic" in e for e in errors)
+        assert errors == []
         assert report["phonetic_coverage"] == pytest.approx(0.10)
 
-    def test_phonetic_coverage_exactly_95_passes(self):
-        entries = [make_entry("a", phonetic=None)] + \
-            [make_entry(w) for w in "bcdefghijklmnopqrst"]
-        errors, report = validate_entries(entries)
-        assert not any("phonetic" in e for e in errors)
-        assert report["phonetic_coverage"] == pytest.approx(0.95)
+    def test_preset_word_without_phonetic_fails(self):
+        entries = [make_entry("a", phonetic=None), make_entry("b")]
+        errors, report = validate_entries(
+            entries, preset_books=[("cet4_2016", {"a", "b"})])
+        assert any("cet4_2016" in e and "'a'" in e for e in errors), errors
+
+    def test_preset_word_with_us_only_phonetic_passes_gate(self):
+        entries = [make_entry("a", phonetic=None, phonetic_us="/a/")]
+        errors, _ = validate_entries(
+            entries, preset_books=[("cet4_2016", {"a"})])
+        assert not any("cet4_2016" in e for e in errors), errors
+
+    def test_nonpreset_word_without_phonetic_not_gated(self):
+        entries = [make_entry("a"), make_entry("zzz", phonetic=None)]
+        errors, _ = validate_entries(
+            entries, preset_books=[("cet4_2016", {"a"})])
+        assert errors == []
+
+    def test_preset_word_without_entry_reported_not_failed(self):
+        # ADR 0003: words Youdao has no entry for are excluded from the
+        # dictionary; that is reported per book, not a validation error.
+        entries = [make_entry("a")]
+        errors, report = validate_entries(
+            entries, preset_books=[("cet4_2016", {"a", "not crawled"})])
+        assert errors == []
+        stats = report["preset_books"]["cet4_2016"]
+        assert stats["with_entry"] == 1
+        assert stats["without_entry"] == ["not crawled"]
+
+    def test_preset_book_phonetic_split_reported(self):
+        entries = [make_entry("a", phonetic="/æ/", phonetic_us="/ə/"),  # both
+                   make_entry("b", phonetic=None, phonetic_us="/b/"),   # us only
+                   make_entry("c", phonetic="/k/"),                     # uk only
+                   make_entry("d", phonetic=None, phonetic_us=None)]    # none
+        _, report = validate_entries(
+            entries, preset_books=[("cet4_2016", {"a", "b", "c", "d"})])
+        stats = report["preset_books"]["cet4_2016"]
+        assert stats["with_entry"] == 4
+        assert stats["both"] == 1
+        assert stats["uk_only"] == 1
+        assert stats["us_only"] == 1
+        assert stats["no_phonetic"] == ["d"]
+
+    def test_exception_phrase_without_phonetic_passes_reported(self):
+        entries = [make_entry("according to", pos="", phonetic=None)]
+        errors, report = validate_entries(
+            entries, preset_books=[("cet4_2016", {"according to"})])
+        assert errors == []
+        stats = report["preset_books"]["cet4_2016"]
+        assert stats["excepted"] == ["according to"]
+        assert stats["no_phonetic"] == []
+
+    def test_exception_list_locked_to_verified_phrases(self):
+        # Each entry must be verified against live Youdao as carrying no
+        # ukphone AND no usphone; growing the list is an owner decision.
+        assert PHONETIC_GATE_EXCEPTIONS == ("according to", "owing to")
 
     def test_unnormalized_punctuation_fails(self):
         entries = [make_entry("a", meaning="苹果, 梨")]
@@ -262,6 +315,14 @@ class TestValidateEntries:
         errors, report = validate_entries(entries)
         assert not any("phonetic" in e for e in errors)
         assert report["us_coverage"] == 1.0
+
+
+class TestLoadPresetBooks:
+    def test_loads_the_three_preset_book_lists(self):
+        books = dict(load_preset_books())
+        assert set(books) == {"cet4_2016", "cet6_2016", "kaoyan"}
+        assert "abandon" in books["cet4_2016"]
+        assert all(len(words) > 3000 for words in books.values())
 
 
 if __name__ == "__main__":
