@@ -247,6 +247,7 @@ class Migration45Test {
                 WordDrillDatabase.MIGRATION_3_4,
                 WordDrillDatabase.MIGRATION_4_5,
                 WordDrillDatabase.MIGRATION_5_6,
+                WordDrillDatabase.MIGRATION_6_7,
             )
             .build()
         val deleted = kotlinx.coroutines.runBlocking {

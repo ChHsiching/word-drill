@@ -8,9 +8,9 @@ class DictionaryWordsParserTest {
 
     private val sample = """
         {
-          "source": "ECDICT (MIT License, https://github.com/skywind3000/ECDICT)",
+          "source": "Youdao (dict.youdao.com web API, crawled 2026-11-21)",
           "words": [
-            { "word": "apple", "phonetic": "/ˈæpl/", "pos": "n.", "meaning": "苹果" },
+            { "word": "apple", "phonetic": "/ˈæpl/", "phonetic_us": "/ˈæpl/", "pos": "n.", "meaning": "苹果" },
             { "word": "apple", "phonetic": "/ˈæpl/", "pos": "v.", "meaning": "..." },
             { "word": "run", "pos": "v.", "meaning": "跑" }
           ]
@@ -20,7 +20,7 @@ class DictionaryWordsParserTest {
     @Test
     fun parse_readsSource() {
         val parsed = DictionaryWordsParser.parse(sample)
-        assertThat(parsed.source).isEqualTo("ECDICT (MIT License, https://github.com/skywind3000/ECDICT)")
+        assertThat(parsed.source).isEqualTo("Youdao (dict.youdao.com web API, crawled 2026-11-21)")
     }
 
     @Test
@@ -78,6 +78,41 @@ class DictionaryWordsParserTest {
         """.trimIndent()
         val parsed = DictionaryWordsParser.parse(json)
         assertThat(parsed.words[0].phonetic).isNull()
+    }
+
+    @Test
+    fun parse_readsPhoneticUs_whenPresent() {
+        val parsed = DictionaryWordsParser.parse(sample)
+        assertThat(parsed.words.first { it.word == "apple" && it.pos == "n." }.phoneticUs)
+            .isEqualTo("/ˈæpl/")
+    }
+
+    @Test
+    fun parse_phoneticUsIsNull_whenAbsent() {
+        val parsed = DictionaryWordsParser.parse(sample)
+        assertThat(parsed.words.first { it.word == "apple" && it.pos == "v." }.phoneticUs).isNull()
+    }
+
+    @Test
+    fun parse_phoneticUsIsNull_whenJsonNull() {
+        val json = """
+            {"source":"x","words":[
+              {"word":"a","phonetic":"/p/","phonetic_us":null,"pos":"n.","meaning":"甲"}
+            ]}
+        """.trimIndent()
+        val parsed = DictionaryWordsParser.parse(json)
+        assertThat(parsed.words[0].phoneticUs).isNull()
+    }
+
+    @Test
+    fun parse_phoneticUsIsNull_whenBlank() {
+        val json = """
+            {"source":"x","words":[
+              {"word":"a","phonetic_us":"  ","pos":"n.","meaning":"甲"}
+            ]}
+        """.trimIndent()
+        val parsed = DictionaryWordsParser.parse(json)
+        assertThat(parsed.words[0].phoneticUs).isNull()
     }
 
     @Test(expected = JSONException::class)

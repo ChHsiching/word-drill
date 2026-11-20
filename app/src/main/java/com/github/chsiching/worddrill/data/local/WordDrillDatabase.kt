@@ -24,7 +24,7 @@ import com.github.chsiching.worddrill.data.local.entity.Word
         SwipeLog::class,
         DictionaryEntry::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class WordDrillDatabase : RoomDatabase() {
@@ -92,6 +92,13 @@ abstract class WordDrillDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE book ADD COLUMN completionCount INTEGER NOT NULL DEFAULT 0"
                 )
+            }
+        }
+
+        // Nullable column, so a plain ALTER TABLE suffices; existing rows keep NULL.
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE dictionary ADD COLUMN phoneticUs TEXT")
             }
         }
     }

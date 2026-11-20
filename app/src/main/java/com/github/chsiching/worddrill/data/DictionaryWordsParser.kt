@@ -18,10 +18,16 @@ object DictionaryWordsParser {
                 } else {
                     w.optString("phonetic", "").ifBlank { null }
                 }
+                val phoneticUs = if (w.isNull("phonetic_us")) {
+                    null
+                } else {
+                    w.optString("phonetic_us", "").ifBlank { null }
+                }
                 add(
                     DictionaryWords.Entry(
                         word = w.getString("word"),
                         phonetic = phonetic,
+                        phoneticUs = phoneticUs,
                         pos = w.getString("pos"),
                         meaning = w.getString("meaning"),
                     )

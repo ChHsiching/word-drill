@@ -20,7 +20,13 @@ class DictionaryImporter @Inject constructor(
         val before = dictionaryDao.count()
         dictionaryDao.insertAll(
             data.words.map { e ->
-                DictionaryEntry(word = e.word, phonetic = e.phonetic, pos = e.pos, meaning = e.meaning)
+                DictionaryEntry(
+                    word = e.word,
+                    phonetic = e.phonetic,
+                    phoneticUs = e.phoneticUs,
+                    pos = e.pos,
+                    meaning = e.meaning,
+                )
             }
         )
         dictionaryDao.count() - before

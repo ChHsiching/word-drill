@@ -73,12 +73,14 @@ class DictionaryDaoTest {
     }
 
     @Test
-    fun findByWord_isCaseSensitive() = runTest {
+    fun findByWord_isCaseInsensitive() = runTest {
+        // The Youdao asset keeps entry casing (April, AIDS, ...), while callers pass
+        // the lowercased import row, so the match must fold case in SQL.
         dao.insertAll(
-            listOf(DictionaryEntry(word = "apple", pos = "n.", meaning = "苹果"))
+            listOf(DictionaryEntry(word = "April", pos = "n.", meaning = "四月"))
         )
-        assertThat(dao.findByWord("apple")).hasSize(1)
-        assertThat(dao.findByWord("Apple")).isEmpty()
+        assertThat(dao.findByWord("april")).hasSize(1)
+        assertThat(dao.findByWord("APRIL")).hasSize(1)
     }
 
     @Test
@@ -99,6 +101,24 @@ class DictionaryDaoTest {
             listOf(DictionaryEntry(word = "run", pos = "v.", meaning = "跑"))
         )
         assertThat(dao.findByWord("run").single().phonetic).isNull()
+    }
+
+    @Test
+    fun findByWord_carriesBothPhoneticVariants() = runTest {
+        dao.insertAll(
+            listOf(
+                DictionaryEntry(
+                    word = "telephone",
+                    phonetic = "/ˈtelɪfəʊn/",
+                    phoneticUs = "/ˈtelɪfoʊn/",
+                    pos = "v.",
+                    meaning = "打电话",
+                )
+            )
+        )
+        val e = dao.findByWord("telephone").single()
+        assertThat(e.phonetic).isEqualTo("/ˈtelɪfəʊn/")
+        assertThat(e.phoneticUs).isEqualTo("/ˈtelɪfoʊn/")
     }
 
     @Test
@@ -155,6 +175,51 @@ class DictionaryDaoTest {
         importer.importDictionary(DictionaryWordsParser.parse(json))
         val ghost = dao.findByWord("ghost").single()
         assertThat(ghost.phonetic).isNull()
+    }
+
+    @Test
+    fun importer_readsPhoneticUs_fromAssetJson() = runTest {
+        val json = """
+            {"source":"x","words":[
+              {"word":"telephone","phonetic":"/ˈtelɪfəʊn/","phonetic_us":"/ˈtelɪfoʊn/","pos":"v.","meaning":"打电话"},
+              {"word":"ghost","phonetic":null,"phonetic_us":null,"pos":"n.","meaning":"鬼"}
+            ]}
+        """.trimIndent()
+        importer.importDictionary(DictionaryWordsParser.parse(json))
+        val telephone = dao.findByWord("telephone").single()
+        assertThat(telephone.phoneticUs).isEqualTo("/ˈtelɪfoʊn/")
+        assertThat(dao.findByWord("ghost").single().phoneticUs).isNull()
+    }
+
+    @Test
+    fun importer_reImportWithClear_replacesStaleRows() = runTest {
+        importer.importDictionary(
+            DictionaryWords(
+                source = "old",
+                words = listOf(
+                    DictionaryWords.Entry(word = "apple", phonetic = "/old/", pos = "n.", meaning = "旧释义"),
+                    DictionaryWords.Entry(word = "staleword", pos = "n.", meaning = "已删词"),
+                ),
+            )
+        )
+
+        val inserted = importer.importDictionary(
+            DictionaryWords(
+                source = "new",
+                words = listOf(
+                    DictionaryWords.Entry(word = "apple", phonetic = "/new/", phoneticUs = "/nu/", pos = "n.", meaning = "新释义"),
+                ),
+            ),
+            clearFirst = true,
+        )
+
+        assertThat(inserted).isEqualTo(1)
+        assertThat(dao.count()).isEqualTo(1)
+        val apple = dao.findByWord("apple").single()
+        assertThat(apple.meaning).isEqualTo("新释义")
+        assertThat(apple.phonetic).isEqualTo("/new/")
+        assertThat(apple.phoneticUs).isEqualTo("/nu/")
+        assertThat(dao.findByWord("staleword")).isEmpty()
     }
 
     private fun sampleDictionary(): DictionaryWords = DictionaryWords(
