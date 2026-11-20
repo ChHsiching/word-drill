@@ -92,11 +92,10 @@ phrase entries both syllabi print. Result: 5,658 words, +2.9% against the
 ## Dictionary content
 
 `tools/gen_words_json.py` attaches content (phonetic, senses) from the
-bundled `assets/dictionary.json` (ECDICT-derived, MIT) by exact word match.
-Words without a match (37 / 41 / 26 per book — mostly proper nouns and
-hyphenated compounds) keep their slot with `phonetic: null` and empty
-senses; backfilling definitions belongs to the dictionary-rebuild workstream,
-not this membership alignment.
+bundled `assets/dictionary.json` (Youdao-sourced per ADR 0001/0003, built by
+`tools/build_youdao_dictionary.py`) by exact word match. Words Youdao has no
+entry for keep their slot with `phonetic: null` and empty senses (ADR 0003:
+importing them shows the not-found state).
 
 ## Verification
 
@@ -117,6 +116,6 @@ python -m pytest tools/ -q
 The research notes flag that the official syllabi are copyrighted
 publications and free access is not a redistribution license; the spec (#47)
 nevertheless locked these sources for the preset books. The shipped lists are
-bare word forms; dictionary definitions remain ECDICT (MIT). If the owner
-later wants a cleaner stance, the reference lists and regenerating scripts
-here make any swap a one-file change.
+bare word forms; dictionary definitions are Youdao-sourced (ADR 0001/0003).
+If the owner later wants a cleaner stance, the reference lists and
+regenerating scripts here make any swap a one-file change.

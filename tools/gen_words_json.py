@@ -39,7 +39,7 @@ BOOKS = [
 
 SOURCE = ("membership: official CET 2016 syllabus + cross-verified 考研 "
           "transcription (docs/preset-books-provenance.md); definitions: "
-          "ECDICT (MIT License, https://github.com/skywind3000/ECDICT)")
+          "Youdao (dict.youdao.com web API; tools/build_youdao_dictionary.py)")
 
 
 def load_dictionary(path):

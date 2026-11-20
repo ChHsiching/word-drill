@@ -18,10 +18,17 @@ phonetic alongside the existing (UK) phonetic:
     ]
   }
 
-Validation rules (spec, issue #49): every entry has a word and at least one
-sense; phonetic present for >=95% of words (UK or US); no duplicate words
-(each (word, pos) appears once — the Room import dedupes on that key); meaning
-punctuation normalized (normalize_meaning is idempotent on its own output).
+Validation rules (issue #49, ADR 0003): every entry has a word and at least
+one sense; no duplicate (word, pos) pairs (the Room import dedupes on that
+key); meaning punctuation normalized (normalize_meaning is idempotent on its
+own output). Hard gate: every word of the three preset-book word lists
+(tools/data/) that HAS a dictionary entry must also carry a phonetic (UK or
+US) — words Youdao genuinely gives no phonetic for may pass only via
+PHONETIC_GATE_EXCEPTIONS. Words Youdao has no entry for are excluded from the
+output. Overall phonetic coverage is reported, not gated. Missing phonetic
+variants are gap-filled from English Wiktionary IPA (tools/
+wiktionary_phonetic_fill.py, per the amended ADR 0003): Youdao values always
+win, and the build reports the fill counts.
 
 Youdao renders domain labels as full-width parens, e.g. （电信）切换; the app
 data uses bracket labels per ADR 0001, e.g. 【电信】切换. Only parentheticals
@@ -70,10 +77,18 @@ CJK_RE = r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3000-\u303f\uff00-\uffef]"
 
 HALF_TO_FULL = {",": "，", ";": "；", ":": "：", "?": "？", "!": "！"}
 
-# <美>, <美，非正式> style region/register markers -> full-width parens.
-ANGLE_MARKER_RE = re.compile(r"<([\u4e00-\u9fff][\u4e00-\u9fff，、]{0,11})>")
+# <美>, <美，非正式>, <美， 非正式> style region/register markers ->
+# full-width parens (inner spaces allowed and dropped).
+ANGLE_MARKER_RE = re.compile(r"<([\u4e00-\u9fff][\u4e00-\u9fff，、 ]{0,11})>")
 
-PHONETIC_COVERAGE_MIN = 0.95
+# ADR 0003 hard gate: the three preset-book word lists, files in tools/data/.
+PRESET_BOOK_FILES = ("cet4_2016.txt", "cet6_2016.txt", "kaoyan.txt")
+
+# Preset-book words whose Youdao entry genuinely carries no phonetic (no
+# ukphone AND no usphone, verified against live Youdao on 2026-11-20:
+# multi-word phrase entries). The gate lets exactly these through; anything
+# else failing it is an error. Growing this list is an owner decision.
+PHONETIC_GATE_EXCEPTIONS = ("according to", "owing to")
 
 
 def split_pos(line):
@@ -92,17 +107,21 @@ def _is_domain_label(content):
 def normalize_meaning(text):
     """Normalize punctuation in a Chinese sense text:
     1. collapse whitespace runs to one space and strip;
-    2. <美> style markers -> （美）;
-    3. half-width , ; : ? ! -> full-width when adjacent to CJK;
+    2. half-width , ; : ? ! -> full-width when adjacent to CJK;
+    3. <美> style markers -> （美） (after widening — markers may hold a
+       half-width comma, "<美,非正式>");
     4. （电信） and [古生] domain labels -> 【】 form;
-    5. strip spaces hugging full-width separators and labels.
+    5. strip spaces hugging full-width separators, labels, and close parens.
     Idempotent on its own output.
     """
     text = re.sub(r"\s+", " ", text).strip()
-    text = ANGLE_MARKER_RE.sub(r"（\1）", text)
     for half, full in HALF_TO_FULL.items():
         text = re.sub(f"(?<={CJK_RE}){re.escape(half)}", full, text)
         text = re.sub(f"{re.escape(half)}(?={CJK_RE})", full, text)
+    # After the widening pass: markers may hold half-width commas
+    # ("<美,非正式>") or stray spaces ("<美， 非正式>").
+    text = ANGLE_MARKER_RE.sub(
+        lambda m: "（" + m.group(1).replace(" ", "") + "）", text)
 
     def repl(m):
         content = m.group(1)
@@ -111,9 +130,10 @@ def normalize_meaning(text):
     text = re.sub(r"（([^（）]+)）", repl, text)
     # Youdao also marks domains with square brackets: "[古生] 赤道部".
     text = re.sub(r"\[([^[\]]+)\]", repl, text)
-    # No space hugs full-width separators or labels: "苹果， 梨" -> "苹果，梨".
-    text = re.sub(r" +([，；：？！】])", r"\1", text)
-    return re.sub(r"([，；：？！】]) +", r"\1", text)
+    # No space hugs full-width separators, labels, or close parens:
+    # "苹果， 梨" -> "苹果，梨"; "（非正式） （尤指…）" -> "（非正式）（尤指…）".
+    text = re.sub(r" +([，；：？！】）])", r"\1", text)
+    return re.sub(r"([，；：？！】）]) +", r"\1", text)
 
 
 def wrap_phonetic(raw):
@@ -177,9 +197,27 @@ def extract_entries(word, trimmed):
     ]
 
 
-def validate_entries(entries):
+def load_preset_books(data_dir=None):
+    """[(file stem, {words})] for the three preset-book reference lists in
+    tools/data/ — the ADR 0003 hard gate's scope."""
+    data_dir = data_dir or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "data")
+    books = []
+    for ref_file in PRESET_BOOK_FILES:
+        with open(os.path.join(data_dir, ref_file), encoding="utf-8") as f:
+            stem = os.path.splitext(ref_file)[0]
+            books.append((stem, {w for w in f.read().splitlines() if w}))
+    return books
+
+
+def validate_entries(entries, preset_books=()):
     """Return (errors, report). errors is a list of strings; report carries
-    the counts printed by the CLI."""
+    the counts printed by the CLI.
+
+    ADR 0003 hard gate: every preset-book word that HAS a dictionary entry
+    must also carry a phonetic (UK or US); words in PHONETIC_GATE_EXCEPTIONS
+    pass without one. Overall phonetic coverage is reported, not gated.
+    """
     errors = []
     seen_pairs = set()
     words = set()
@@ -201,19 +239,72 @@ def validate_entries(entries):
         if e["phonetic_us"]:
             words_with_us.add(e["word"])
 
-    coverage = len(words_with_uk | words_with_us) / len(words) if words else 1.0
-    if coverage < PHONETIC_COVERAGE_MIN:
-        errors.append(
-            f"phonetic coverage {coverage:.1%} below {PHONETIC_COVERAGE_MIN:.0%}"
-        )
+    words_phonetic = words_with_uk | words_with_us
+    coverage = len(words_phonetic) / len(words) if words else 1.0
     report = {
         "entries": len(entries),
         "words": len(words),
         "phonetic_coverage": coverage,
         "uk_coverage": len(words_with_uk) / len(words) if words else 1.0,
         "us_coverage": len(words_with_us) / len(words) if words else 1.0,
+        "preset_books": {},
     }
+    for name, preset in preset_books:
+        with_entry = preset & words
+        no_phonetic = sorted(with_entry - words_phonetic)
+        excepted = [w for w in no_phonetic if w in PHONETIC_GATE_EXCEPTIONS]
+        report["preset_books"][name] = {
+            "with_entry": len(with_entry),
+            "with_phonetic": len(with_entry) - len(no_phonetic),
+            "both": len(with_entry & words_with_uk & words_with_us),
+            "uk_only": len((with_entry & words_with_uk) - words_with_us),
+            "us_only": len((with_entry & words_with_us) - words_with_uk),
+            "no_phonetic": [w for w in no_phonetic
+                            if w not in PHONETIC_GATE_EXCEPTIONS],
+            "excepted": excepted,
+            "without_entry": sorted(preset - words),
+        }
+        for w in report["preset_books"][name]["no_phonetic"]:
+            errors.append(f"{name}: preset word {w!r} has an entry but no phonetic")
     return errors, report
+
+
+def apply_phonetic_fill(entries, fill):
+    """Fill missing phonetic variants from the Wiktionary gap-fill (ADR 0003,
+    owner decision 2026-11-20). Youdao values always win; a variant stays
+    None when neither source has it. Returns (entries, stats) with unique
+    word counts: gap_words (missing a variant before the fill), filled_uk,
+    filled_us, still_missing (still missing a variant after the fill)."""
+    before = {}
+    for e in entries:
+        seen = before.setdefault(e["word"], [False, False])
+        seen[0] = seen[0] or e["phonetic"] is not None
+        seen[1] = seen[1] or e["phonetic_us"] is not None
+    gap_words = {w for w, had in before.items() if not (had[0] and had[1])}
+    filled_uk = set()
+    filled_us = set()
+    for e in entries:
+        f = fill.get(e["word"])
+        if not f:
+            continue
+        if e["phonetic"] is None and f.get("uk"):
+            e["phonetic"] = f["uk"]
+            filled_uk.add(e["word"])
+        if e["phonetic_us"] is None and f.get("us"):
+            e["phonetic_us"] = f["us"]
+            filled_us.add(e["word"])
+    after = {}
+    for e in entries:
+        seen = after.setdefault(e["word"], [False, False])
+        seen[0] = seen[0] or e["phonetic"] is not None
+        seen[1] = seen[1] or e["phonetic_us"] is not None
+    still_missing = {w for w in gap_words if not (after[w][0] and after[w][1])}
+    return entries, {
+        "gap_words": len(gap_words),
+        "filled_uk": len(filled_uk),
+        "filled_us": len(filled_us),
+        "still_missing": len(still_missing),
+    }
 
 
 def build_output(entries, source):
@@ -228,6 +319,9 @@ def main(argv=None):
                         help="output JSON path (default: <state-dir>/dictionary.youdao.json)")
     parser.add_argument("--source-run-date", default=datetime.date.today().isoformat(),
                         help="crawl date recorded in the source string")
+    parser.add_argument("--fill-file", default=None,
+                        help="Wiktionary phonetic gap-fill JSONL (default: "
+                             "<state-dir>/wiktionary_fill.jsonl when present)")
     parser.add_argument("--allow-validation-errors", action="store_true",
                         help="write the output and exit 0 even when validation fails "
                              "(mid-crawl CI chunks; the final full build runs strict)")
@@ -245,11 +339,35 @@ def main(argv=None):
             misses += 1
         entries.extend(word_entries)
 
-    errors, report = validate_entries(entries)
+    fill_path = args.fill_file or os.path.join(
+        args.state_dir, "wiktionary_fill.jsonl")
+    if os.path.exists(fill_path):
+        from wiktionary_phonetic_fill import load_fill  # deferred: avoids import cycle
+        fill = load_fill(fill_path)
+    else:
+        fill = {}
+    entries, fill_stats = apply_phonetic_fill(entries, fill)
+
+    errors, report = validate_entries(entries, load_preset_books())
     print(f"raw words: {len(raw)} (no entries: {misses})")
     print(f"entries: {report['entries']} over {report['words']} words")
     print(f"phonetic coverage: {report['phonetic_coverage']:.1%} "
           f"(uk {report['uk_coverage']:.1%}, us {report['us_coverage']:.1%})")
+    print(f"wiktionary fill: {fill_stats['gap_words']} gap words, filled "
+          f"uk {fill_stats['filled_uk']} / us {fill_stats['filled_us']}, "
+          f"still missing a variant {fill_stats['still_missing']}")
+    for name, stats in report["preset_books"].items():
+        line = (f"{name}: {stats['with_phonetic']}/{stats['with_entry']} entry "
+                f"words with phonetic (both {stats['both']}, uk-only "
+                f"{stats['uk_only']}, us-only {stats['us_only']})")
+        if stats["excepted"]:
+            line += f"; excepted no-phonetic: {', '.join(stats['excepted'])}"
+        if stats["without_entry"]:
+            line += (f"; {len(stats['without_entry'])} without dictionary "
+                     f"entry: {', '.join(stats['without_entry'][:30])}")
+            if len(stats["without_entry"]) > 30:
+                line += f" (+{len(stats['without_entry']) - 30} more)"
+        print(line)
     if errors:
         for e in errors[:50]:
             print(f"VALIDATION ERROR: {e}", file=sys.stderr)
