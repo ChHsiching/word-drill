@@ -101,6 +101,10 @@
     <string name="me_group_navigation">导航</string>
     <string name="me_group_general">通用</string>
     <string name="me_setting_hide_phonetic">隐藏音标</string>
+    <string name="me_setting_phonetic_preference">音标偏好</string>
+    <string name="me_setting_phonetic_preference_uk">英式</string>
+    <string name="me_setting_phonetic_preference_us">美式</string>
+    <string name="me_setting_phonetic_preference_both">双语</string>
     <string name="me_setting_dwell_interval">自动连播间隔</string>
     <string name="me_setting_dwell_value">%1$.1f 秒</string>
     <string name="me_setting_dwell_hint_min">1s</string>

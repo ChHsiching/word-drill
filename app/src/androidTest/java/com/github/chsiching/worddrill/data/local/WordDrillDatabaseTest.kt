@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
+import com.github.chsiching.worddrill.data.local.entity.DictionaryEntry
 import com.github.chsiching.worddrill.data.local.entity.Sense
 import com.github.chsiching.worddrill.data.local.entity.SwipeLog
 import com.github.chsiching.worddrill.data.local.entity.Word
@@ -87,6 +88,74 @@ class WordDrillDatabaseTest {
 
         val result = wordDao.getWordsWithSensesByBook(bookId).single()
         assertThat(result.word.phonetic).isEqualTo("/ˈæpl/")
+    }
+
+    // --- Phonetic variant resolution for the drill card (issue #58) ---
+
+    @Test
+    fun getPhoneticsByBook_returnsDictionaryVariants_andSkipsSkippedWords() = runTest {
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        // The word row carries its own UK phonetic; the dictionary entry is the
+        // live variant source (in-app dictionary updates), so its values win.
+        val wApple = wordDao.insert(Word(text = "apple", phonetic = "/wordrow/"))
+        val wGone = wordDao.insert(Word(text = "gone", phonetic = "/ɡɒn/"))
+        bookDao.linkBookWord(BookWord(bookId, wApple))
+        bookDao.linkBookWord(BookWord(bookId, wGone))
+        // One entry per sense (pos): the dictionary stores the same phonetics on
+        // every pos row of a word; the resolution must dedupe to one pair.
+        db.dictionaryDao().insertAll(
+            listOf(
+                DictionaryEntry(word = "apple", phonetic = "/uk/", phoneticUs = "/us/", pos = "n.", meaning = "苹果"),
+                DictionaryEntry(word = "apple", phonetic = "/uk/", phoneticUs = "/us/", pos = "v.", meaning = "囤积"),
+            )
+        )
+        bookDao.setSkipped(bookId, wGone, skipped = true)
+
+        val byWordId = wordDao.getPhoneticsByBook(bookId).associateBy { it.wordId }
+        assertThat(byWordId.keys).containsExactly(wApple)
+        assertThat(byWordId[wApple]!!.phoneticUk).isEqualTo("/uk/")
+        assertThat(byWordId[wApple]!!.phoneticUs).isEqualTo("/us/")
+    }
+
+    @Test
+    fun getPhoneticsByBook_fallsBackToWordRowUk_whenDictionaryLacksTheWord() = runTest {
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        // File-imported word with its own phonetic and no dictionary entry: UK
+        // falls back to the word row, US simply does not exist.
+        val wImported = wordDao.insert(Word(text = "zzzzunknown", phonetic = "/zz/"))
+        val wBare = wordDao.insert(Word(text = "bare", phonetic = null))
+        bookDao.linkBookWord(BookWord(bookId, wImported))
+        bookDao.linkBookWord(BookWord(bookId, wBare))
+
+        val byWordId = wordDao.getPhoneticsByBook(bookId).associateBy { it.wordId }
+        assertThat(byWordId[wImported]!!.phoneticUk).isEqualTo("/zz/")
+        assertThat(byWordId[wImported]!!.phoneticUs).isNull()
+        assertThat(byWordId[wBare]!!.phoneticUk).isNull()
+        assertThat(byWordId[wBare]!!.phoneticUs).isNull()
+    }
+
+    @Test
+    fun getPhoneticsByBook_matchesDictionaryCaseInsensitively() = runTest {
+        val wordDao = db.wordDao()
+        val bookDao = db.bookDao()
+        val bookId = bookDao.insert(Book(name = "b1"))
+        // The dictionary keeps entry casing (April) while word rows land lowercased
+        // from import rows; the join folds case exactly like findByWord.
+        val wApril = wordDao.insert(Word(text = "april", phonetic = null))
+        bookDao.linkBookWord(BookWord(bookId, wApril))
+        db.dictionaryDao().insertAll(
+            listOf(
+                DictionaryEntry(word = "April", phonetic = "/ˈeɪprəl/", phoneticUs = "/ˈeɪprəl/", pos = "n.", meaning = "四月"),
+            )
+        )
+
+        val result = wordDao.getPhoneticsByBook(bookId).single()
+        assertThat(result.phoneticUk).isEqualTo("/ˈeɪprəl/")
+        assertThat(result.phoneticUs).isEqualTo("/ˈeɪprəl/")
     }
 
     @Test

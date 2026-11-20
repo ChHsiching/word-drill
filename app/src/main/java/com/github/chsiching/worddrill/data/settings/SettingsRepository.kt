@@ -29,6 +29,7 @@ class SettingsRepository @Inject constructor(
     private val currentBookIdKey = longPreferencesKey("current_book_id")
     private val themeKey = stringPreferencesKey("theme_mode")
     private val hidePhoneticKey = booleanPreferencesKey("hide_phonetic")
+    private val phoneticPreferenceKey = stringPreferencesKey("phonetic_preference")
     private val navStyleKey = stringPreferencesKey("nav_style")
     private val compactNavKey = booleanPreferencesKey("compact_nav")
     private val dwellIntervalKey = floatPreferencesKey("dwell_interval_seconds")
@@ -109,6 +110,15 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setHidePhonetic(value: Boolean) {
         context.appDataStore.edit { it[hidePhoneticKey] = value }
+    }
+
+    /** Phonetic preference (GLOSSARY.md, issue #58): which variant(s) the drill card
+     *  shows. Default US (美式); hiding (hidePhonetic) always wins over it. */
+    val phoneticPreference: Flow<PhoneticPreference> =
+        context.appDataStore.data.map { PhoneticPreference.fromStorageName(it[phoneticPreferenceKey]) }
+
+    suspend fun setPhoneticPreference(preference: PhoneticPreference) {
+        context.appDataStore.edit { it[phoneticPreferenceKey] = preference.name }
     }
 
     val navStyle: Flow<NavStyle> =

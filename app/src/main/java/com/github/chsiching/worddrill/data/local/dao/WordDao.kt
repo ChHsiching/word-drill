@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import com.github.chsiching.worddrill.data.local.WordPhonetics
 import com.github.chsiching.worddrill.data.local.WordWithSenses
 import com.github.chsiching.worddrill.data.local.entity.Sense
 import com.github.chsiching.worddrill.data.local.entity.Word
@@ -63,6 +64,25 @@ interface WordDao {
         """
     )
     fun observeWordsWithSensesByBook(bookId: Long): Flow<List<WordWithSenses>>
+
+    /** UK/US phonetic pair per deck word (issue #58), for render-time variant
+     *  choice. The dictionary entry is the live source (its join folds case like
+     *  DictionaryDao.findByWord; MAX dedupes the per-pos rows, which share one
+     *  pair per word); the word row's own phonetic backs UK up for words the
+     *  dictionary does not carry. Same deck filter as the card query above. */
+    @Query(
+        """
+        SELECT w.wordId AS wordId,
+               COALESCE(MAX(d.phonetic), w.phonetic) AS phoneticUk,
+               MAX(d.phoneticUs) AS phoneticUs
+        FROM word w
+        INNER JOIN book_word bw ON w.wordId = bw.wordId
+        LEFT JOIN dictionary d ON d.word = w.text COLLATE NOCASE
+        WHERE bw.bookId = :bookId AND bw.skipped = 0 AND bw.deleted = 0
+        GROUP BY w.wordId
+        """
+    )
+    suspend fun getPhoneticsByBook(bookId: Long): List<WordPhonetics>
 
     @Query("UPDATE sense SET pos = :pos, meaning = :meaning WHERE senseId = :senseId")
     suspend fun updateSense(senseId: Long, pos: String, meaning: String)

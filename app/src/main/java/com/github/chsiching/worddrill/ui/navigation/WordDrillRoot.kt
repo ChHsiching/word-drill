@@ -85,6 +85,7 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
     val navStyle by settingsViewModel.navStyle.collectAsStateWithLifecycle()
     val compactNav by settingsViewModel.compactNav.collectAsStateWithLifecycle()
     val hidePhonetic by settingsViewModel.hidePhonetic.collectAsStateWithLifecycle()
+    val phoneticPreference by settingsViewModel.phoneticPreference.collectAsStateWithLifecycle()
 
     val overlayViewModel: AutoAdvanceOverlayViewModel = hiltViewModel()
     val dwellFraction by overlayViewModel.fraction.collectAsStateWithLifecycle()
@@ -119,6 +120,7 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
                     locked = drillLocked,
                     onToggleLock = { drillLocked = !drillLocked },
                     hidePhonetic = hidePhonetic,
+                    phoneticPreference = phoneticPreference,
                     onSwitchBook = { navigateTo(TopDestination.Library.route) },
                 )
             }
