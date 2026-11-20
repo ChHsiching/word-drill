@@ -54,9 +54,9 @@ fun UpdateGate(modifier: Modifier = Modifier) {
 }
 
 /**
- * Me-tab host for the manual 检查更新 row (#59): renders the shared update dialog
+ * Me-tab host for the manual check-update row (#59): renders the shared update dialog
  * while an update is available and bridges the install-permission event. The inline
- * results (已是最新版本 / errors) stay in MeScreen, which owns that group's
+ * results (up-to-date line / errors) stay in MeScreen, which owns that group's
  * status-line style.
  */
 @Composable
@@ -139,7 +139,7 @@ private fun UpdateDialog(
     onDismiss: () -> Unit,
 ) {
     WordDrillDialog(
-        // Scrim tap lands here too — same as 暂不更新.
+        // Scrim tap lands here too — same as the later button.
         onDismissRequest = onDismiss,
         title = stringResource(R.string.update_dialog_title),
         message = stringResource(R.string.update_dialog_version, state.release.version),

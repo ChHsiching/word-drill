@@ -13,9 +13,9 @@ import javax.inject.Singleton
 
 /** Progress reset (GLOSSARY.md): returns a book to its starting state — resume
  *  position back to the first card, every skipped word of the book back in the
- *  deck, those words' links removed from the 复习 review book. Swipe logs and
- *  cumulative stats (今日/累计) are history and are never touched. The completion
- *  card's restart action reuses this engine. */
+ *  deck, those words' links removed from the review book (REVIEW_BOOK_NAME).
+ *  Swipe logs and cumulative stats (today / all-time) are history and are never
+ *  touched. The completion card's restart action reuses this engine. */
 @Singleton
 class ProgressResetter @Inject constructor(
     private val db: WordDrillDatabase,

@@ -23,6 +23,13 @@ enum class PhoneticPreference {
         }
     }
 
+    /** Setting-row tap cycle (issue #58): UK -> US -> BOTH -> UK. */
+    fun next(): PhoneticPreference = when (this) {
+        UK -> US
+        US -> BOTH
+        BOTH -> UK
+    }
+
     companion object {
         fun fromStorageName(name: String?): PhoneticPreference =
             name?.let { runCatching { valueOf(it) }.getOrNull() } ?: US

@@ -1,6 +1,8 @@
 package com.github.chsiching.worddrill.update
 
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -160,36 +162,52 @@ class UpdateFlowTest {
     }
 
     @Test
-    fun dnsFailure_showsInlineMappedMessage() {
-        setContentWith(UpdateCheckResult.CheckFailed(R.string.update_error_dns), FakeInstaller())
+    fun launchCheckFailure_showsNoUi() {
+        // One setContent for the whole test (the activity rejects a second), so the
+        // host composes whatever ViewModel the holder points at, one per failure id.
+        val checker = FakeChecker(UpdateCheckResult.CheckFailed(R.string.update_error_dns))
+        val vmHolder = mutableStateOf(UpdateViewModel(checker, FakeInstaller(), UpdateCheckCache()))
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    val vm by vmHolder
+                    UpdateContent(
+                        viewModel = vm,
+                        onRequestInstallPermission = {},
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
 
-        awaitShown("无法解析域名", substring = false)
-        composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
-    }
+        listOf(
+            R.string.update_error_dns,
+            R.string.update_error_interrupted,
+            R.string.update_error_generic,
+        ).forEach { messageRes ->
+            checker.result = UpdateCheckResult.CheckFailed(messageRes)
+            composeRule.runOnIdle {
+                vmHolder.value = UpdateViewModel(checker, FakeInstaller(), UpdateCheckCache())
+            }
+            composeRule.runOnIdle { vmHolder.value.checkForUpdate() }
+            composeRule.waitForIdle()
 
-    @Test
-    fun connectionInterrupted_showsInlineMappedMessage() {
-        setContentWith(
-            UpdateCheckResult.CheckFailed(R.string.update_error_interrupted),
-            FakeInstaller(),
-        )
-
-        awaitShown("连接被中断，可能是网络限制", substring = false)
-    }
-
-    @Test
-    fun genericFailure_showsInlineMappedMessage() {
-        setContentWith(UpdateCheckResult.CheckFailed(R.string.update_error_generic), FakeInstaller())
-
-        awaitShown("无法连接 GitHub", substring = false)
+            // Background check: no dialog and no banner unless a newer release
+            // was found; failures surface only on the manual check path.
+            composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
+            composeRule.onNodeWithText("无法解析域名", substring = false).assertDoesNotExist()
+            composeRule.onNodeWithText("连接被中断，可能是网络限制", substring = false).assertDoesNotExist()
+            composeRule.onNodeWithText("无法连接 GitHub", substring = false).assertDoesNotExist()
+        }
     }
 
     @Test
     fun noticeDismiss_removesBanner() {
-        setContentWith(
+        val vm = setContentWith(
             UpdateCheckResult.CheckFailed(R.string.update_error_dns),
             FakeInstaller(),
         )
+        composeRule.runOnIdle { vm.manualCheck() }
         awaitShown("无法解析域名", substring = false)
 
         composeRule.onNodeWithContentDescription("关闭").performClick()

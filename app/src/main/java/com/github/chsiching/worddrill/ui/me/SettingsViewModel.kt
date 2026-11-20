@@ -84,12 +84,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun cyclePhoneticPreference() {
-        val next = when (phoneticPreference.value) {
-            PhoneticPreference.UK -> PhoneticPreference.US
-            PhoneticPreference.US -> PhoneticPreference.BOTH
-            PhoneticPreference.BOTH -> PhoneticPreference.UK
-        }
-        setPhoneticPreference(next)
+        setPhoneticPreference(phoneticPreference.value.next())
     }
 
     fun setNavStyle(style: NavStyle) {
@@ -114,9 +109,6 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun cycleDeckOrdering() {
-        val next =
-            if (deckOrdering.value == DeckOrdering.ALPHABETICAL) DeckOrdering.SHUFFLED
-            else DeckOrdering.ALPHABETICAL
-        setDeckOrdering(next)
+        setDeckOrdering(deckOrdering.value.next())
     }
 }

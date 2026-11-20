@@ -113,7 +113,7 @@ class SettingsRepository @Inject constructor(
     }
 
     /** Phonetic preference (GLOSSARY.md, issue #58): which variant(s) the drill card
-     *  shows. Default US (美式); hiding (hidePhonetic) always wins over it. */
+     *  shows. Default US; hiding (hidePhonetic) always wins over it. */
     val phoneticPreference: Flow<PhoneticPreference> =
         context.appDataStore.data.map { PhoneticPreference.fromStorageName(it[phoneticPreferenceKey]) }
 

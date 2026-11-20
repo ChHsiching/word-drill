@@ -54,7 +54,8 @@ class FreshInstallDictionaryContentTest {
         }
     }
 
-    /** Opens the Library tab, re-tapping until its title (词库, present on the library
+    /** Opens the Library tab, re-tapping until its title (R.string.library_large_title,
+     *  present on the library
      *  screen only) appears: the launch splash is a full-screen Canvas with no
      *  semantics, and a tap issued while it is still up is swallowed by it even though
      *  the drill beneath is already queryable. */
@@ -68,7 +69,8 @@ class FreshInstallDictionaryContentTest {
         }
     }
 
-    /** Opens a book's word list through its row arrow (contentDescription 词书) and
+    /** Opens a book's word list through its row arrow (contentDescription
+     *  R.string.library_title) and
      *  waits for the list's search field. */
     private fun openFirstBookWordList() {
         composeRule.waitUntil(20_000L) {
@@ -97,7 +99,7 @@ class FreshInstallDictionaryContentTest {
 
         composeRule.onNodeWithText("CET-4").assertIsDisplayed()
         // substring=true is load-bearing: a book row is one merged node whose text
-        // collection is ["CET-4", "4035 词 · 预置"], and the default exact matcher
+        // collection is ["CET-4", "4035 words (Chinese row subtitle)"], and the default exact matcher
         // only hits the first item.
         composeRule.onNodeWithText("4035 词", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("5298 词", substring = true).assertIsDisplayed()
@@ -116,7 +118,7 @@ class FreshInstallDictionaryContentTest {
         composeRule.waitForIdle()
 
         // Celsius ships a domain-labeled sense in the bundled asset:
-        // 【名】（瑞、印尼、巴、印）摄尔西乌斯（人名）. The sense text is not the
+        // a Chinese part-of-speech tag with region labels and a person-name gloss. The sense text is not the
         // first item of the merged row, so the match must be substring-based.
         composeRule.onNodeWithText("摄尔西乌斯", substring = true).assertIsDisplayed()
     }

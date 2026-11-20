@@ -16,7 +16,7 @@ import com.github.chsiching.worddrill.data.local.entity.SwipeLog
 import com.github.chsiching.worddrill.data.local.entity.Word
 
 @Database(
-        entities = [
+    entities = [
         Word::class,
         Sense::class,
         Book::class,
