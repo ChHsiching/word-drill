@@ -15,8 +15,11 @@ absolute, including origin-neutral data such as IPA.
 
 ## Decision
 
-- All dictionary content — definitions, phonetics, domain labels — is 100% Youdao-sourced.
-  No external backfill of any kind, ever.
+- Dictionary definitions and domain labels are 100% Youdao-sourced. No second source for
+  meanings, ever.
+- Phonetics are Youdao-first; English Wiktionary IPA is permitted as a gap-fill source for
+  MISSING variants only (origin-neutral IPA, never definitions). Owner decision 2026-11-20:
+  a word must not stay single-variant if Wiktionary knows the missing variant.
 - The retired dataset's word inventory served only as the crawl's lookup list (which words
   to fetch), exactly as the spec defined; none of its data ships in the dictionary.
 - Words Youdao has no entry for are excluded from the dictionary; importing them shows the
@@ -30,6 +33,9 @@ absolute, including origin-neutral data such as IPA.
 
 - Imported-list auto-lookup keeps definitions for ~90% of the lookup list; phonetic-less
   words are almost exclusively deep tail that no study path touches.
-- No second data source to maintain, no mixed provenance anywhere.
-- The phonetic-preference setting (#58) must define fallback behavior when the chosen
-  variant is missing for a word (show the other variant vs show nothing).
+- Phonetic provenance is two-tier (Youdao primary, Wiktionary gap-fill) but meanings stay
+  single-source; the build script records fill counts in its report.
+- Wiktionary rate-limits bulk queries — the gap-fill must be paced (≤1 req/s), resumable,
+  and tolerate partial fills (words neither source covers keep whatever they have).
+- The phonetic-preference fallback (word lacks the chosen variant) is: show the available
+  variant, show nothing if neither exists.
