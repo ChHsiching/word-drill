@@ -34,6 +34,11 @@ interface WordDao {
     @Query("SELECT * FROM word WHERE text = :text LIMIT 1")
     suspend fun getByText(text: String): Word?
 
+    /** Preset refresh path: word-table phonetic is app-managed (no user editing), so the
+     *  bundled asset's value is authoritative. */
+    @Query("UPDATE word SET phonetic = :phonetic WHERE wordId = :wordId")
+    suspend fun updatePhonetic(wordId: Long, phonetic: String?)
+
     @Query("SELECT * FROM sense WHERE wordId = :wordId")
     suspend fun getSensesForWord(wordId: Long): List<Sense>
 

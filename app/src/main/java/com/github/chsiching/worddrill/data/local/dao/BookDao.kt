@@ -95,6 +95,24 @@ interface BookDao {
     )
     suspend fun removeReviewLinksOfBookWords(reviewBookId: Long, bookId: Long)
 
+    /** Same contract as [removeReviewLinksOfBookWords], but for an explicit word set
+     *  (words a preset refresh just unlinked) instead of a book's current links. Run
+     *  after the unlinks, inside the caller's transaction. */
+    @Query(
+        """
+        DELETE FROM book_word WHERE bookId = :reviewBookId
+        AND wordId IN (:wordIds)
+        AND wordId NOT IN (SELECT wordId FROM book_word WHERE skipped = 1)
+        """
+    )
+    suspend fun removeReviewLinksOfWords(reviewBookId: Long, wordIds: List<Long>)
+
+    @Query("SELECT wordId FROM book_word WHERE bookId = :bookId")
+    suspend fun getWordIdsInBook(bookId: Long): List<Long>
+
+    @Query("DELETE FROM book_word WHERE bookId = :bookId AND wordId IN (:wordIds)")
+    suspend fun unlinkWords(bookId: Long, wordIds: List<Long>)
+
     @Query("UPDATE book_word SET deleted = :deleted WHERE bookId = :bookId AND wordId = :wordId")
     suspend fun setDeleted(bookId: Long, wordId: Long, deleted: Boolean)
 
