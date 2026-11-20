@@ -8,7 +8,7 @@ class PresetWordsParserTest {
 
     private val sample = """
         {
-          "source": "ECDICT (MIT)",
+          "source": "test source",
           "books": [
             { "name": "CET-4", "words": [
               { "text": "apple", "phonetic": "/ˈæpl/", "senses": [ {"pos":"n.","meaning":"苹果"} ] },
@@ -27,7 +27,7 @@ class PresetWordsParserTest {
     @Test
     fun parse_readsSource() {
         val parsed = PresetWordsParser.parse(sample)
-        assertThat(parsed.source).isEqualTo("ECDICT (MIT)")
+        assertThat(parsed.source).isEqualTo("test source")
     }
 
     @Test
