@@ -61,6 +61,12 @@ class PhoneticPreferenceTest {
     }
 
     @Test
+    fun resolve_both_showsSingleCopy_whenVariantsAreIdentical() {
+        assertThat(PhoneticPreference.BOTH.resolve("/əˈbændən/", "/əˈbændən/"))
+            .isEqualTo("/əˈbændən/")
+    }
+
+    @Test
     fun resolve_returnsNull_whenNeitherVariantExists() {
         assertThat(PhoneticPreference.UK.resolve(null, null)).isNull()
         assertThat(PhoneticPreference.US.resolve(null, null)).isNull()
