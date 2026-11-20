@@ -25,7 +25,10 @@ own output). Hard gate: every word of the three preset-book word lists
 (tools/data/) that HAS a dictionary entry must also carry a phonetic (UK or
 US) — words Youdao genuinely gives no phonetic for may pass only via
 PHONETIC_GATE_EXCEPTIONS. Words Youdao has no entry for are excluded from the
-output. Overall phonetic coverage is reported, not gated.
+output. Overall phonetic coverage is reported, not gated. Missing phonetic
+variants are gap-filled from English Wiktionary IPA (tools/
+wiktionary_phonetic_fill.py, per the amended ADR 0003): Youdao values always
+win, and the build reports the fill counts.
 
 Youdao renders domain labels as full-width parens, e.g. （电信）切换; the app
 data uses bracket labels per ADR 0001, e.g. 【电信】切换. Only parentheticals
@@ -260,6 +263,44 @@ def validate_entries(entries, preset_books=()):
     return errors, report
 
 
+def apply_phonetic_fill(entries, fill):
+    """Fill missing phonetic variants from the Wiktionary gap-fill (ADR 0003,
+    owner decision 2026-11-20). Youdao values always win; a variant stays
+    None when neither source has it. Returns (entries, stats) with unique
+    word counts: gap_words (missing a variant before the fill), filled_uk,
+    filled_us, still_missing (still missing a variant after the fill)."""
+    before = {}
+    for e in entries:
+        seen = before.setdefault(e["word"], [False, False])
+        seen[0] = seen[0] or e["phonetic"] is not None
+        seen[1] = seen[1] or e["phonetic_us"] is not None
+    gap_words = {w for w, had in before.items() if not (had[0] and had[1])}
+    filled_uk = set()
+    filled_us = set()
+    for e in entries:
+        f = fill.get(e["word"])
+        if not f:
+            continue
+        if e["phonetic"] is None and f.get("uk"):
+            e["phonetic"] = f["uk"]
+            filled_uk.add(e["word"])
+        if e["phonetic_us"] is None and f.get("us"):
+            e["phonetic_us"] = f["us"]
+            filled_us.add(e["word"])
+    after = {}
+    for e in entries:
+        seen = after.setdefault(e["word"], [False, False])
+        seen[0] = seen[0] or e["phonetic"] is not None
+        seen[1] = seen[1] or e["phonetic_us"] is not None
+    still_missing = {w for w in gap_words if not (after[w][0] and after[w][1])}
+    return entries, {
+        "gap_words": len(gap_words),
+        "filled_uk": len(filled_uk),
+        "filled_us": len(filled_us),
+        "still_missing": len(still_missing),
+    }
+
+
 def build_output(entries, source):
     return {"source": source, "words": entries}
 
@@ -272,6 +313,9 @@ def main(argv=None):
                         help="output JSON path (default: <state-dir>/dictionary.youdao.json)")
     parser.add_argument("--source-run-date", default=datetime.date.today().isoformat(),
                         help="crawl date recorded in the source string")
+    parser.add_argument("--fill-file", default=None,
+                        help="Wiktionary phonetic gap-fill JSONL (default: "
+                             "<state-dir>/wiktionary_fill.jsonl when present)")
     parser.add_argument("--allow-validation-errors", action="store_true",
                         help="write the output and exit 0 even when validation fails "
                              "(mid-crawl CI chunks; the final full build runs strict)")
@@ -289,11 +333,23 @@ def main(argv=None):
             misses += 1
         entries.extend(word_entries)
 
+    fill_path = args.fill_file or os.path.join(
+        args.state_dir, "wiktionary_fill.jsonl")
+    if os.path.exists(fill_path):
+        from wiktionary_phonetic_fill import load_fill  # deferred: avoids import cycle
+        fill = load_fill(fill_path)
+    else:
+        fill = {}
+    entries, fill_stats = apply_phonetic_fill(entries, fill)
+
     errors, report = validate_entries(entries, load_preset_books())
     print(f"raw words: {len(raw)} (no entries: {misses})")
     print(f"entries: {report['entries']} over {report['words']} words")
     print(f"phonetic coverage: {report['phonetic_coverage']:.1%} "
           f"(uk {report['uk_coverage']:.1%}, us {report['us_coverage']:.1%})")
+    print(f"wiktionary fill: {fill_stats['gap_words']} gap words, filled "
+          f"uk {fill_stats['filled_uk']} / us {fill_stats['filled_us']}, "
+          f"still missing a variant {fill_stats['still_missing']}")
     for name, stats in report["preset_books"].items():
         line = (f"{name}: {stats['with_phonetic']}/{stats['with_entry']} entry "
                 f"words with phonetic (both {stats['both']}, uk-only "

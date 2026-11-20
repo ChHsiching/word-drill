@@ -13,6 +13,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_youdao_dictionary import (  # noqa: E402
     PHONETIC_GATE_EXCEPTIONS,
+    apply_phonetic_fill,
     extract_entries,
     load_preset_books,
     normalize_meaning,
@@ -315,6 +316,64 @@ class TestValidateEntries:
         errors, report = validate_entries(entries)
         assert not any("phonetic" in e for e in errors)
         assert report["us_coverage"] == 1.0
+
+
+class TestApplyPhoneticFill:
+    def test_fills_only_missing_variants(self):
+        entries = [make_entry("a", phonetic="/uk/", phonetic_us=None),
+                   make_entry("b", phonetic=None, phonetic_us="/us/")]
+        filled, stats = apply_phonetic_fill(
+            entries, {"a": {"uk": None, "us": "/ɑ/"},
+                      "b": {"uk": "/biː/", "us": None}})
+        assert filled[0]["phonetic"] == "/uk/"          # Youdao wins
+        assert filled[0]["phonetic_us"] == "/ɑ/"        # fill supplies us
+        assert filled[1]["phonetic"] == "/biː/"
+        assert filled[1]["phonetic_us"] == "/us/"
+        assert stats["gap_words"] == 2
+        assert stats["filled_uk"] == 1
+        assert stats["filled_us"] == 1
+        assert stats["still_missing"] == 0
+
+    def test_complete_word_is_no_gap(self):
+        entries = [make_entry("a", phonetic="/a/", phonetic_us="/ɑ/")]
+        _, stats = apply_phonetic_fill(entries, {})
+        assert stats == {"gap_words": 0, "filled_uk": 0, "filled_us": 0,
+                         "still_missing": 0}
+
+    def test_gap_without_fill_stays_missing(self):
+        entries = [make_entry("a", phonetic=None)]
+        _, stats = apply_phonetic_fill(entries, {})
+        assert stats["gap_words"] == 1
+        assert stats["still_missing"] == 1
+
+    def test_partially_filled_still_missing(self):
+        # Both variants missing, fill only has uk -> still single-variant.
+        entries = [make_entry("a", phonetic=None, phonetic_us=None)]
+        filled, stats = apply_phonetic_fill(
+            entries, {"a": {"uk": "/a/", "us": None}})
+        assert filled[0]["phonetic"] == "/a/"
+        assert stats["gap_words"] == 1
+        assert stats["filled_uk"] == 1
+        assert stats["still_missing"] == 1
+
+    def test_all_pos_entries_of_a_word_get_the_fill(self):
+        trimmed = {
+            "input": "x",
+            "ec": {"word": [{"ukphone": "k", "trs": [{"tr": [{"l": {"i": [
+                "n. 猫", "vi. 呕吐",
+            ]}}]}]}]},
+        }
+        entries = extract_entries("x", trimmed)
+        filled, _ = apply_phonetic_fill(
+            entries, {"x": {"uk": None, "us": "/eks/"}})
+        assert all(e["phonetic_us"] == "/eks/" for e in filled)
+
+    def test_fill_none_values_ignored(self):
+        entries = [make_entry("a", phonetic=None)]
+        filled, stats = apply_phonetic_fill(
+            entries, {"a": {"uk": None, "us": None}})
+        assert filled[0]["phonetic"] is None
+        assert stats["filled_uk"] == 0
 
 
 class TestLoadPresetBooks:
