@@ -60,7 +60,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.R
+import com.github.chsiching.worddrill.data.local.WordPhonetics
 import com.github.chsiching.worddrill.data.local.WordWithSenses
+import com.github.chsiching.worddrill.data.settings.PhoneticPreference
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 import com.github.chsiching.worddrill.ui.theme.wordDrillTypography
 import kotlinx.coroutines.flow.Flow
@@ -125,6 +127,7 @@ fun DrillScreen(
     locked: Boolean = false,
     onToggleLock: () -> Unit = {},
     hidePhonetic: Boolean = false,
+    phoneticPreference: PhoneticPreference = PhoneticPreference.US,
     onSwitchBook: () -> Unit = {},
     viewModel: DrillViewModel = hiltViewModel(),
 ) {
@@ -183,6 +186,8 @@ fun DrillScreen(
                 locked = locked,
                 onToggleLock = onToggleLock,
                 hidePhonetic = hidePhonetic,
+                phonetics = state.phonetics,
+                phoneticPreference = phoneticPreference,
                 modifier = modifier,
                 onToggleAutoAdvance = viewModel::toggleAutoAdvance,
                 advance = viewModel.advance,
@@ -195,6 +200,8 @@ fun DrillScreen(
 internal fun DrillPager(
     bookName: String,
     cards: List<WordWithSenses>,
+    phonetics: Map<Long, WordPhonetics> = emptyMap(),
+    phoneticPreference: PhoneticPreference = PhoneticPreference.US,
     initialPage: Int = 0,
     /** Completed passes before the one the completion card is showing (the settle
      *  handler bumps it once the card is reached). */
@@ -289,6 +296,8 @@ internal fun DrillPager(
                 } else {
                     WordCard(
                         word = cards[pageIndex],
+                        phonetic = phonetics[cards[pageIndex].word.wordId],
+                        phoneticPreference = phoneticPreference,
                         hidePhonetic = hidePhonetic,
                     )
                 }
@@ -400,6 +409,8 @@ private fun LockButton(locked: Boolean, onClick: () -> Unit) {
 @Composable
 private fun WordCard(
     word: WordWithSenses,
+    phonetic: WordPhonetics?,
+    phoneticPreference: PhoneticPreference,
     hidePhonetic: Boolean,
 ) {
     val typography = MaterialTheme.wordDrillTypography
@@ -423,9 +434,13 @@ private fun WordCard(
                 style = typography.word.copy(color = colors.onSurface),
                 textAlign = TextAlign.Center,
             )
-            if (!word.word.phonetic.isNullOrBlank() && !hidePhonetic) {
+            // Phonetic preference (issue #58): resolve UK/US/both per word at render
+            // time; the hide toggle outranks the preference.
+            val displayPhonetic =
+                phoneticPreference.resolve(phonetic?.phoneticUk, phonetic?.phoneticUs)
+            if (displayPhonetic != null && !hidePhonetic) {
                 Text(
-                    text = word.word.phonetic,
+                    text = displayPhonetic,
                     style = typography.phonetic.copy(color = colors.onSurfaceVariant),
                     modifier = Modifier.padding(top = 10.dp),
                 )

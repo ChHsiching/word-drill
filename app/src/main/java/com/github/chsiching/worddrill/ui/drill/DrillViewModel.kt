@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import com.github.chsiching.worddrill.data.ProgressResetter
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
+import com.github.chsiching.worddrill.data.local.WordPhonetics
 import com.github.chsiching.worddrill.data.local.WordWithSenses
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.dao.BookDao
@@ -46,6 +47,10 @@ sealed interface DrillUiState {
         val cards: List<WordWithSenses>,
         val isReviewBook: Boolean = false,
         val initialPageIndex: Int = 0,
+        /** Phonetic variants per card word (issue #58), resolved from the dictionary
+         *  at book open; the card picks UK/US/both per the preference at render
+         *  time. Skip/restore only shrink the deck, so the map outlives reloads. */
+        val phonetics: Map<Long, WordPhonetics> = emptyMap(),
         /** Bumped only when a progress reset rebuilt this deck. The pager keys on it
          *  so the restored deck starts at the first card instead of restoring the
          *  pre-reset page. */
@@ -203,6 +208,7 @@ class DrillViewModel @Inject constructor(
             initialPageIndex = initialPageIndex,
             deckGeneration = deckGeneration,
             completionCount = book.completionCount,
+            phonetics = wordDao.getPhoneticsByBook(book.bookId).associateBy { it.wordId },
         )
     }
 

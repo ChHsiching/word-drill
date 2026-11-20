@@ -67,6 +67,7 @@ import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.settings.DeckOrdering
 import com.github.chsiching.worddrill.data.settings.DwellInterval
 import com.github.chsiching.worddrill.data.settings.NavStyle
+import com.github.chsiching.worddrill.data.settings.PhoneticPreference
 import com.github.chsiching.worddrill.data.settings.ThemeMode
 import com.github.chsiching.worddrill.ui.theme.DialogButton
 import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
@@ -92,6 +93,7 @@ fun MeScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
     val hidePhonetic by settingsViewModel.hidePhonetic.collectAsStateWithLifecycle()
+    val phoneticPreference by settingsViewModel.phoneticPreference.collectAsStateWithLifecycle()
     val navStyle by settingsViewModel.navStyle.collectAsStateWithLifecycle()
     val compactNav by settingsViewModel.compactNav.collectAsStateWithLifecycle()
     val dwellInterval by settingsViewModel.dwellInterval.collectAsStateWithLifecycle()
@@ -139,6 +141,11 @@ fun MeScreen(
                 label = stringResource(R.string.me_setting_hide_phonetic),
                 on = hidePhonetic,
                 onToggle = settingsViewModel::setHidePhonetic,
+            )
+            InGroupSeparator()
+            PhoneticPreferenceRow(
+                current = phoneticPreference,
+                onClick = settingsViewModel::cyclePhoneticPreference,
             )
             InGroupSeparator()
             DwellIntervalRow(
@@ -451,6 +458,45 @@ private fun DeckOrderingRow(current: DeckOrdering, onClick: () -> Unit) {
                     R.string.me_setting_deck_ordering_alphabetical
                 } else {
                     R.string.me_setting_deck_ordering_shuffled
+                }
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+/** Phonetic preference (GLOSSARY.md, issue #58): global 英式 / 美式 / 双语 row in
+ *  the 显示 group, next to the hide-phonetic toggle. Tapping cycles; the card
+ *  resolves variants per word at render time, falling back to the available
+ *  variant (ADR 0003). */
+@Composable
+private fun PhoneticPreferenceRow(current: PhoneticPreference, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.me_setting_phonetic_preference),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = stringResource(
+                when (current) {
+                    PhoneticPreference.UK -> R.string.me_setting_phonetic_preference_uk
+                    PhoneticPreference.US -> R.string.me_setting_phonetic_preference_us
+                    PhoneticPreference.BOTH -> R.string.me_setting_phonetic_preference_both
                 }
             ),
             style = MaterialTheme.typography.bodyMedium,

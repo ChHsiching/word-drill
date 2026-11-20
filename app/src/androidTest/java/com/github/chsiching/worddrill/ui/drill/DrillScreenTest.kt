@@ -23,8 +23,10 @@ import com.github.chsiching.worddrill.data.ProgressResetter
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
+import com.github.chsiching.worddrill.data.local.entity.DictionaryEntry
 import com.github.chsiching.worddrill.data.local.entity.Sense
 import com.github.chsiching.worddrill.data.local.entity.Word
+import com.github.chsiching.worddrill.data.settings.PhoneticPreference
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.ui.DeckSequenceState
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
@@ -82,6 +84,36 @@ class DrillScreenTest {
     private fun cardsOf(bookName: String) = runBlocking {
         val bookId = db.bookDao().getByName(bookName)!!.bookId
         db.wordDao().getWordsWithSensesByBook(bookId)
+    }
+
+    /** The same phonetic source the ViewModel loads for the deck: the dictionary's
+     *  UK/US pair per word with the word row backing UK up (issue #58). */
+    private fun phoneticsOf(bookName: String) = runBlocking {
+        val bookId = db.bookDao().getByName(bookName)!!.bookId
+        db.wordDao().getPhoneticsByBook(bookId).associateBy { it.wordId }
+    }
+
+    /** A word with both dictionary variants (the word row's own phonetic must lose
+     *  to the dictionary pair) plus one sense, in its own single-card book. The word
+     *  text may already exist from setUp's seed, so resolve the row and set its
+     *  phonetic through the app's managed update path. */
+    private fun seedBookWithDictPhonetics(
+        bookName: String,
+        word: String,
+        dictUk: String?,
+        dictUs: String?,
+    ): Long = runBlocking {
+        val bookId = db.bookDao().insert(Book(name = bookName, isPreset = false))
+        val wordId = db.wordDao().findOrInsertWord(word, null)
+        db.wordDao().updatePhonetic(wordId, "/wordrow/")
+        db.wordDao().insertSense(Sense(wordId = wordId, pos = "n.", meaning = "测试释义"))
+        db.bookDao().linkBookWord(BookWord(bookId, wordId))
+        db.dictionaryDao().insertAll(
+            listOf(
+                DictionaryEntry(word = word, phonetic = dictUk, phoneticUs = dictUs, pos = "n.", meaning = "测试释义"),
+            )
+        )
+        bookId
     }
 
     private fun composeDrillPager(
@@ -142,6 +174,7 @@ class DrillScreenTest {
                     DrillPager(
                         bookName = "无释义词书",
                         cards = cards,
+                        phonetics = phoneticsOf("无释义词书"),
                         onPageSettled = { _, _ -> },
                         onSkip = { },
                         isReviewBook = false,
@@ -161,6 +194,114 @@ class DrillScreenTest {
         composeRule.onNodeWithText("/zz/").assertIsDisplayed()
         composeRule.onNodeWithText("词典未收录").assertIsDisplayed()
         Unit
+    }
+
+    // --- Phonetic preference on the card (issue #58) ---
+
+    @Test
+    fun cardPhonetics_followPreferenceSwitches_usUkBoth() {
+        // A word with both dictionary variants: the card shows exactly the chosen
+        // one, and 双语 joins them with a space. The word row's own phonetic
+        // ("/wordrow/") must lose to the dictionary pair.
+        seedBookWithDictPhonetics("音标词书", "apple", "/uk-apple/", "/us-apple/")
+        val cards = cardsOf("音标词书")
+        val phonetics = phoneticsOf("音标词书")
+        var preference by mutableStateOf(PhoneticPreference.US)
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillPager(
+                        bookName = "音标词书",
+                        cards = cards,
+                        phonetics = phonetics,
+                        phoneticPreference = preference,
+                        onPageSettled = { _, _ -> },
+                        onSkip = { },
+                        isReviewBook = false,
+                        onRestore = { },
+                        locked = false,
+                        onToggleLock = {},
+                        hidePhonetic = false,
+                        onToggleAutoAdvance = { },
+                        advance = emptyFlow(),
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("/us-apple/").assertIsDisplayed()
+
+        composeRule.runOnUiThread { preference = PhoneticPreference.UK }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("/uk-apple/").assertIsDisplayed()
+        composeRule.onNodeWithText("/us-apple/").assertDoesNotExist()
+
+        composeRule.runOnUiThread { preference = PhoneticPreference.BOTH }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("/uk-apple/ /us-apple/").assertIsDisplayed()
+        composeRule.onNodeWithText("/wordrow/").assertDoesNotExist()
+    }
+
+    @Test
+    fun cardPhonetics_usPreference_fallsBackToUk_whenWordLacksUsVariant() {
+        // ADR 0003 fallback: the chosen variant is missing for this word, so the
+        // card shows the available one instead.
+        seedBookWithDictPhonetics("无美式词书", "balance", "/uk-only/", null)
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillPager(
+                        bookName = "无美式词书",
+                        cards = cardsOf("无美式词书"),
+                        phonetics = phoneticsOf("无美式词书"),
+                        phoneticPreference = PhoneticPreference.US,
+                        onPageSettled = { _, _ -> },
+                        onSkip = { },
+                        isReviewBook = false,
+                        onRestore = { },
+                        locked = false,
+                        onToggleLock = {},
+                        hidePhonetic = false,
+                        onToggleAutoAdvance = { },
+                        advance = emptyFlow(),
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("/uk-only/").assertIsDisplayed()
+    }
+
+    @Test
+    fun cardPhonetics_hidePhoneticWinsOverPreference() {
+        // The existing hide-phonetic toggle outranks the preference: even 双语 with
+        // both variants available shows nothing.
+        seedBookWithDictPhonetics("隐藏音标词书", "circle", "/uk-circle/", "/us-circle/")
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillPager(
+                        bookName = "隐藏音标词书",
+                        cards = cardsOf("隐藏音标词书"),
+                        phonetics = phoneticsOf("隐藏音标词书"),
+                        phoneticPreference = PhoneticPreference.BOTH,
+                        onPageSettled = { _, _ -> },
+                        onSkip = { },
+                        isReviewBook = false,
+                        onRestore = { },
+                        locked = false,
+                        onToggleLock = {},
+                        hidePhonetic = true,
+                        onToggleAutoAdvance = { },
+                        advance = emptyFlow(),
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("/uk-circle/ /us-circle/").assertDoesNotExist()
+        composeRule.onNodeWithText("/uk-circle/").assertDoesNotExist()
+        composeRule.onNodeWithText("/us-circle/").assertDoesNotExist()
     }
 
     @Test

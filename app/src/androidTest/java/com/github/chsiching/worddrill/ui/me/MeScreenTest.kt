@@ -26,6 +26,7 @@ import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.SwipeLog
 import com.github.chsiching.worddrill.data.local.entity.Word
 import com.github.chsiching.worddrill.data.settings.DeckOrdering
+import com.github.chsiching.worddrill.data.settings.PhoneticPreference
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.data.settings.ThemeMode
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
@@ -94,6 +95,8 @@ class MeScreenTest {
         // Deck ordering is process-global; other classes in this process assume
         // the 按字母 default.
         settings.setDeckOrdering(DeckOrdering.ALPHABETICAL)
+        // So is the phonetic preference (美式 default).
+        settings.setPhoneticPreference(PhoneticPreference.US)
         Unit
     }
 
@@ -258,6 +261,8 @@ class MeScreenTest {
         composeRule.onNodeWithText("导航").assertIsDisplayed()
         composeRule.onNodeWithText("通用", substring = false)
         composeRule.onNodeWithText("隐藏音标").assertIsDisplayed()
+        // The phonetic preference row (issue #58) renders in the 显示 group too.
+        composeRule.onNodeWithText("音标偏好").performScrollTo().assertIsDisplayed()
         // The CI emulator viewport is shorter: assert the top-bar icon before any
         // performScrollTo moves it off screen, and scroll below-fold rows into view.
         composeRule.onNodeWithContentDescription("主题").assertIsDisplayed()
@@ -283,6 +288,33 @@ class MeScreenTest {
             composeRule.onAllNodesWithText("乱序", substring = false).fetchSemanticsNodes().isNotEmpty()
         }
         assertThat(runBlocking { settings.deckOrdering.first() }).isEqualTo(DeckOrdering.SHUFFLED)
+        Unit
+    }
+
+    @Test
+    fun phoneticPreferenceRow_defaultsToAmerican_thenCyclesAndPersists() = runBlocking {
+        settings.setPhoneticPreference(PhoneticPreference.US)
+        renderWithVm(vm())
+        composeRule.onNodeWithText("音标偏好").performScrollTo().assertIsDisplayed()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("美式", substring = false).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Tapping cycles 美式 → 双语 → 英式 (listing order 英式/美式/双语) and
+        // persists the global setting (issue #58).
+        composeRule.onNodeWithText("音标偏好").performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("双语", substring = false).fetchSemanticsNodes().isNotEmpty()
+        }
+        assertThat(runBlocking { settings.phoneticPreference.first() })
+            .isEqualTo(PhoneticPreference.BOTH)
+
+        composeRule.onNodeWithText("音标偏好").performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("英式", substring = false).fetchSemanticsNodes().isNotEmpty()
+        }
+        assertThat(runBlocking { settings.phoneticPreference.first() })
+            .isEqualTo(PhoneticPreference.UK)
         Unit
     }
 

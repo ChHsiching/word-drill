@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.chsiching.worddrill.data.settings.DeckOrdering
 import com.github.chsiching.worddrill.data.settings.DwellInterval
 import com.github.chsiching.worddrill.data.settings.NavStyle
+import com.github.chsiching.worddrill.data.settings.PhoneticPreference
 import com.github.chsiching.worddrill.data.settings.SettingsRepository
 import com.github.chsiching.worddrill.data.settings.ThemeMode
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,6 +30,12 @@ class SettingsViewModel @Inject constructor(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = false,
+    )
+
+    val phoneticPreference: StateFlow<PhoneticPreference> = settings.phoneticPreference.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = PhoneticPreference.US,
     )
 
     val navStyle: StateFlow<NavStyle> = settings.navStyle.stateIn(
@@ -70,6 +77,19 @@ class SettingsViewModel @Inject constructor(
 
     fun setHidePhonetic(value: Boolean) {
         viewModelScope.launch { settings.setHidePhonetic(value) }
+    }
+
+    fun setPhoneticPreference(preference: PhoneticPreference) {
+        viewModelScope.launch { settings.setPhoneticPreference(preference) }
+    }
+
+    fun cyclePhoneticPreference() {
+        val next = when (phoneticPreference.value) {
+            PhoneticPreference.UK -> PhoneticPreference.US
+            PhoneticPreference.US -> PhoneticPreference.BOTH
+            PhoneticPreference.BOTH -> PhoneticPreference.UK
+        }
+        setPhoneticPreference(next)
     }
 
     fun setNavStyle(style: NavStyle) {
