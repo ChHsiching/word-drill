@@ -17,6 +17,13 @@ internal object ImportRowMapper {
         if (word.isEmpty()) return null
         val phonetic = cols.getOrNull(2)?.trim()?.takeIf { it.isNotEmpty() }
         val posMeaning = cols.getOrNull(3)?.trim()?.takeIf { it.isNotEmpty() }
-        return ImportRow(word = word, phonetic = phonetic, posMeaning = posMeaning)
+        return ImportRow(
+            word = word,
+            phonetic = phonetic,
+            posMeaning = posMeaning,
+            // Word-only row: nothing followed the word column. Empty trailing
+            // columns still count as present (incomplete data, not a bare word).
+            wordOnly = cols.size == 2,
+        )
     }
 }

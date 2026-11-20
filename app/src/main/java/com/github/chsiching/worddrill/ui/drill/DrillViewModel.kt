@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -51,9 +53,10 @@ sealed interface DrillUiState {
          *  at book open; the card picks UK/US/both per the preference at render
          *  time. Skip/restore only shrink the deck, so the map outlives reloads. */
         val phonetics: Map<Long, WordPhonetics> = emptyMap(),
-        /** Bumped only when a progress reset rebuilt this deck. The pager keys on it
-         *  so the restored deck starts at the first card instead of restoring the
-         *  pre-reset page. */
+        /** Deck snapshot identity. The pager keys on it (with the book id) and
+         *  restores its remembered page when the key is unchanged, so it is bumped
+         *  whenever the deck must not inherit an earlier deck's page: a progress
+         *  reset, switching to a different book, an out-of-band deck edit. */
         val deckGeneration: Int = 0,
         /** Completed passes of this book (GLOSSARY.md, completion count), bumped by one
          *  each time the completion card appears. Progress resets never clear it. */
@@ -93,8 +96,10 @@ class DrillViewModel @Inject constructor(
 
     private var currentBookId: Long? = null
 
-    /** Monotonic counter handed to Ready.deckGeneration; only progress resets
-     *  advance it (skip/restore reloads deliberately keep the pager's page). */
+    /** Monotonic counter handed to Ready.deckGeneration. Advanced whenever the deck
+     *  must not inherit a pager page remembered from an earlier deck: a progress
+     *  reset, switching to a different book, an out-of-band deck edit. Skip/restore
+     *  reloads deliberately keep the pager's page and the current generation. */
     private var resetGeneration = 0
 
     /** deckGeneration the CURRENT book's pager was built with. A book-table reload
@@ -107,6 +112,14 @@ class DrillViewModel @Inject constructor(
      *  shrunken sequence in this same ordering (issue #60: the word list's letter
      *  bar follows the dealt mode until the next book open). */
     private var currentDeckOrdering = DeckOrdering.ALPHABETICAL
+
+    /** Deck size (bookId to unskipped, undeleted link count) the loaded state was
+     *  built with. The out-of-band observer below reloads only when the observed
+     *  size of the SAME book drifts from this; the skip/restore paths set it
+     *  BEFORE their writes so their own, page-preserving reloads never trip the
+     *  observer, and a size recorded for another book never matches (the loader
+     *  owns book switches). */
+    private var expectedDeckSize: Pair<Long, Int>? = null
 
     init {
         // Mirror playback into the app-wide overlay state so the navigation root
@@ -135,7 +148,8 @@ class DrillViewModel @Inject constructor(
         // A progress reset (#52) runs on the word-list page while this retained
         // ViewModel sits in the nav backstack; without this reload the drill would
         // keep showing the shrunken pre-reset deck at the pre-reset page. Resets of
-        // other books need nothing: switching back to them reloads via currentBookId.
+        // other books need nothing here: the generation bump in loadBookFor makes
+        // switching back to them rebuild the pager at the fresh position.
         viewModelScope.launch {
             progressResetter.resetBookIds.collect { resetBookId ->
                 val bookId = currentBookId
@@ -145,6 +159,39 @@ class DrillViewModel @Inject constructor(
                 }
             }
         }
+        // Out-of-band deck edits (word added or deleted on the word-list page) change
+        // the current book's link set without touching the book table, so nothing
+        // above fires and the retained ViewModel would keep a stale deck — or a
+        // stale Empty — until relaunch (e2e defect). Observe the current book's deck
+        // size and reload whenever it drifts from the loaded deck's size.
+        viewModelScope.launch {
+            observeOutOfBandDeckChanges()
+        }
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private suspend fun observeOutOfBandDeckChanges() {
+        settings.currentBookId
+            .flatMapLatest { id ->
+                if (id == null) flowOf(null)
+                else bookDao.observeWordCountInBook(id)
+                    .distinctUntilChanged()
+                    .map { size -> id to size }
+            }
+            // DataStore's .data re-emits on every unrelated key edit; the collector
+            // writes (setReady), so de-duplicate before it.
+            .distinctUntilChanged()
+            .collect { observed ->
+                // Only act when the drift is against a size recorded for the SAME
+                // book: during a book switch no expectation exists for the incoming
+                // book yet and the loader owns the reload.
+                val (id, observedSize) = observed ?: return@collect
+                val expected = expectedDeckSize
+                if (id != currentBookId || expected == null || expected.first != id) return@collect
+                if (expected.second == observedSize) return@collect
+                val book = bookDao.getById(id)?.takeIf { !it.deleted } ?: return@collect
+                setReady(book, deckGeneration = ++resetGeneration)
+            }
     }
 
     private suspend fun loadBookFor(recorded: Long?) {
@@ -155,7 +202,12 @@ class DrillViewModel @Inject constructor(
             _uiState.value = DrillUiState.Empty()
             return
         }
-        setReady(book, deckGeneration = if (book.bookId == currentBookId) currentDeckGeneration else 0)
+        // A different book always gets a FRESH generation. The pager keys on
+        // (bookId, deckGeneration) and restores its remembered page on tab
+        // switches; returning to a book with the generation of an earlier visit
+        // would restore a pager saved before an out-of-band change (e.g. a reset
+        // done while another book was current), landing on the stale page.
+        setReady(book, deckGeneration = if (book.bookId == currentBookId) currentDeckGeneration else ++resetGeneration)
     }
 
     // The default book is the first preset, non-review book in the library ordering
@@ -187,6 +239,7 @@ class DrillViewModel @Inject constructor(
         }
         // The dealt sequence is the one ordering source the word list consumes.
         deckSequence.publish(book.bookId, cards.map { it.word.wordId }, currentDeckOrdering)
+        expectedDeckSize = book.bookId to cards.size
         if (cards.isEmpty()) {
             _uiState.value = DrillUiState.Empty(
                 bookName = book.name,
@@ -278,6 +331,9 @@ class DrillViewModel @Inject constructor(
         val ready = _uiState.value as? DrillUiState.Ready ?: return
         if (ready.isReviewBook) return
         val wordId = ready.cards.getOrNull(currentPage)?.word?.wordId ?: return
+        // Publish the post-skip deck size before the write: the out-of-band observer
+        // must stay quiet about this deck's own edit.
+        expectedDeckSize = bookId to (ready.cards.size - 1)
         viewModelScope.launch {
             db.withTransaction {
                 bookDao.setSkipped(bookId, wordId, skipped = true)
@@ -294,6 +350,8 @@ class DrillViewModel @Inject constructor(
         val ready = _uiState.value as? DrillUiState.Ready ?: return
         if (!ready.isReviewBook) return
         val wordId = ready.cards.getOrNull(currentPage)?.word?.wordId ?: return
+        // See skipCurrentWord: keep the out-of-band observer quiet for this edit.
+        expectedDeckSize = bookId to (ready.cards.size - 1)
         viewModelScope.launch {
             db.withTransaction {
                 bookDao.unskipWordEverywhere(wordId)
@@ -312,6 +370,7 @@ class DrillViewModel @Inject constructor(
             .associateBy { it.word.wordId }
         val cards = ready.cards.mapNotNull { freshById[it.word.wordId] }
         deckSequence.publish(bookId, cards.map { it.word.wordId }, currentDeckOrdering)
+        expectedDeckSize = bookId to cards.size
         if (cards.isEmpty()) {
             autoAdvance.stop()
             _uiState.value = DrillUiState.Empty(
@@ -319,15 +378,29 @@ class DrillViewModel @Inject constructor(
                 isReviewBook = ready.isReviewBook,
             )
         } else {
-            // Skip/restore swapped the word under the pager: playback continues on the
-            // new current card with a fresh countdown, never pausing.
             val page = currentPage.coerceAtMost(cards.size - 1)
-            autoAdvance.reposition(page, cards.size)
+            if (currentPage == cards.size) {
+                // Acting on the deck's LAST card finishes the pass: pageCount shrank
+                // under the pager's unchanged page, so the completion card now shows
+                // there without a settle event ever firing (e2e defect). Record the
+                // finished pass here, exactly as the settle path would.
+                autoAdvance.stop()
+                _uiState.value = ready.copy(
+                    cards = cards,
+                    initialPageIndex = page,
+                    completionCount = ready.completionCount + 1,
+                )
+                bookDao.incrementCompletionCount(bookId)
+            } else {
+                // Skip/restore swapped the word under the pager: playback continues on
+                // the new current card with a fresh countdown, never pausing.
+                autoAdvance.reposition(page, cards.size)
+                _uiState.value = ready.copy(cards = cards, initialPageIndex = page)
+            }
             // The acted-on word left the deck, so the card now at the clamped page is
             // the new current card and the resume point. Saving it here (not via a
             // settle event) is deliberate: a middle-page skip shrinks the deck without
             // moving the pager, so no settle fires.
-            _uiState.value = ready.copy(cards = cards, initialPageIndex = page)
             settings.setResumeWordId(bookId, cards[page].word.wordId)
         }
     }

@@ -55,7 +55,8 @@ class XlsxParserTest {
             ),
         )
         val rows = XlsxParser.parse(ByteArrayInputStream(xlsx))
-        assertThat(rows.single()).isEqualTo(ImportRow("ghost", null, null))
+        // Only the index and word cells exist: a word-only row.
+        assertThat(rows.single()).isEqualTo(ImportRow("ghost", null, null, wordOnly = true))
     }
 
     @Test

@@ -8,8 +8,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performTextInput
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -92,6 +95,51 @@ class WordListScreenTest {
                         onBack = {},
                         viewModel = vm,
                     )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+    }
+
+    /** The production environment's ViewConfiguration expands every
+     *  Modifier.clickable touch region to the 48dp minimum touch target; the
+     *  Compose test environment's own default is zero, so a test that must
+     *  reproduce on-device touch dispatch (the letter bar) has to opt in. */
+    private class FortyEightDpTouchTargets(wrapped: androidx.compose.ui.platform.ViewConfiguration) :
+        androidx.compose.ui.platform.ViewConfiguration by wrapped {
+        override val minimumTouchTargetSize: androidx.compose.ui.unit.DpSize
+            get() = androidx.compose.ui.unit.DpSize(48.dp, 48.dp)
+    }
+
+    private fun setContentForWithProductionTouchTargets(bookId: Long) {
+        val vm = WordListViewModel(
+            savedStateHandle = androidx.lifecycle.SavedStateHandle(
+                mapOf("bookId" to bookId.toString())
+            ).also { },
+            db = db,
+            wordDao = db.wordDao(),
+            bookDao = db.bookDao(),
+            dictionaryDao = db.dictionaryDao(),
+            settings = settings,
+            progressResetter = com.github.chsiching.worddrill.data.ProgressResetter(
+                db, db.bookDao(), settings,
+            ),
+            deckSequence = deckSequence,
+        )
+        composeRule.setContent {
+            WordDrillTheme {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    androidx.compose.ui.platform.LocalViewConfiguration provides
+                        FortyEightDpTouchTargets(
+                            androidx.compose.ui.platform.LocalViewConfiguration.current
+                        )
+                ) {
+                    Surface {
+                        WordListScreen(
+                            onBack = {},
+                            viewModel = vm,
+                        )
+                    }
                 }
             }
         }
@@ -333,6 +381,37 @@ class WordListScreenTest {
         composeRule.onNodeWithText("W", substring = false).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("water").assertIsDisplayed()
+    }
+
+    @Test
+    fun letterBar_tap_landsOnTappedLetterSection_notOneAbove() {
+        // E2e defect: Modifier.clickable silently expands each letter's touch
+        // region to the 48dp minimum touch target, which spans the two cells
+        // below it, so a tap on a letter fired the letter ABOVE and the jump
+        // landed one section early. A real touch must land on the tapped
+        // letter's own section.
+        val bookId = runBlocking {
+            db.bookDao().insert(Book(name = "字母跳转词书", isPreset = false))
+        }
+        for (i in 1..20) seedOneWord(bookId, "a%02d".format(i), "n.", "甲词")
+        for (i in 1..20) seedOneWord(bookId, "b%02d".format(i), "n.", "乙词")
+        setContentForWithProductionTouchTargets(bookId)
+
+        // 'b01' sits far below the fold: not composed before the jump.
+        composeRule.onNodeWithText("b01", substring = false).assertDoesNotExist()
+        composeRule.onNodeWithText("B", substring = false)
+            .performTouchInput { click() }
+
+        // Landing on B's section: b01 at the top of the viewport, and the
+        // second a-word (still on screen when the jump lands one section high)
+        // scrolled off above.
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(
+                androidx.compose.ui.test.hasTextExactly("b01")
+            ).fetchSemanticsNodes().size == 1
+        }
+        composeRule.onNodeWithText("b01", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("a02", substring = false).assertDoesNotExist()
     }
 
     @Test

@@ -392,7 +392,6 @@ class DrillViewModelTest {
         settings.setCurrentBookId(bookId)
         val vm = newViewModel()
         val before = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
-        assertThat(before.deckGeneration).isEqualTo(0)
 
         // Drill into the book and skip the middle card: the deck shrinks and the
         // resume position moves off the first card.
@@ -588,12 +587,13 @@ class DrillViewModelTest {
         vm.uiState.first { it is DrillUiState.Ready && it.cards.size == 2 }
         vm.onPageSettled(previousPage = 1, currentPage = 2)
         assertThat((vm.uiState.value as DrillUiState.Ready).completionCount).isEqualTo(1)
+        val generationBeforeRestart = (vm.uiState.value as DrillUiState.Ready).deckGeneration
 
         // Restart: the shared reset engine restores the full deck at the first card;
         // the completion count is cumulative history and survives.
         vm.restartBook()
         val after = vm.uiState
-            .first { it is DrillUiState.Ready && it.deckGeneration > 0 } as DrillUiState.Ready
+            .first { it is DrillUiState.Ready && it.deckGeneration > generationBeforeRestart } as DrillUiState.Ready
         assertThat(after.cards.map { it.word.text }).containsExactly("apple", "balance", "circle").inOrder()
         assertThat(after.initialPageIndex).isEqualTo(0)
         assertThat(after.completionCount).isEqualTo(1)
@@ -622,6 +622,133 @@ class DrillViewModelTest {
         vm.onPageSettled(previousPage = 0, currentPage = 2)
         assertThat((vm.uiState.value as DrillUiState.Ready).completionCount).isEqualTo(1)
         assertThat(awaitDbCompletionCount(reviewBookId, 1)).isEqualTo(1)
+        Unit
+    }
+
+    @Test
+    fun skippingLastWord_countsCompletionLikeASettle() = runBlocking {
+        // E2e defect: skipping the deck's last word shrank pageCount under the
+        // pager's unchanged page, so the completion card showed without a settle
+        // event and the pass was never recorded. Skipping the last word finishes
+        // the deck exactly like swiping onto the completion card.
+        val bookId = 934_620L
+        insertBookWithWords(bookId, "跳过完成词书", isPreset = false, "apple", "balance")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+        vm.uiState.first { it is DrillUiState.Ready && it.cards.size == 2 }
+
+        vm.skipCurrentWord(currentPage = 1) // the last card
+
+        val ready = withTimeoutOrNull(5_000) {
+            vm.uiState.first { it is DrillUiState.Ready && it.completionCount == 1 } as DrillUiState.Ready
+        }
+        assertThat(ready).isNotNull()
+        assertThat(ready!!.cards).hasSize(1)
+        assertThat(awaitDbCompletionCount(bookId, 1)).isEqualTo(1)
+        Unit
+    }
+
+    @Test
+    fun skippingMidDeck_doesNotCountCompletion() = runBlocking {
+        val bookId = 934_621L
+        insertBookWithWords(bookId, "跳过中部词书", isPreset = false, "apple", "balance", "circle")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+        vm.uiState.first { it is DrillUiState.Ready }
+
+        vm.skipCurrentWord(currentPage = 0)
+
+        val ready = withTimeoutOrNull(5_000) {
+            vm.uiState.first { it is DrillUiState.Ready && it.cards.size == 2 } as DrillUiState.Ready
+        }
+        assertThat(ready).isNotNull()
+        assertThat(ready!!.completionCount).isEqualTo(0)
+        assertThat(db.bookDao().getById(bookId)!!.completionCount).isEqualTo(0)
+        Unit
+    }
+
+    // --- Out-of-band deck edits seen by the retained drill ViewModel ---
+
+    @Test
+    fun wordsAddedToCurrentBookOutOfBand_deckReloads() = runBlocking {
+        // E2e defect: 新增词条 on the word-list page links a word into the
+        // current book without touching the book table, so the retained drill
+        // ViewModel never reloaded and the deck stayed stale until relaunch.
+        val bookId = 934_622L
+        insertBookWithWords(bookId, "越界加词书", isPreset = false, "zzseed1")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+        vm.uiState.first { it is DrillUiState.Ready && it.cards.size == 1 }
+
+        // The word-list page's insert path: link a new word out of band.
+        val wId = db.wordDao().findOrInsertWord("zzadded1", null)
+        db.wordDao().insertSense(Sense(wordId = wId, pos = "n.", meaning = "越界"))
+        db.bookDao().linkBookWord(BookWord(bookId, wId))
+
+        val ready = withTimeoutOrNull(5_000) {
+            vm.uiState.first { it is DrillUiState.Ready && it.cards.size == 2 } as DrillUiState.Ready
+        }
+        assertThat(ready).isNotNull()
+        Unit
+    }
+
+    @Test
+    fun emptyCurrentBook_becomesReadyWhenWordsLinkedOutOfBand() = runBlocking {
+        // E2e defect (fresh book + 新增词条 + 刷): the drill showed the stale
+        // empty state until app relaunch.
+        val bookId = 934_623L
+        insertBookWithWords(bookId, "空书越界词书", isPreset = false)
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+        vm.uiState.first { it is DrillUiState.Empty }
+
+        val wId = db.wordDao().findOrInsertWord("zzempty1", null)
+        db.wordDao().insertSense(Sense(wordId = wId, pos = "n.", meaning = "空书"))
+        db.bookDao().linkBookWord(BookWord(bookId, wId))
+
+        val ready = withTimeoutOrNull(5_000) {
+            vm.uiState.first { it is DrillUiState.Ready && it.cards.size == 1 } as DrillUiState.Ready
+        }
+        assertThat(ready).isNotNull()
+        Unit
+    }
+
+    @Test
+    fun resetNonCurrentBook_switchingBack_rebuildsPagerAtFreshPosition() = runBlocking {
+        // E2e defect: a reset of a NON-current book cleared the prefs, but when
+        // the book became current again the pager restored its saved page (the
+        // pager keys on bookId + deckGeneration, and the returning load reused
+        // the first visit's generation), so the drill showed the pre-reset
+        // position. Returning to a book must never reuse a pager state saved
+        // before the deck changed.
+        val bookId = 934_624L
+        val detourBook = 934_625L
+        val wordIds = insertBookWithWords(bookId, "非当前重置词书", isPreset = false, "apple", "balance", "circle")
+        insertBookWithWords(detourBook, "换乘重置词书", isPreset = false, "delta")
+        settings.setCurrentBookId(bookId)
+        val vm = newViewModel()
+        val firstVisit = vm.uiState.first { it is DrillUiState.Ready } as DrillUiState.Ready
+
+        // Drill to the last card so a resume position exists to go stale.
+        vm.onPageSettled(previousPage = 0, currentPage = 2)
+        assertThat(awaitSavedResumeWordId(bookId)).isEqualTo(wordIds[2])
+
+        // Switch away, reset this book out of band, switch back.
+        settings.setCurrentBookId(detourBook)
+        vm.uiState.first { it is DrillUiState.Ready && it.bookId == detourBook }
+        resetter.reset(bookId)
+        settings.setCurrentBookId(bookId)
+
+        val back = withTimeoutOrNull(5_000) {
+            vm.uiState.first {
+                it is DrillUiState.Ready && it.bookId == bookId && it.initialPageIndex == 0
+            } as DrillUiState.Ready
+        }
+        assertThat(back).isNotNull()
+        assertThat(back!!.cards).hasSize(3)
+        // The pager keys on (bookId, deckGeneration): the generation must differ
+        // from the first visit's, or the saved pager page would be restored.
+        assertThat(back.deckGeneration).isNotEqualTo(firstVisit.deckGeneration)
         Unit
     }
 

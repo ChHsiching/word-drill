@@ -71,9 +71,31 @@ class TextTableParserTest {
         val text = "1,apple\n2,run\n"
         val rows = TextTableParser.parse(stream(text), delimiter = ',')
         assertThat(rows).containsExactly(
-            ImportRow(word = "apple"),
-            ImportRow(word = "run"),
+            ImportRow(word = "apple", wordOnly = true),
+            ImportRow(word = "run", wordOnly = true),
         )
+    }
+
+    @Test
+    fun csv_indexAndWordOnly_marksWordOnly() {
+        // Story 8: a word-only row (no pos/meaning columns at all) carries the
+        // flag so the importer can accept a bare unknown word.
+        val rows = TextTableParser.parse(stream("1,flurbozz\n"), delimiter = ',')
+        assertThat(rows.single().wordOnly).isTrue()
+    }
+
+    @Test
+    fun csv_columnsPresentButEmpty_notWordOnly() {
+        // Empty trailing columns are still columns: incomplete data, not a
+        // word-only row.
+        val rows = TextTableParser.parse(stream("1,test,,\n"), delimiter = ',')
+        assertThat(rows.single().wordOnly).isFalse()
+    }
+
+    @Test
+    fun txt_tabRow_indexAndWordOnly_marksWordOnly() {
+        val rows = TextTableParser.parse(stream("1\tflurbozz\n"), delimiter = null)
+        assertThat(rows.single().wordOnly).isTrue()
     }
 
     @Test
