@@ -94,8 +94,44 @@ class FileWordImporterTest {
         val file = txtFile("1,lonelyword,,\n")
         val summary = importer.import(uriOf(file), bookName = "我的", filenameDecoded = "test.csv")
 
-        assertThat(summary).isEqualTo(ImportSummary(success = 0, skipped = 1))
+        // Columns present but empty is incomplete data, not a word-only row.
+        assertThat(summary).isEqualTo(ImportSummary(success = 0, skipped = 1, skippedWords = listOf("lonelyword")))
         assertThat(db.wordDao().getByText("lonelyword")).isNull()
+    }
+
+    // --- Word-only rows (story 8: an unknown bare word must enter the book) ---
+
+    @Test
+    fun wordOnlyRow_unknownWord_importedBareWithNoSenses() = runTest {
+        // A tab-format row with just the word (no pos/meaning columns) imports
+        // the word even when the dictionary does not know it; the card then
+        // shows the not-in-dictionary state.
+        val file = txtFile("1\tflurbozz\n")
+        val summary = importer.import(uriOf(file), bookName = "我的", filenameDecoded = "test.txt")
+
+        assertThat(summary).isEqualTo(ImportSummary(success = 1, skipped = 0))
+        val word = db.wordDao().getByText("flurbozz")!!
+        assertThat(db.wordDao().getSensesForWord(word.wordId)).isEmpty()
+        val book = db.bookDao().getByName("我的")!!
+        assertThat(db.bookDao().countWordsInBook(book.bookId)).isEqualTo(1)
+    }
+
+    @Test
+    fun wordOnlyRow_knownWord_filledFromDictionary() = runTest {
+        dictImporter.importDictionary(
+            DictionaryWords(
+                source = "test",
+                words = listOf(DictionaryWords.Entry(word = "apple", phonetic = "/p/", pos = "n.", meaning = "苹果")),
+            )
+        )
+        val file = txtFile("1\tapple\n")
+        val summary = importer.import(uriOf(file), bookName = "我的", filenameDecoded = "test.txt")
+
+        assertThat(summary.success).isEqualTo(1)
+        val word = db.wordDao().getByText("apple")!!
+        assertThat(word.phonetic).isEqualTo("/p/")
+        assertThat(db.wordDao().getSensesForWord(word.wordId).map { it.pos to it.meaning })
+            .containsExactly("n." to "苹果")
     }
 
     @Test
@@ -149,7 +185,7 @@ class FileWordImporterTest {
 
         val summary = importer.import(uriOf(file), bookName = "测试", filenameDecoded = "test.csv")
 
-        assertThat(summary).isEqualTo(ImportSummary(success = 3, skipped = 1))
+        assertThat(summary).isEqualTo(ImportSummary(success = 3, skipped = 1, skippedWords = listOf("emptyword")))
         val book = db.bookDao().getByName("测试")!!
         assertThat(db.bookDao().countWordsInBook(book.bookId)).isEqualTo(3)
     }

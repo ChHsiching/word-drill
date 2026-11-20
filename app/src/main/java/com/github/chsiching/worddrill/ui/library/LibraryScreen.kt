@@ -423,10 +423,19 @@ private fun ImportDoneDialog(
     summary: com.github.chsiching.worddrill.data.wordimport.ImportSummary,
     onDismiss: () -> Unit,
 ) {
+    // Name up to a few skipped words so the user can see WHAT was incomplete,
+    // not just how much.
+    val message = if (summary.skippedWords.isEmpty()) {
+        stringResource(R.string.library_import_done, summary.success, summary.skipped)
+    } else {
+        val names = summary.skippedWords.joinToString("、") +
+            if (summary.skipped > summary.skippedWords.size) "等" else ""
+        stringResource(R.string.library_import_done_with_words, summary.success, summary.skipped, names)
+    }
     WordDrillDialog(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.library_import_title),
-        message = stringResource(R.string.library_import_done, summary.success, summary.skipped),
+        message = message,
         buttons = {
             DialogButton(
                 text = stringResource(R.string.library_confirm),

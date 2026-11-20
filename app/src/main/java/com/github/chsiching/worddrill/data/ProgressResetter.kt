@@ -30,6 +30,10 @@ class ProgressResetter @Inject constructor(
     val resetBookIds: SharedFlow<Long> = _resetBookIds.asSharedFlow()
 
     suspend fun reset(bookId: Long) {
+        // Clear the resume position BEFORE the un-skip transaction commits: the
+        // drill observes the book's link count, so a reload triggered by that
+        // commit must not read the pre-reset position in between.
+        settings.clearResumeWordId(bookId)
         db.withTransaction {
             bookDao.unskipAllInBook(bookId)
             // Un-skip first: the removal keeps links for words still skipped in
@@ -38,7 +42,6 @@ class ProgressResetter @Inject constructor(
                 bookDao.removeReviewLinksOfBookWords(review.bookId, bookId)
             }
         }
-        settings.clearResumeWordId(bookId)
         _resetBookIds.emit(bookId)
     }
 }

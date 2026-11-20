@@ -18,6 +18,9 @@ import javax.inject.Singleton
 
 class FileNotOpenableException(val uri: String) : Exception("file not openable: $uri")
 
+/** The import summary names at most this many skipped words. */
+private const val MAX_NAMED_SKIPPED_WORDS = 3
+
 @Singleton
 class FileWordImporter @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -47,9 +50,16 @@ class FileWordImporter @Inject constructor(
                 val bookId = bookDao.insert(Book(name = bookName.trim(), isPreset = false))
                 var success = 0
                 var skipped = 0
+                val skippedWords = mutableListOf<String>()
+                fun skip(word: String) {
+                    skipped++
+                    if (word.isNotBlank() && skippedWords.size < MAX_NAMED_SKIPPED_WORDS) {
+                        skippedWords.add(word)
+                    }
+                }
                 for (row in rows) {
                     if (row.word.isBlank()) {
-                        skipped++
+                        skip(row.word)
                         continue
                     }
                     val dictEntries = dictionaryDao.findByWord(row.word.lowercase())
@@ -63,10 +73,19 @@ class FileWordImporter @Inject constructor(
                         success++
                         continue
                     }
+                    if (row.wordOnly) {
+                        // Story 8: a word-only row (no pos/meaning columns) imports
+                        // the bare word even though the dictionary missed it; the
+                        // card shows the not-in-dictionary state until senses exist.
+                        val wordId = wordDao.findOrInsertWord(row.word, null)
+                        bookDao.linkBookWord(BookWord(bookId = bookId, wordId = wordId))
+                        success++
+                        continue
+                    }
                     val phonetic = row.phonetic?.takeIf { it.isNotBlank() }
                     val senses = PosMeaningParser.parse(row.posMeaning ?: "")
                     if (phonetic == null && senses.isEmpty()) {
-                        skipped++
+                        skip(row.word)
                         continue
                     }
                     val wordId = wordDao.findOrInsertWord(row.word, phonetic)
@@ -76,7 +95,7 @@ class FileWordImporter @Inject constructor(
                     bookDao.linkBookWord(BookWord(bookId = bookId, wordId = wordId))
                     success++
                 }
-                ImportSummary(success = success, skipped = skipped)
+                ImportSummary(success = success, skipped = skipped, skippedWords = skippedWords)
             }
         }
 }

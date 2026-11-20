@@ -129,6 +129,7 @@
     <string name="library_import_file_none">未选择文件</string>
     <string name="library_import_working">导入中…</string>
     <string name="library_import_done">成功导入 %1$d 词 · 跳过 %2$d 词（数据不完整）</string>
+    <string name="library_import_done_with_words">成功导入 %1$d 词 · 跳过 %2$d 词（数据不完整：%3$s）</string>
     <string name="library_import_failed">导入失败</string>
     <string name="library_import_failed_file_type">不支持的文件类型（仅支持 xlsx/txt/csv/pdf）</string>
     <string name="library_import_failed_open">无法打开所选文件</string>

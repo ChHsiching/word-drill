@@ -153,7 +153,14 @@ object XlsxParser {
         val word = cells[1]?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         val phonetic = cells[2]?.trim()?.takeIf { it.isNotEmpty() }
         val posMeaning = cells[3]?.trim()?.takeIf { it.isNotEmpty() }
-        return ImportRow(word = word, phonetic = phonetic, posMeaning = posMeaning)
+        return ImportRow(
+            word = word,
+            phonetic = phonetic,
+            posMeaning = posMeaning,
+            // Word-only row: neither the phonetic nor the pos/meaning cell exists.
+            // Empty xlsx cells never reach the map, so presence is the only signal.
+            wordOnly = !cells.containsKey(2) && !cells.containsKey(3),
+        )
     }
 
     private fun newParser(input: InputStream): XmlPullParser {

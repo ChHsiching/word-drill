@@ -38,6 +38,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,9 +49,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -475,38 +479,53 @@ private fun EmptyState(text: String) {
     }
 }
 
+/** Modifier.clickable silently expands its touch region to the ViewConfiguration's
+ *  minimum touch target (48dp in production). The bar's cells are a fraction of
+ *  that, so each letter's expanded region spans the two cells below it and
+ *  steals their taps — every jump lands one letter high (e2e defect). The cells
+ *  are already full-height touch targets, so the bar opts out of the expansion. */
+private class CellSizedTouchTargets(wrapped: ViewConfiguration) : ViewConfiguration by wrapped {
+    override val minimumTouchTargetSize: DpSize
+        get() = DpSize(0.dp, 0.dp)
+}
+
 @Composable
 private fun LetterIndexBar(
     anchors: Map<Char, Int>,
     onJump: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .width(32.dp)
-            // Mirrors the list's content insets so the bar spans exactly the
-            // scrollable region; 'Z' stays clear of the floating capsule nav.
-            .padding(top = 8.dp, bottom = 120.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    CompositionLocalProvider(
+        LocalViewConfiguration provides
+            CellSizedTouchTargets(LocalViewConfiguration.current)
     ) {
-        for (letter in 'A'..'Z') {
-            val anchor = anchors[letter]
-            Text(
-                text = letter.toString(),
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = TextAlign.Center,
-                color = if (anchor != null) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
-                // The full cell is the touch target (weight over the bar height);
-                // the glyph centers inside it. Letters with no section in the
-                // displayed list keep their slot for a stable thumb map but are inert.
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .then(if (anchor != null) Modifier.clickable { onJump(anchor) } else Modifier)
-                    .wrapContentHeight(Alignment.CenterVertically),
-            )
+        Column(
+            modifier = modifier
+                .fillMaxHeight()
+                .width(32.dp)
+                // Mirrors the list's content insets so the bar spans exactly the
+                // scrollable region; 'Z' stays clear of the floating capsule nav.
+                .padding(top = 8.dp, bottom = 120.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            for (letter in 'A'..'Z') {
+                val anchor = anchors[letter]
+                Text(
+                    text = letter.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = TextAlign.Center,
+                    color = if (anchor != null) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                    // The full cell is the touch target (weight over the bar height);
+                    // the glyph centers inside it. Letters with no section in the
+                    // displayed list keep their slot for a stable thumb map but are inert.
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .then(if (anchor != null) Modifier.clickable { onJump(anchor) } else Modifier)
+                        .wrapContentHeight(Alignment.CenterVertically),
+                )
+            }
         }
     }
 }
