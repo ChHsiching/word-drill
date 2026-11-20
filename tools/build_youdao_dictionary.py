@@ -77,8 +77,9 @@ CJK_RE = r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3000-\u303f\uff00-\uffef]"
 
 HALF_TO_FULL = {",": "，", ";": "；", ":": "：", "?": "？", "!": "！"}
 
-# <美>, <美，非正式> style region/register markers -> full-width parens.
-ANGLE_MARKER_RE = re.compile(r"<([\u4e00-\u9fff][\u4e00-\u9fff，、]{0,11})>")
+# <美>, <美，非正式>, <美， 非正式> style region/register markers ->
+# full-width parens (inner spaces allowed and dropped).
+ANGLE_MARKER_RE = re.compile(r"<([\u4e00-\u9fff][\u4e00-\u9fff，、 ]{0,11})>")
 
 # ADR 0003 hard gate: the three preset-book word lists, files in tools/data/.
 PRESET_BOOK_FILES = ("cet4_2016.txt", "cet6_2016.txt", "kaoyan.txt")
@@ -106,17 +107,21 @@ def _is_domain_label(content):
 def normalize_meaning(text):
     """Normalize punctuation in a Chinese sense text:
     1. collapse whitespace runs to one space and strip;
-    2. <美> style markers -> （美）;
-    3. half-width , ; : ? ! -> full-width when adjacent to CJK;
+    2. half-width , ; : ? ! -> full-width when adjacent to CJK;
+    3. <美> style markers -> （美） (after widening — markers may hold a
+       half-width comma, "<美,非正式>");
     4. （电信） and [古生] domain labels -> 【】 form;
-    5. strip spaces hugging full-width separators and labels.
+    5. strip spaces hugging full-width separators, labels, and close parens.
     Idempotent on its own output.
     """
     text = re.sub(r"\s+", " ", text).strip()
-    text = ANGLE_MARKER_RE.sub(r"（\1）", text)
     for half, full in HALF_TO_FULL.items():
         text = re.sub(f"(?<={CJK_RE}){re.escape(half)}", full, text)
         text = re.sub(f"{re.escape(half)}(?={CJK_RE})", full, text)
+    # After the widening pass: markers may hold half-width commas
+    # ("<美,非正式>") or stray spaces ("<美， 非正式>").
+    text = ANGLE_MARKER_RE.sub(
+        lambda m: "（" + m.group(1).replace(" ", "") + "）", text)
 
     def repl(m):
         content = m.group(1)

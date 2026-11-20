@@ -112,6 +112,19 @@ class TestNormalizeMeaning:
         # Real Youdao data: can n. "罐，听；<美，非正式>监狱"
         assert normalize_meaning("罐，听；<美，非正式>监狱") == "罐，听；（美，非正式）监狱"
 
+    def test_angle_bracket_marker_with_halfwidth_comma_and_space(self):
+        # Real re-fetched data (2026-11 repair): roast "…斥责；<美,非正式>
+        # 和善地戏弄" — the marker holds a half-width comma, widened by the
+        # CJK comma rule, so the marker conversion must run after it.
+        assert normalize_meaning("斥责；<美,非正式> 和善地戏弄") == \
+            "斥责；（美，非正式）和善地戏弄"
+
+    def test_angle_bracket_marker_with_inner_space(self):
+        # Real re-fetched data: roast "<美， 非正式> 和善地戏弄" — full-width
+        # comma with a stray space inside the marker.
+        assert normalize_meaning("斥责；<美， 非正式> 和善地戏弄") == \
+            "斥责；（美，非正式）和善地戏弄"
+
     def test_ascii_angle_brackets_untouched(self):
         assert normalize_meaning("x <y> z") == "x <y> z"
 
