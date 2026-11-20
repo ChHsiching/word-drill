@@ -184,7 +184,8 @@ def fetch_wikitext(word):
     for page in data.get("query", {}).get("pages", {}).values():
         if page.get("missing") or "revisions" not in page:
             return None
-        return page["revisions"][0].get("slots", {}).get("main", {}).get("content")
+        slot = page["revisions"][0].get("slots", {}).get("main", {})
+        return slot.get("*") or slot.get("content")
     return None
 
 
