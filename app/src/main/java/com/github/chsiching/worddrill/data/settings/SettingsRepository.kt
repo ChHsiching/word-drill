@@ -22,7 +22,7 @@ private val Context.appDataStore: DataStore<Preferences> by preferencesDataStore
 class SettingsRepository @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    private val presetImportedKey = booleanPreferencesKey("preset_imported")
+    private val presetVersionKey = longPreferencesKey("preset_version")
     private val dictionaryImportedKey = booleanPreferencesKey("dictionary_imported")
     private val dictionaryVersionKey = longPreferencesKey("dictionary_version")
     private val reviewBookCreatedKey = booleanPreferencesKey("review_book_created")
@@ -34,10 +34,13 @@ class SettingsRepository @Inject constructor(
     private val dwellIntervalKey = floatPreferencesKey("dwell_interval_seconds")
     private val deckOrderingKey = stringPreferencesKey("deck_ordering")
 
-    val presetImported: Flow<Boolean> = context.appDataStore.data.map { it[presetImportedKey] ?: false }
+    /** Version of the bundled preset data an install last imported; 0 means never (or a
+     *  pre-versioning boolean-flag install, whose books need the refresh pass). */
+    val presetVersion: Flow<Long> =
+        context.appDataStore.data.map { it[presetVersionKey] ?: 0L }
 
-    suspend fun markPresetImported() {
-        context.appDataStore.edit { it[presetImportedKey] = true }
+    suspend fun markPresetVersion(version: Long) {
+        context.appDataStore.edit { it[presetVersionKey] = version }
     }
 
     /** Legacy pre-versioning flag: true only means the dictionary table may already hold rows

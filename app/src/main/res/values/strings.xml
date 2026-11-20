@@ -5,6 +5,7 @@
     <string name="tab_me">我的</string>
     <string name="drill_empty">这个词书是空的</string>
     <string name="drill_loading">加载中…</string>
+    <string name="drill_not_in_dictionary">词典未收录</string>
     <string name="library_title">词书</string>
     <string name="library_preset_badge">预置</string>
     <string name="library_custom_badge">自定义</string>

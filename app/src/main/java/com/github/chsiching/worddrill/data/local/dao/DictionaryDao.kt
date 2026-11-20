@@ -9,9 +9,9 @@ import com.github.chsiching.worddrill.data.local.entity.DictionaryEntry
 @Dao
 interface DictionaryDao {
 
-    /** Case-sensitive: ECDICT stores base-form (mostly lowercase) spellings, so callers pass
-     *  the lowercased base form. */
-    @Query("SELECT * FROM dictionary WHERE word = :word")
+    /** Case-insensitive: the Youdao asset keeps entry casing (April, AIDS), while callers
+     *  pass the lowercased import row, so the match folds case in SQL. */
+    @Query("SELECT * FROM dictionary WHERE word = :word COLLATE NOCASE")
     suspend fun findByWord(word: String): List<DictionaryEntry>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)

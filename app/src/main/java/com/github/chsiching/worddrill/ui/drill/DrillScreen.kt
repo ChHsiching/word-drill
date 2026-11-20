@@ -441,6 +441,15 @@ private fun WordCard(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                if (word.senses.isEmpty()) {
+                    // Imported word the dictionary does not know: say so instead of
+                    // showing a bare separator.
+                    Text(
+                        text = stringResource(R.string.drill_not_in_dictionary),
+                        style = typography.meaning.copy(color = colors.onSurfaceVariant),
+                        textAlign = TextAlign.Center,
+                    )
+                }
                 word.senses.forEach { sense ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

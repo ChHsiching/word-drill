@@ -79,6 +79,11 @@ class DrillScreenTest {
         db.wordDao().getWordsWithSensesByBook(bookId)
     }
 
+    private fun cardsOf(bookName: String) = runBlocking {
+        val bookId = db.bookDao().getByName(bookName)!!.bookId
+        db.wordDao().getWordsWithSensesByBook(bookId)
+    }
+
     private fun composeDrillPager(
         locked: Boolean = false,
         onSkip: (Int) -> Unit = {},
@@ -118,6 +123,44 @@ class DrillScreenTest {
         composeRule.onNodeWithText("v.").assertIsDisplayed()
         composeRule.onNodeWithText("囤积").assertIsDisplayed()
         composeRule.onNodeWithText("1 / 3").assertIsDisplayed()
+    }
+
+    // --- Not-in-dictionary card state (#56) ---
+
+    @Test
+    fun wordWithoutSenses_showsNotInDictionaryState() = runBlocking {
+        // An imported word the dictionary does not know can land in a book with a phonetic
+        // but no senses; the card must say so instead of showing bare emptiness.
+        val bookId = db.bookDao().insert(Book(name = "无释义词书", isPreset = false))
+        val w = db.wordDao().insert(Word(text = "zzzzunknown", phonetic = "/zz/"))
+        db.bookDao().linkBookWord(BookWord(bookId, w))
+        val cards = cardsOf("无释义词书")
+
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillPager(
+                        bookName = "无释义词书",
+                        cards = cards,
+                        onPageSettled = { _, _ -> },
+                        onSkip = { },
+                        isReviewBook = false,
+                        onRestore = { },
+                        locked = false,
+                        onToggleLock = {},
+                        hidePhonetic = false,
+                        onToggleAutoAdvance = { },
+                        advance = emptyFlow(),
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("zzzzunknown").assertIsDisplayed()
+        composeRule.onNodeWithText("/zz/").assertIsDisplayed()
+        composeRule.onNodeWithText("词典未收录").assertIsDisplayed()
+        Unit
     }
 
     @Test
