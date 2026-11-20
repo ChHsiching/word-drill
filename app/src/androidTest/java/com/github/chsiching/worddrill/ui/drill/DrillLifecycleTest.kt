@@ -140,7 +140,7 @@ class DrillLifecycleTest {
             WordDrillTheme {
                 Surface {
                     WithHairlineOverlay(vm) {
-                        if (showDrill.value) DrillScreen(viewModel = vm)
+                        if (showDrill.value) DrillScreen(onSwitchBook = {}, viewModel = vm)
                     }
                 }
             }
@@ -175,7 +175,7 @@ class DrillLifecycleTest {
             WordDrillTheme {
                 Surface {
                     WithHairlineOverlay(vm) {
-                        DrillScreen(viewModel = vm)
+                        DrillScreen(onSwitchBook = {}, viewModel = vm)
                     }
                 }
             }
@@ -206,7 +206,7 @@ class DrillLifecycleTest {
             WordDrillTheme {
                 Surface {
                     WithHairlineOverlay(vm) {
-                        DrillScreen(viewModel = vm)
+                        DrillScreen(onSwitchBook = {}, viewModel = vm)
                     }
                 }
             }
@@ -243,7 +243,7 @@ class DrillLifecycleTest {
             WordDrillTheme {
                 Surface {
                     WithHairlineOverlay(vm) {
-                        DrillScreen(viewModel = vm)
+                        DrillScreen(onSwitchBook = {}, viewModel = vm)
                     }
                 }
             }
@@ -267,7 +267,7 @@ class DrillLifecycleTest {
             WordDrillTheme {
                 Surface {
                     WithHairlineOverlay(vm) {
-                        DrillScreen(viewModel = vm)
+                        DrillScreen(onSwitchBook = {}, viewModel = vm)
                     }
                 }
             }
@@ -302,6 +302,7 @@ class DrillLifecycleTest {
                         DrillScreen(
                             locked = locked.value,
                             onToggleLock = { locked.value = !locked.value },
+                            onSwitchBook = {},
                             viewModel = vm,
                         )
                     }

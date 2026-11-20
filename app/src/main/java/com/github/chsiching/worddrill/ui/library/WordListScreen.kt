@@ -104,7 +104,7 @@ fun WordListScreen(
                             )
                         }
                     }
-                    // Reset makes no sense for the 复习 book: it holds no skipped
+                    // Reset makes no sense for the review book: it holds no skipped
                     // words of its own, so there is no progress to reset.
                     if (!state.isReviewBook) {
                         IconButton(onClick = viewModel::openResetDialog) {

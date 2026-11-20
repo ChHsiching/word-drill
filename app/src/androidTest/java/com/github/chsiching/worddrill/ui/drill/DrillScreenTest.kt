@@ -128,10 +128,15 @@ class DrillScreenTest {
                     DrillPager(
                         bookName = if (isReviewBook) "复习" else "测试词书",
                         cards = cards(),
+                        phonetics = emptyMap(),
+                        phoneticPreference = PhoneticPreference.US,
+                        completionCount = 0,
                         onPageSettled = { _, _ -> },
                         onSkip = onSkip,
                         isReviewBook = isReviewBook,
                         onRestore = onRestore,
+                        onRestartBook = {},
+                        onSwitchBook = {},
                         locked = locked,
                         onToggleLock = {},
                         hidePhonetic = false,
@@ -175,10 +180,14 @@ class DrillScreenTest {
                         bookName = "无释义词书",
                         cards = cards,
                         phonetics = phoneticsOf("无释义词书"),
+                        phoneticPreference = PhoneticPreference.US,
+                        completionCount = 0,
                         onPageSettled = { _, _ -> },
                         onSkip = { },
                         isReviewBook = false,
                         onRestore = { },
+                        onRestartBook = {},
+                        onSwitchBook = {},
                         locked = false,
                         onToggleLock = {},
                         hidePhonetic = false,
@@ -201,7 +210,7 @@ class DrillScreenTest {
     @Test
     fun cardPhonetics_followPreferenceSwitches_usUkBoth() {
         // A word with both dictionary variants: the card shows exactly the chosen
-        // one, and 双语 joins them with a space. The word row's own phonetic
+        // one, and BOTH joins them with a space. The word row's own phonetic
         // ("/wordrow/") must lose to the dictionary pair.
         seedBookWithDictPhonetics("音标词书", "apple", "/uk-apple/", "/us-apple/")
         val cards = cardsOf("音标词书")
@@ -215,10 +224,13 @@ class DrillScreenTest {
                         cards = cards,
                         phonetics = phonetics,
                         phoneticPreference = preference,
+                        completionCount = 0,
                         onPageSettled = { _, _ -> },
                         onSkip = { },
                         isReviewBook = false,
                         onRestore = { },
+                        onRestartBook = {},
+                        onSwitchBook = {},
                         locked = false,
                         onToggleLock = {},
                         hidePhonetic = false,
@@ -255,10 +267,13 @@ class DrillScreenTest {
                         cards = cardsOf("无美式词书"),
                         phonetics = phoneticsOf("无美式词书"),
                         phoneticPreference = PhoneticPreference.US,
+                        completionCount = 0,
                         onPageSettled = { _, _ -> },
                         onSkip = { },
                         isReviewBook = false,
                         onRestore = { },
+                        onRestartBook = {},
+                        onSwitchBook = {},
                         locked = false,
                         onToggleLock = {},
                         hidePhonetic = false,
@@ -274,7 +289,7 @@ class DrillScreenTest {
 
     @Test
     fun cardPhonetics_hidePhoneticWinsOverPreference() {
-        // The existing hide-phonetic toggle outranks the preference: even 双语 with
+        // The existing hide-phonetic toggle outranks the preference: even BOTH with
         // both variants available shows nothing.
         seedBookWithDictPhonetics("隐藏音标词书", "circle", "/uk-circle/", "/us-circle/")
         composeRule.setContent {
@@ -285,10 +300,13 @@ class DrillScreenTest {
                         cards = cardsOf("隐藏音标词书"),
                         phonetics = phoneticsOf("隐藏音标词书"),
                         phoneticPreference = PhoneticPreference.BOTH,
+                        completionCount = 0,
                         onPageSettled = { _, _ -> },
                         onSkip = { },
                         isReviewBook = false,
                         onRestore = { },
+                        onRestartBook = {},
+                        onSwitchBook = {},
                         locked = false,
                         onToggleLock = {},
                         hidePhonetic = true,
@@ -373,10 +391,15 @@ class DrillScreenTest {
                     DrillPager(
                         bookName = longName,
                         cards = cards(),
+                        phonetics = emptyMap(),
+                        phoneticPreference = PhoneticPreference.US,
+                        completionCount = 0,
                         onPageSettled = { _, _ -> },
                         onSkip = { },
                         isReviewBook = false,
                         onRestore = { },
+                        onRestartBook = {},
+                        onSwitchBook = {},
                         locked = false,
                         onToggleLock = {},
                         hidePhonetic = false,
@@ -404,7 +427,7 @@ class DrillScreenTest {
             composeRule.setContent {
                 WordDrillTheme {
                     Surface {
-                        DrillScreen(viewModel = vm)
+                        DrillScreen(onSwitchBook = {}, viewModel = vm)
                     }
                 }
             }
@@ -454,7 +477,7 @@ class DrillScreenTest {
             composeRule.setContent {
                 WordDrillTheme {
                     Surface {
-                        DrillScreen(viewModel = vm)
+                        DrillScreen(onSwitchBook = {}, viewModel = vm)
                     }
                 }
             }
@@ -512,6 +535,8 @@ class DrillScreenTest {
                     DrillPager(
                         bookName = "测试词书",
                         cards = cards,
+                        phonetics = emptyMap(),
+                        phoneticPreference = PhoneticPreference.US,
                         completionCount = completionCount,
                         onPageSettled = { _, current ->
                             if (current == cards.size) completionCount += 1
@@ -519,6 +544,8 @@ class DrillScreenTest {
                         onSkip = { },
                         isReviewBook = false,
                         onRestore = { },
+                        onRestartBook = {},
+                        onSwitchBook = {},
                         locked = false,
                         onToggleLock = {},
                         hidePhonetic = false,
@@ -550,18 +577,22 @@ class DrillScreenTest {
     @Test
     fun completionCard_passCount_followsCompletedCount() {
         // Post-settle contract: the card reads the completed-pass count carried by the
-        // state, so a book with one recorded pass shows 第 1 遍 while settled.
+        // state, so a book with one recorded pass shows the first-pass line while settled.
         composeRule.setContent {
             WordDrillTheme {
                 Surface {
                     DrillPager(
                         bookName = "测试词书",
                         cards = cards(),
+                        phonetics = emptyMap(),
+                        phoneticPreference = PhoneticPreference.US,
                         completionCount = 1,
                         onPageSettled = { _, _ -> },
                         onSkip = { },
                         isReviewBook = false,
                         onRestore = { },
+                        onRestartBook = {},
+                        onSwitchBook = {},
                         locked = false,
                         onToggleLock = {},
                         hidePhonetic = false,
@@ -588,10 +619,14 @@ class DrillScreenTest {
                     DrillPager(
                         bookName = "测试词书",
                         cards = cards(),
+                        phonetics = emptyMap(),
+                        phoneticPreference = PhoneticPreference.US,
+                        completionCount = 0,
                         onPageSettled = { _, _ -> },
                         onSkip = { },
                         isReviewBook = false,
                         onRestore = { },
+                        onRestartBook = {},
                         onSwitchBook = { switchRequested = true },
                         locked = false,
                         onToggleLock = {},
@@ -646,7 +681,7 @@ class DrillScreenTest {
             }
             composeRule.onNodeWithText("这是你第 1 遍刷完这本书").assertIsDisplayed()
 
-            // 重新刷 runs the shared reset engine: the skipped word is back, the deck
+            // Restart runs the shared reset engine: the skipped word is back, the deck
             // is whole again, and the pager lands on the first card.
             composeRule.onNodeWithText("重新刷").performClick()
             composeRule.waitUntil(10_000L) {
@@ -655,7 +690,7 @@ class DrillScreenTest {
             composeRule.onNodeWithText("apple").assertIsDisplayed()
             composeRule.onNodeWithText("🎉 刷完了").assertDoesNotExist()
 
-            // Finishing again is the second pass: 第 2 遍.
+            // Finishing again is the second pass.
             repeat(3) {
                 composeRule.onRoot().performTouchInput { swipeLeft() }
                 composeRule.waitForIdle()

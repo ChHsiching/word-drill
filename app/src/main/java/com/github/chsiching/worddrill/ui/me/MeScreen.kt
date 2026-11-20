@@ -404,111 +404,84 @@ private fun ToggleRow(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
     }
 }
 
+/** Settings row with a label, the current value, and a chevron; tapping cycles the
+ *  setting. Shared anatomy of the nav-style, deck-ordering, and phonetic-preference
+ *  rows. */
+@Composable
+private fun SettingValueRow(label: String, value: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
 @Composable
 private fun NavStyleRow(current: NavStyle, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(R.string.me_setting_nav_style),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = stringResource(
-                if (current == NavStyle.PILL) R.string.me_setting_nav_style_pill else R.string.me_setting_nav_style_bar
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Icon(
-            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
-        )
-    }
+    SettingValueRow(
+        label = stringResource(R.string.me_setting_nav_style),
+        value = stringResource(
+            if (current == NavStyle.PILL) R.string.me_setting_nav_style_pill else R.string.me_setting_nav_style_bar
+        ),
+        onClick = onClick,
+    )
 }
 
-/** Deck ordering (GLOSSARY.md, ADR 0002): global 按字母 / 乱序 two-state row in
- *  the 显示 group. Tapping cycles; the change takes effect on the next book open. */
+/** Deck ordering (GLOSSARY.md, ADR 0002): global alphabetical / shuffled two-state
+ *  row in the display group. Tapping cycles; the change takes effect on the next
+ *  book open. */
 @Composable
 private fun DeckOrderingRow(current: DeckOrdering, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(R.string.me_setting_deck_ordering),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = stringResource(
-                if (current == DeckOrdering.ALPHABETICAL) {
-                    R.string.me_setting_deck_ordering_alphabetical
-                } else {
-                    R.string.me_setting_deck_ordering_shuffled
-                }
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Icon(
-            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
-        )
-    }
+    SettingValueRow(
+        label = stringResource(R.string.me_setting_deck_ordering),
+        value = stringResource(
+            if (current == DeckOrdering.ALPHABETICAL) {
+                R.string.me_setting_deck_ordering_alphabetical
+            } else {
+                R.string.me_setting_deck_ordering_shuffled
+            }
+        ),
+        onClick = onClick,
+    )
 }
 
-/** Phonetic preference (GLOSSARY.md, issue #58): global 英式 / 美式 / 双语 row in
- *  the 显示 group, next to the hide-phonetic toggle. Tapping cycles; the card
+/** Phonetic preference (GLOSSARY.md, issue #58): global UK / US / both row in the
+ *  display group, next to the hide-phonetic toggle. Tapping cycles; the card
  *  resolves variants per word at render time, falling back to the available
  *  variant (ADR 0003). */
 @Composable
 private fun PhoneticPreferenceRow(current: PhoneticPreference, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(R.string.me_setting_phonetic_preference),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = stringResource(
-                when (current) {
-                    PhoneticPreference.UK -> R.string.me_setting_phonetic_preference_uk
-                    PhoneticPreference.US -> R.string.me_setting_phonetic_preference_us
-                    PhoneticPreference.BOTH -> R.string.me_setting_phonetic_preference_both
-                }
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Icon(
-            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
-        )
-    }
+    SettingValueRow(
+        label = stringResource(R.string.me_setting_phonetic_preference),
+        value = stringResource(
+            when (current) {
+                PhoneticPreference.UK -> R.string.me_setting_phonetic_preference_uk
+                PhoneticPreference.US -> R.string.me_setting_phonetic_preference_us
+                PhoneticPreference.BOTH -> R.string.me_setting_phonetic_preference_both
+            }
+        ),
+        onClick = onClick,
+    )
 }
 
 /** Test tag on the dwell-interval slider so instrumented tests can locate the control. */
@@ -831,7 +804,7 @@ private fun AboutRow(onClick: () -> Unit) {
     }
 }
 
-/** Inline result under the 检查更新 row; mirrors the export/import StatusLine style. */
+/** Inline result under the check-update row; mirrors the export/import StatusLine style. */
 @Composable
 private fun UpdateCheckStatusLine(
     text: String,

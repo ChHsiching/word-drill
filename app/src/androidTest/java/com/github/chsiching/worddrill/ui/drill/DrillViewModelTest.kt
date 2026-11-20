@@ -62,7 +62,7 @@ class DrillViewModelTest {
         delay(200)
         db.close()
         // Deck ordering is process-global; every other test in this process assumes
-        // the 按字母 default, so restore it even when a shuffle test failed midway.
+        // the alphabetical default, so restore it even when a shuffle test failed midway.
         settings.setDeckOrdering(DeckOrdering.ALPHABETICAL)
         Unit
     }
@@ -589,7 +589,7 @@ class DrillViewModelTest {
         vm.onPageSettled(previousPage = 1, currentPage = 2)
         assertThat((vm.uiState.value as DrillUiState.Ready).completionCount).isEqualTo(1)
 
-        // 重新刷: the shared reset engine restores the full deck at the first card;
+        // Restart: the shared reset engine restores the full deck at the first card;
         // the completion count is cumulative history and survives.
         vm.restartBook()
         val after = vm.uiState

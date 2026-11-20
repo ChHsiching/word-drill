@@ -11,7 +11,7 @@ import kotlinx.coroutines.sync.withLock
  * the cached result (failures included). Singleton because the launch check's
  * per-ViewModel started flag does not survive activity recreation within a
  * process; the mutex dedups a second launch check arriving while the first fetch
- * is still in flight. The Me tab's manual 检查更新 row deliberately bypasses
+ * is still in flight. The Me tab's manual check-update row deliberately bypasses
  * this cache and always re-fetches (reopened #59).
  */
 @Singleton

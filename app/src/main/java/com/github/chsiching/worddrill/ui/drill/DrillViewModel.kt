@@ -263,10 +263,11 @@ class DrillViewModel @Inject constructor(
         }
     }
 
-    /** 重新刷 on the completion card: the shared reset engine (GLOSSARY.md, progress
-     *  reset) returns the book to its first card with every skipped word back in the
-     *  deck. The reset listener above reloads the deck (deckGeneration bump), landing
-     *  on the first card; the completion count is history and survives. */
+    /** Restart on the completion card (R.string.drill_completion_restart): the
+     *  shared reset engine (GLOSSARY.md, progress reset) returns the book to its
+     *  first card with every skipped word back in the deck. The reset listener
+     *  above reloads the deck (deckGeneration bump), landing on the first card;
+     *  the completion count is history and survives. */
     fun restartBook() {
         val bookId = currentBookId ?: return
         viewModelScope.launch { progressResetter.reset(bookId) }

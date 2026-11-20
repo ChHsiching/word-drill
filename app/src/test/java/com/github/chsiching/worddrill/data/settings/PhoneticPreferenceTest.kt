@@ -5,7 +5,7 @@ import org.junit.Test
 
 class PhoneticPreferenceTest {
 
-    // --- Storage round-trip (default 美式, issue #58) ---
+    // --- Storage round-trip (default US, issue #58) ---
 
     @Test
     fun fromStorageName_roundTripsAllVariants() {

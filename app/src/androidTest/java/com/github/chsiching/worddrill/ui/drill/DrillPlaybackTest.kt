@@ -26,6 +26,7 @@ import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
 import com.github.chsiching.worddrill.data.local.entity.Word
+import com.github.chsiching.worddrill.data.settings.PhoneticPreference
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -112,6 +113,9 @@ class DrillPlaybackTest {
                         DrillPager(
                             bookName = "测试词书",
                             cards = cards(),
+                            phonetics = emptyMap(),
+                            phoneticPreference = PhoneticPreference.US,
+                            completionCount = 0,
                             onPageSettled = { previous, current ->
                                 settleLog += previous to current
                                 machine.reposition(current, deckSize)
@@ -119,6 +123,8 @@ class DrillPlaybackTest {
                             onSkip = {},
                             isReviewBook = false,
                             onRestore = {},
+                            onRestartBook = {},
+                            onSwitchBook = {},
                             locked = false,
                             onToggleLock = {},
                             hidePhonetic = false,

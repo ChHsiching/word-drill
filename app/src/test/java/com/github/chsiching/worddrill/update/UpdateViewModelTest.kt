@@ -74,7 +74,7 @@ class UpdateViewModelTest {
     }
 
     @Test
-    fun check_failure_showsNoticeWithMappedMessage() = runTest {
+    fun check_failure_staysSilent() = runTest {
         val vm = UpdateViewModel(
             FakeChecker(UpdateCheckResult.CheckFailed(R.string.update_error_dns)),
             FakeInstaller(),
@@ -83,8 +83,8 @@ class UpdateViewModelTest {
         vm.checkForUpdate()
         advanceUntilIdle()
 
-        assertThat(vm.state.value)
-            .isEqualTo(UpdateUiState.Notice(R.string.update_error_dns))
+        // Background check: no UI unless a newer release was found (spec).
+        assertThat(vm.state.value).isEqualTo(UpdateUiState.Idle)
     }
 
     @Test
@@ -172,7 +172,7 @@ class UpdateViewModelTest {
         assertThat(vm.state.value).isEqualTo(UpdateUiState.Notice(R.string.update_download_failed))
     }
 
-    // --- Manual 检查更新 row (#59) ---
+    // --- Manual check-update row (#59) ---
 
     @Test
     fun manualCheck_upToDate_showsUpToDateState() = runTest {

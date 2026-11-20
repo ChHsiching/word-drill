@@ -128,7 +128,7 @@ fun DrillScreen(
     onToggleLock: () -> Unit = {},
     hidePhonetic: Boolean = false,
     phoneticPreference: PhoneticPreference = PhoneticPreference.US,
-    onSwitchBook: () -> Unit = {},
+    onSwitchBook: () -> Unit,
     viewModel: DrillViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -200,18 +200,18 @@ fun DrillScreen(
 internal fun DrillPager(
     bookName: String,
     cards: List<WordWithSenses>,
-    phonetics: Map<Long, WordPhonetics> = emptyMap(),
-    phoneticPreference: PhoneticPreference = PhoneticPreference.US,
+    phonetics: Map<Long, WordPhonetics>,
+    phoneticPreference: PhoneticPreference,
     initialPage: Int = 0,
     /** Completed passes before the one the completion card is showing (the settle
      *  handler bumps it once the card is reached). */
-    completionCount: Int = 0,
+    completionCount: Int,
     onPageSettled: (previousPage: Int, currentPage: Int) -> Unit,
     onSkip: (currentPage: Int) -> Unit,
     isReviewBook: Boolean,
     onRestore: (currentPage: Int) -> Unit,
-    onRestartBook: () -> Unit = {},
-    onSwitchBook: () -> Unit = {},
+    onRestartBook: () -> Unit,
+    onSwitchBook: () -> Unit,
     locked: Boolean,
     onToggleLock: () -> Unit,
     hidePhonetic: Boolean,
@@ -493,8 +493,9 @@ private fun CenterText(text: String, modifier: Modifier) {
 }
 
 /** The virtual card after the deck's last one (GLOSSARY.md, completion card): the
- *  book name, the pass count, and the two ways on — 重新刷 (progress reset, back to
- *  the first card) primary, 换一本书 (Library) secondary. */
+ *  book name, the pass count, and the two ways on — restart (R.string.drill_completion_restart,
+ *  progress reset back to the first card) primary, switch book
+ *  (R.string.drill_completion_switch_book, Library) secondary. */
 @Composable
 private fun CompletionCard(
     bookName: String,

@@ -19,7 +19,7 @@ sealed interface UpdateUiState {
 
     data class Available(val release: ReleaseInfo) : UpdateUiState
 
-    /** Manual 检查更新 found nothing newer: inline 已是最新版本 in the Me tab. */
+    /** Manual check found nothing newer: inline up-to-date line in the Me tab. */
     data object UpToDate : UpdateUiState
 
     /** Inline diagnostic banner (check or download failure). */
@@ -57,23 +57,23 @@ class UpdateViewModel @Inject constructor(
                 is UpdateCheckResult.UpdateAvailable ->
                     if (!dismissed) _state.value = UpdateUiState.Available(result.release)
                 UpdateCheckResult.UpToDate -> Unit // completely silent
-                is UpdateCheckResult.CheckFailed ->
-                    if (!dismissed) _state.value = UpdateUiState.Notice(result.messageRes)
+                // Background check: no UI unless a newer release was found (spec).
+                is UpdateCheckResult.CheckFailed -> Unit
             }
         }
     }
 
     /**
-     * Me tab's 检查更新 row. Always performs a real fetch — the launch check's
-     * cached result is never replayed and a failure is never cached, so every
-     * tap (and every retry after a failure) hits the network again. Unlike the
-     * silent launch check, every outcome is surfaced.
+     * Me tab's check-update row (R.string.me_setting_check_update). Always performs
+     * a real fetch — the launch check's cached result is never replayed and a
+     * failure is never cached, so every tap (and every retry after a failure) hits
+     * the network again. Unlike the silent launch check, every outcome is surfaced.
      */
     fun manualCheck() {
         viewModelScope.launch {
             when (val result = checker.checkForUpdate()) {
                 is UpdateCheckResult.UpdateAvailable -> {
-                    // An explicit check overrides an earlier 暂不更新.
+                    // An explicit check overrides an earlier dialog dismissal.
                     dismissed = false
                     _state.value = UpdateUiState.Available(result.release)
                 }
@@ -84,7 +84,7 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
-    /** 立即更新. */
+    /** Update now (R.string.update_action_now). */
     fun updateNow() {
         val release = (_state.value as? UpdateUiState.Available)?.release ?: return
         if (!installer.canInstallApk()) {
@@ -104,7 +104,7 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
-    /** 暂不更新 / scrim tap: gone until the next launch. */
+    /** Later (R.string.update_action_later) / scrim tap: gone until the next launch. */
     fun dismissDialog() {
         dismissed = true
         _state.value = UpdateUiState.Idle

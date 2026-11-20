@@ -93,9 +93,9 @@ class MeScreenTest {
         db.close()
         settings.setDwellInterval(5f)
         // Deck ordering is process-global; other classes in this process assume
-        // the 按字母 default.
+        // the alphabetical default.
         settings.setDeckOrdering(DeckOrdering.ALPHABETICAL)
-        // So is the phonetic preference (美式 default).
+        // So is the phonetic preference (US default).
         settings.setPhoneticPreference(PhoneticPreference.US)
         Unit
     }
@@ -261,7 +261,7 @@ class MeScreenTest {
         composeRule.onNodeWithText("导航").assertIsDisplayed()
         composeRule.onNodeWithText("通用", substring = false)
         composeRule.onNodeWithText("隐藏音标").assertIsDisplayed()
-        // The phonetic preference row (issue #58) renders in the 显示 group too.
+        // The phonetic preference row (issue #58) renders in the display group too.
         composeRule.onNodeWithText("音标偏好").performScrollTo().assertIsDisplayed()
         // The CI emulator viewport is shorter: assert the top-bar icon before any
         // performScrollTo moves it off screen, and scroll below-fold rows into view.
@@ -282,7 +282,7 @@ class MeScreenTest {
             composeRule.onAllNodesWithText("按字母", substring = false).fetchSemanticsNodes().isNotEmpty()
         }
 
-        // Tapping cycles to 乱序 and persists the global setting (ADR 0002).
+        // Tapping cycles to shuffled and persists the global setting (ADR 0002).
         composeRule.onNodeWithText("单词顺序").performClick()
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText("乱序", substring = false).fetchSemanticsNodes().isNotEmpty()
@@ -300,8 +300,7 @@ class MeScreenTest {
             composeRule.onAllNodesWithText("美式", substring = false).fetchSemanticsNodes().isNotEmpty()
         }
 
-        // Tapping cycles 美式 → 双语 → 英式 (listing order 英式/美式/双语) and
-        // persists the global setting (issue #58).
+        // Tapping cycles US -> BOTH -> UK and persists the global setting (issue #58).
         composeRule.onNodeWithText("音标偏好").performClick()
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText("双语", substring = false).fetchSemanticsNodes().isNotEmpty()
@@ -459,7 +458,7 @@ class MeScreenTest {
         }
     }
 
-    // --- Manual 检查更新 row (#59) ---
+    // --- Manual check-update row (#59) ---
 
     private fun awaitShown(text: String, substring: Boolean = true) {
         composeRule.waitUntil(timeoutMillis = 10_000) {
