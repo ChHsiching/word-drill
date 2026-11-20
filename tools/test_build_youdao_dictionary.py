@@ -132,6 +132,15 @@ class TestNormalizeMeaning:
         text = "抛弃，遗弃；【电信】切换；（美）收拾"
         assert normalize_meaning(text) == text
 
+    def test_spaces_hugging_full_width_parens_stripped(self):
+        # Real re-fetched data (2026-11 repair): "（非正式） （尤指通过暴露在
+        # 太阳下或炉火前）使受热发烫" — a half-width space hugs the full-width
+        # close paren.
+        assert normalize_meaning("（非正式） （尤指通过暴露）使受热发烫") == \
+            "（非正式）（尤指通过暴露）使受热发烫"
+        assert normalize_meaning("（美，非正式） 和善地戏弄") == \
+            "（美，非正式）和善地戏弄"
+
 
 class TestWrapPhonetic:
     def test_wraps_in_slashes(self):

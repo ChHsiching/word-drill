@@ -17,8 +17,9 @@ are checkpointed in <state-dir>/wiktionary_fill_state.jsonl, so an interrupted
 fill resumes without re-fetching. The Youdao raw cache is never mutated;
 tools/build_youdao_dictionary.py merges the fill file at build time.
 
-Disambiguation pages are skipped. Preset-book gap words are fetched first
-(the build gate depends on them), the rest alphabetically. Pace is <=1 req/s;
+Disambiguation pages are skipped. Scope (owner rule 2026-11-20): fetch only
+gap words a book uses — preset-list words or words Youdao tags with
+exam_type; untagged deep-tail gaps are skipped entirely. Pace is <=1 req/s;
 HTTP 429 backs off 60s with doubling, and sustained refusal stops the run
 cleanly (state kept, resumable).
 
@@ -189,14 +190,22 @@ def fetch_wikitext(word):
     return None
 
 
-def gap_queue(gaps, preset_books):
-    """Gap words, preset-book words first, then the rest alphabetically."""
+def scoped_gap_words(raw, gaps, preset_books):
+    """Owner rule (2026-11-20): spend Wiktionary fetches only on words a
+    book uses — preset-list words or words Youdao tags with exam_type.
+    Untagged deep-tail gaps are skipped entirely. Returns the sorted scope."""
     preset = set()
     for _, words in preset_books:
         preset |= words
-    head = sorted(w for w in gaps if w in preset)
-    tail = sorted(w for w in gaps if w not in preset)
-    return head + tail
+    scoped = []
+    for word in gaps:
+        if word in preset:
+            scoped.append(word)
+            continue
+        ec = (raw.get(word) or {}).get("ec") or {}
+        if ec.get("exam_type"):
+            scoped.append(word)
+    return sorted(scoped)
 
 
 def run(args):
@@ -208,10 +217,10 @@ def run(args):
     state_path = os.path.join(args.state_dir, "wiktionary_fill_state.jsonl")
 
     processed = load_checkpoint(state_path)
-    queue = [w for w in gap_queue(gaps, load_preset_books())
-             if w not in processed]
-    print(f"gaps: {len(gaps)} words, processed: {len(processed)}, "
-          f"to fetch: {len(queue)}")
+    scope = scoped_gap_words(raw, gaps, load_preset_books())
+    queue = [w for w in scope if w not in processed]
+    print(f"gaps: {len(gaps)} words (scoped: {len(scope)}), "
+          f"processed: {len(processed)}, to fetch: {len(queue)}")
     if args.limit is not None:
         queue = queue[: args.limit]
         print(f"limited to {len(queue)} fetches this run")
@@ -282,7 +291,8 @@ def run(args):
 
     print(f"run finished: fetched {fetched} (filled uk {filled_uk}, "
           f"us {filled_us}, nothing usable {empty}), errors {errors}; "
-          f"processed overall {len(load_checkpoint(state_path))}/{len(gaps)}")
+          f"processed overall {len(load_checkpoint(state_path))}/{len(scope)} "
+          f"of the scoped {len(scope)} (full gap set: {len(gaps)})")
     return 0 if errors == 0 else 1
 
 

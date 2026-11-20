@@ -17,6 +17,7 @@ from wiktionary_phonetic_fill import (  # noqa: E402
     compute_gap_words,
     load_fill,
     parse_wiktionary_ipa,
+    scoped_gap_words,
 )
 
 
@@ -146,6 +147,28 @@ class TestChooseFill:
         parsed = {"uk": ["/ɒp/", "/ɒp2/"], "us": [], "unqualified": []}
         assert choose_fill({"need_uk": True, "need_us": False}, parsed)["uk"] == \
             "/ɒp/"
+
+
+class TestScopedGapWords:
+    TAGGED = {"input": "tagged", "ec": {
+        "exam_type": ["CET4"],
+        "word": [{"trs": [{"tr": [{"l": {"i": ["n. 标记词"]}}]}]}]}}
+
+    def test_preset_and_exam_type_words_in_scope(self):
+        raw = {"presetword": trimmed(), "tagged": self.TAGGED}
+        scoped = scoped_gap_words(raw, compute_gap_words(raw),
+                                  [("cet4_2016", {"presetword"})])
+        assert scoped == ["presetword", "tagged"]
+
+    def test_untagged_gap_word_out_of_scope(self):
+        # Owner rule 2026-11-20: spend nothing on words no book uses.
+        raw = {"deep-tail": trimmed()}
+        assert scoped_gap_words(raw, compute_gap_words(raw), []) == []
+
+    def test_word_with_both_variants_never_in_scope(self):
+        raw = {"complete": trimmed(ukphone="a", usphone="a"),
+               "tagged": self.TAGGED}
+        assert scoped_gap_words(raw, compute_gap_words(raw), []) == ["tagged"]
 
 
 class TestLoadFill:

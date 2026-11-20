@@ -125,9 +125,10 @@ def normalize_meaning(text):
     text = re.sub(r"（([^（）]+)）", repl, text)
     # Youdao also marks domains with square brackets: "[古生] 赤道部".
     text = re.sub(r"\[([^[\]]+)\]", repl, text)
-    # No space hugs full-width separators or labels: "苹果， 梨" -> "苹果，梨".
-    text = re.sub(r" +([，；：？！】])", r"\1", text)
-    return re.sub(r"([，；：？！】]) +", r"\1", text)
+    # No space hugs full-width separators, labels, or close parens:
+    # "苹果， 梨" -> "苹果，梨"; "（非正式） （尤指…）" -> "（非正式）（尤指…）".
+    text = re.sub(r" +([，；：？！】）])", r"\1", text)
+    return re.sub(r"([，；：？！】）]) +", r"\1", text)
 
 
 def wrap_phonetic(raw):
