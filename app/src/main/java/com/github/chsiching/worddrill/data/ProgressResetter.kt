@@ -15,7 +15,8 @@ import javax.inject.Singleton
  *  position back to the first card, every skipped word of the book back in the
  *  deck, those words' links removed from the review book (REVIEW_BOOK_NAME).
  *  Swipe logs and cumulative stats (today / all-time) are history and are never
- *  touched. The completion card's restart action reuses this engine. */
+ *  touched. Driven by the word-list page's 重置进度 action; the completion card's
+ *  重新刷 is a restart only and never reaches this engine. */
 @Singleton
 class ProgressResetter @Inject constructor(
     private val db: WordDrillDatabase,

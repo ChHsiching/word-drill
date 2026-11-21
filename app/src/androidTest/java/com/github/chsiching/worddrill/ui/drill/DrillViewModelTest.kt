@@ -574,9 +574,9 @@ class DrillViewModelTest {
     }
 
     @Test
-    fun restartFromCompletion_resetsDeck_landsOnFirstCard_keepsCount() = runBlocking {
+    fun restartFromCompletion_keepsSkippedWords_landsOnFirstCard_keepsCount() = runBlocking {
         val bookId = 934_612L
-        insertBookWithWords(bookId, "重刷词书", isPreset = false, "apple", "balance", "circle")
+        val wordIds = insertBookWithWords(bookId, "重刷词书", isPreset = false, "apple", "balance", "circle")
         settings.setCurrentBookId(bookId)
         val vm = newViewModel()
         vm.uiState.first { it is DrillUiState.Ready }
@@ -589,15 +589,20 @@ class DrillViewModelTest {
         assertThat((vm.uiState.value as DrillUiState.Ready).completionCount).isEqualTo(1)
         val generationBeforeRestart = (vm.uiState.value as DrillUiState.Ready).deckGeneration
 
-        // Restart: the shared reset engine restores the full deck at the first card;
-        // the completion count is cumulative history and survives.
+        // Restart is not a progress reset: the skipped word stays out of the deck and
+        // in the review book; the book just reopens at its first card. The completion
+        // count is cumulative history and survives.
         vm.restartBook()
         val after = vm.uiState
             .first { it is DrillUiState.Ready && it.deckGeneration > generationBeforeRestart } as DrillUiState.Ready
-        assertThat(after.cards.map { it.word.text }).containsExactly("apple", "balance", "circle").inOrder()
+        assertThat(after.cards.map { it.word.text }).containsExactly("apple", "circle").inOrder()
         assertThat(after.initialPageIndex).isEqualTo(0)
         assertThat(after.completionCount).isEqualTo(1)
         assertThat(settings.resumeWordId(bookId)).isNull()
+        assertThat(db.bookDao().getSkipped(bookId, wordIds[1])).isTrue()
+        val review = db.bookDao().getByName(REVIEW_BOOK_NAME)!!
+        assertThat(db.wordDao().getWordsWithSensesByBook(review.bookId).map { it.word.text })
+            .containsExactly("balance")
         assertThat(awaitDbCompletionCount(bookId, 1)).isEqualTo(1)
         Unit
     }

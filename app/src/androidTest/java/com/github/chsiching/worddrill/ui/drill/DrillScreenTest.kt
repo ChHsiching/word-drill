@@ -21,6 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.github.chsiching.worddrill.data.ProgressResetter
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
+import com.github.chsiching.worddrill.data.local.dao.REVIEW_BOOK_NAME
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.DictionaryEntry
@@ -649,7 +650,7 @@ class DrillScreenTest {
     }
 
     @Test
-    fun completionCard_restart_resetsDeckToFirstCard_incrementsShownPerPass() {
+    fun completionCard_restart_keepsSkippedWordsOut_landsOnFirstCard_incrementsPerPass() {
         val vm = runBlocking { seedCompletionBookAndCreateViewModel() }
         try {
             composeRule.setContent {
@@ -663,8 +664,8 @@ class DrillScreenTest {
                 composeRule.onAllNodesWithText("1 / 3").fetchSemanticsNodes().isNotEmpty()
             }
 
-            // Skip the middle card through the drill's own write path, so the reset
-            // below has a skip to undo; the deck shrinks to two cards.
+            // Skip the middle card through the drill's own write path; the deck
+            // shrinks to two cards and the skipped word moves to the review book.
             composeRule.onRoot().performTouchInput { swipeLeft() }
             composeRule.waitForIdle()
             composeRule.onNodeWithText("跳过").performClick()
@@ -681,17 +682,23 @@ class DrillScreenTest {
             }
             composeRule.onNodeWithText("这是你第 1 遍刷完这本书").assertIsDisplayed()
 
-            // Restart runs the shared reset engine: the skipped word is back, the deck
-            // is whole again, and the pager lands on the first card.
+            // Restart is not a progress reset: the deck keeps its two cards and the
+            // pager lands on the first card.
             composeRule.onNodeWithText("重新刷").performClick()
             composeRule.waitUntil(10_000L) {
-                composeRule.onAllNodesWithText("1 / 3").fetchSemanticsNodes().isNotEmpty()
+                composeRule.onAllNodesWithText("1 / 2").fetchSemanticsNodes().isNotEmpty()
             }
             composeRule.onNodeWithText("apple").assertIsDisplayed()
             composeRule.onNodeWithText("🎉 刷完了").assertDoesNotExist()
+            // The skipped word stays skipped and stays in the review book.
+            runBlocking {
+                val review = db.bookDao().getByName(REVIEW_BOOK_NAME)!!
+                assertThat(db.wordDao().getWordsWithSensesByBook(review.bookId).map { it.word.text })
+                    .containsExactly("balance")
+            }
 
             // Finishing again is the second pass.
-            repeat(3) {
+            repeat(2) {
                 composeRule.onRoot().performTouchInput { swipeLeft() }
                 composeRule.waitForIdle()
             }

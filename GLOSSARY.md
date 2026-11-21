@@ -14,6 +14,7 @@ Domain vocabulary for WordDrill. Keep this file free of implementation detail; i
 - **Dwell time** — how long auto-advance stays on a card before advancing to the next; set in the Me tab, remembered across launches.
 - **Completion card** — the virtual card after the last card of a deck, shown when the deck is finished. Displays the book name and completion count, and offers to restart the book or switch to another.
 - **Completion count** — how many times a book's deck has been fully traversed to the completion card. Per book, cumulative.
+- **Restart** — the completion card's 重新刷 action: reopen the current deck at its first card. Skipped words stay skipped, so the deck keeps its size and the review book is untouched; the completion count survives. Unlike the word-list page's progress reset, a restart does not un-skip the book's words.
 - **Progress reset** — returning a book to its starting state: resume position set to the first card, all skipped words of that book un-skipped. Does not clear swipe logs or the completion count; those are cumulative history.
 - **Self-built dictionary** — the app's built-in English-Chinese dictionary, built by crawling Youdao and packaged as app assets. Replaces ECDICT. Provides UK/US phonetics, domain-labeled senses, and clean punctuation.
 - **Phonetic preference** — the user's choice of which phonetic(s) to display on cards: UK, US, or both. A global setting in the Me tab.
