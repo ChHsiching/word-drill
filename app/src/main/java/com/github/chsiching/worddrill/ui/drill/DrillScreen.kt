@@ -494,8 +494,8 @@ private fun CenterText(text: String, modifier: Modifier) {
 
 /** The virtual card after the deck's last one (GLOSSARY.md, completion card): the
  *  book name, the pass count, and the two ways on — restart (R.string.drill_completion_restart,
- *  progress reset back to the first card) primary, switch book
- *  (R.string.drill_completion_switch_book, Library) secondary. */
+ *  back to the first card of the current deck; skipped words stay skipped) primary,
+ *  switch book (R.string.drill_completion_switch_book, Library) secondary. */
 @Composable
 private fun CompletionCard(
     bookName: String,

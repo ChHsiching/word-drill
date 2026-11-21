@@ -56,7 +56,8 @@ sealed interface DrillUiState {
         /** Deck snapshot identity. The pager keys on it (with the book id) and
          *  restores its remembered page when the key is unchanged, so it is bumped
          *  whenever the deck must not inherit an earlier deck's page: a progress
-         *  reset, switching to a different book, an out-of-band deck edit. */
+         *  reset, a completion-card restart, switching to a different book, an
+         *  out-of-band deck edit. */
         val deckGeneration: Int = 0,
         /** Completed passes of this book (GLOSSARY.md, completion count), bumped by one
          *  each time the completion card appears. Progress resets never clear it. */
@@ -98,8 +99,9 @@ class DrillViewModel @Inject constructor(
 
     /** Monotonic counter handed to Ready.deckGeneration. Advanced whenever the deck
      *  must not inherit a pager page remembered from an earlier deck: a progress
-     *  reset, switching to a different book, an out-of-band deck edit. Skip/restore
-     *  reloads deliberately keep the pager's page and the current generation. */
+     *  reset, a completion-card restart, switching to a different book, an
+     *  out-of-band deck edit. Skip/restore reloads deliberately keep the pager's
+     *  page and the current generation. */
     private var resetGeneration = 0
 
     /** deckGeneration the CURRENT book's pager was built with. A book-table reload
@@ -316,14 +318,20 @@ class DrillViewModel @Inject constructor(
         }
     }
 
-    /** Restart on the completion card (R.string.drill_completion_restart): the
-     *  shared reset engine (GLOSSARY.md, progress reset) returns the book to its
-     *  first card with every skipped word back in the deck. The reset listener
-     *  above reloads the deck (deckGeneration bump), landing on the first card;
-     *  the completion count is history and survives. */
+    /** Restart on the completion card (R.string.drill_completion_restart): back to
+     *  the first card of the CURRENT deck. NOT a progress reset — skipped words
+     *  stay skipped (GLOSSARY.md, restart), so the deck keeps its size and the
+     *  review book is untouched; only the resume position is cleared and the deck
+     *  re-dealt under a fresh generation so the pager rebuilds at card 1. The
+     *  full un-skip reset lives on the word-list page. The completion count is
+     *  history and survives. */
     fun restartBook() {
         val bookId = currentBookId ?: return
-        viewModelScope.launch { progressResetter.reset(bookId) }
+        viewModelScope.launch {
+            settings.clearResumeWordId(bookId)
+            val book = bookDao.getById(bookId)?.takeIf { !it.deleted } ?: return@launch
+            setReady(book, deckGeneration = ++resetGeneration)
+        }
     }
 
     fun skipCurrentWord(currentPage: Int) {
