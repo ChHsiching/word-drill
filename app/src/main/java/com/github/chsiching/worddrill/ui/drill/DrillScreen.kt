@@ -511,33 +511,23 @@ private fun CompletionCard(
 ) {
     val typography = MaterialTheme.wordDrillTypography
     val colors = MaterialTheme.colorScheme
+    // Mirrors the WordCard's vertical grammar (TopCenter + 80dp) so the
+    // completion moment balances the bottom nav exactly like a drill card.
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 28.dp),
-        contentAlignment = Alignment.Center,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .padding(top = 80.dp),
         ) {
-            Text(
-                text = stringResource(R.string.drill_completion_title),
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = (-0.3).sp,
-                textAlign = TextAlign.Center,
-                color = colors.onSurface,
-            )
-            Text(
-                text = bookName,
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp),
-            )
             // The hero: the pass count in the StatCard number grammar, flanked by
-            // its ordinal units on the same baseline.
-            Row(modifier = Modifier.padding(top = 40.dp)) {
+            // its ordinal units on the same baseline — the word slot of the card.
+            Row {
                 Text(
                     text = stringResource(R.string.drill_completion_pass_prefix),
                     style = MaterialTheme.typography.titleLarge,
@@ -558,10 +548,16 @@ private fun CompletionCard(
                     modifier = Modifier.alignByBaseline(),
                 )
             }
+            // The phonetic slot: book name + done status in one secondary line.
+            Text(
+                text = stringResource(R.string.drill_completion_status, bookName),
+                style = typography.phonetic.copy(color = colors.onSurfaceVariant),
+                modifier = Modifier.padding(top = 10.dp),
+            )
             // The app's own completion vocabulary: the StatCard progress track, full.
             Box(
                 modifier = Modifier
-                    .padding(top = 32.dp)
+                    .padding(top = 28.dp)
                     .fillMaxWidth()
                     .height(6.dp)
                     .background(MaterialTheme.wordDrillColors.progressTrack, RoundedCornerShape(3.dp)),
@@ -573,31 +569,25 @@ private fun CompletionCard(
                         .background(colors.onSurface, RoundedCornerShape(3.dp)),
                 )
             }
-            Text(
-                text = stringResource(R.string.drill_completion_pass_line, passCount),
-                fontSize = 13.sp,
-                lineHeight = (13 * 1.5).sp,
-                textAlign = TextAlign.Center,
-                color = colors.onSurfaceVariant,
-                modifier = Modifier.padding(top = 10.dp),
+        }
+        // Actions sit low in the thumb zone, clear of the floating nav.
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 140.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            DialogButton(
+                text = stringResource(R.string.drill_completion_restart),
+                onClick = onRestart,
+                style = DialogButtonStyle.Primary,
             )
-            Row(
-                modifier = Modifier
-                    .padding(top = 48.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                DialogButton(
-                    text = stringResource(R.string.drill_completion_restart),
-                    onClick = onRestart,
-                    style = DialogButtonStyle.Primary,
-                )
-                DialogButton(
-                    text = stringResource(R.string.drill_completion_switch_book),
-                    onClick = onSwitchBook,
-                    style = DialogButtonStyle.Cancel,
-                )
-            }
+            DialogButton(
+                text = stringResource(R.string.drill_completion_switch_book),
+                onClick = onSwitchBook,
+                style = DialogButtonStyle.Cancel,
+            )
         }
     }
 }

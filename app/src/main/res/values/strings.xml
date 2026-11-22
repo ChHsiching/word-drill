@@ -99,10 +99,9 @@
     <string name="drill_unlock">解锁</string>
     <string name="drill_restore">恢复</string>
     <string name="drill_swipe_hint">← 左右滑动切换 →</string>
-    <string name="drill_completion_title">刷完了</string>
     <string name="drill_completion_pass_prefix">第</string>
     <string name="drill_completion_pass_suffix">遍</string>
-    <string name="drill_completion_pass_line">这是你第 %1$d 遍刷完这本书</string>
+    <string name="drill_completion_status">%1$s · 已刷完</string>
     <string name="drill_completion_restart">重新刷</string>
     <string name="drill_completion_switch_book">换一本书</string>
     <string name="library_large_title">词库</string>
