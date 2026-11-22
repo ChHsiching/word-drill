@@ -19,10 +19,10 @@ sealed interface UpdateUiState {
 
     data class Available(val release: ReleaseInfo) : UpdateUiState
 
-    /** Manual check found nothing newer: inline up-to-date line in the Me tab. */
+    /** Manual check found nothing newer: result dialog in the Me tab. */
     data object UpToDate : UpdateUiState
 
-    /** Inline diagnostic banner (check or download failure). */
+    /** Check or download failure: dialog in the Me tab, banner from the launch gate. */
     data class Notice(val messageRes: Int) : UpdateUiState
 }
 

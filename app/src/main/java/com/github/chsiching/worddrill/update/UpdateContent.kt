@@ -55,9 +55,8 @@ fun UpdateGate(modifier: Modifier = Modifier) {
 
 /**
  * Me-tab host for the manual check-update row (#59): renders the shared update dialog
- * while an update is available and bridges the install-permission event. The inline
- * results (up-to-date line / errors) stay in MeScreen, which owns that group's
- * status-line style.
+ * while an update is available and bridges the install-permission event. The result
+ * dialogs (up-to-date / errors) stay in MeScreen, which owns the manual-check flow.
  */
 @Composable
 fun UpdateDialogHost(viewModel: UpdateViewModel) {
@@ -117,7 +116,7 @@ fun UpdateContent(
     }
     when (val current = state) {
         UpdateUiState.Idle -> Unit
-        // Only the Me tab's manual check sets this; MeScreen renders the inline line.
+        // Only the Me tab's manual check sets this; MeScreen renders the dialog.
         UpdateUiState.UpToDate -> Unit
         is UpdateUiState.Available -> UpdateDialog(
             state = current,

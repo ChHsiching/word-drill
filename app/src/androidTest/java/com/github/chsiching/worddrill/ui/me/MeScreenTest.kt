@@ -486,20 +486,23 @@ class MeScreenTest {
     }
 
     @Test
-    fun checkUpdateRow_noUpdate_showsUpToDateInline() {
+    fun checkUpdateRow_noUpdate_showsUpToDateDialog() {
         renderWithVm(vm(), updateViewModel = updateVm(FakeUpdateChecker(UpdateCheckResult.UpToDate)))
 
         composeRule.onNodeWithText("检查更新", substring = false).performScrollTo().performClick()
 
-        // The inline line lands below the tapped row; scroll it into view before
-        // asserting display (scroll-order independence on the CI viewport).
+        // The result lands in the standard dialog: message plus a single OK button.
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithText("已是最新版本", substring = false)
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("已是最新版本", substring = false)
-            .performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("已是最新版本", substring = false).assertIsDisplayed()
         composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
+        composeRule.onNodeWithText("确定", substring = false).performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("已是最新版本", substring = false)
+                .fetchSemanticsNodes().isEmpty()
+        }
     }
 
     @Test
@@ -524,7 +527,7 @@ class MeScreenTest {
     }
 
     @Test
-    fun checkUpdateRow_failure_showsErrorInline() {
+    fun checkUpdateRow_failure_showsErrorDialog() {
         renderWithVm(
             vm(),
             updateViewModel = updateVm(
@@ -538,9 +541,13 @@ class MeScreenTest {
             composeRule.onAllNodesWithText("无法连接 GitHub", substring = false)
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("无法连接 GitHub", substring = false)
-            .performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("无法连接 GitHub", substring = false).assertIsDisplayed()
         composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
+        composeRule.onNodeWithText("确定", substring = false).performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("无法连接 GitHub", substring = false)
+                .fetchSemanticsNodes().isEmpty()
+        }
     }
 
     @Test
@@ -557,8 +564,6 @@ class MeScreenTest {
             composeRule.onAllNodesWithText("已是最新版本", substring = false)
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("已是最新版本", substring = false)
-            .performScrollTo().assertIsDisplayed()
 
         assertThat(checker.calls).isEqualTo(2)
         Unit
