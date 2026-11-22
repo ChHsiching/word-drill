@@ -69,6 +69,7 @@
     <string name="me_about_title">关于 WordDrill</string>
     <string name="me_about_app_name">WordDrill</string>
     <string name="me_about_version">版本 %1$s</string>
+    <string name="me_about_word_source">词表来自教育部考试中心 2016 年版四、六级大纲；官方按拼写分行计数，共 5,418 词目；本应用合并同形词为一卡，词数略少于官方；两种拼法均已收录。</string>
     <string name="me_about_close">关闭</string>
     <string name="me_data">数据</string>
     <string name="me_export">导出</string>
@@ -106,15 +107,15 @@
     <string name="me_setting_phonetic_preference">音标偏好</string>
     <string name="me_setting_phonetic_preference_uk">英式</string>
     <string name="me_setting_phonetic_preference_us">美式</string>
-    <string name="me_setting_phonetic_preference_both">双语</string>
+    <string name="me_setting_phonetic_preference_both">英美</string>
     <string name="me_setting_dwell_interval">自动连播间隔</string>
     <string name="me_setting_dwell_value">%1$.1f 秒</string>
     <string name="me_setting_dwell_hint_min">1s</string>
     <string name="me_setting_dwell_hint_max">30s</string>
     <string name="me_setting_dwell_caption">在学习页双击卡片开始或暂停</string>
     <string name="me_setting_deck_ordering">单词顺序</string>
-    <string name="me_setting_deck_ordering_alphabetical">按字母</string>
-    <string name="me_setting_deck_ordering_shuffled">乱序</string>
+    <string name="me_setting_deck_ordering_alphabetical">字母顺序</string>
+    <string name="me_setting_deck_ordering_shuffled">随机顺序</string>
     <string name="me_setting_nav_style">导航栏风格</string>
     <string name="me_setting_nav_style_pill">浮动胶囊</string>
     <string name="me_setting_nav_style_bar">底部栏</string>

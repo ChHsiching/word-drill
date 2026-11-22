@@ -99,10 +99,10 @@ class FreshInstallDictionaryContentTest {
 
         composeRule.onNodeWithText("CET-4").assertIsDisplayed()
         // substring=true is load-bearing: a book row is one merged node whose text
-        // collection is ["CET-4", "4035 words (Chinese row subtitle)"], and the default exact matcher
+        // collection is ["CET-4", "4070 words (Chinese row subtitle)"], and the default exact matcher
         // only hits the first item.
-        composeRule.onNodeWithText("4035 词", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("5298 词", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("4070 词", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("5341 词", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("5658 词", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("考研英语").assertIsDisplayed()
     }

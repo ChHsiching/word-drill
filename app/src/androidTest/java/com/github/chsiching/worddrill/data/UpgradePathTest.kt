@@ -108,8 +108,8 @@ class UpgradePathTest {
         // --- Preset books refreshed in place ---
         val cet4 = db.bookDao().getByName("CET-4")!!
         assertThat(cet4.bookId).isEqualTo(cet4FixtureBookId)
-        assertThat(db.bookDao().getWordIdsInBook(cet4.bookId)).hasSize(4_035)
-        assertThat(db.bookDao().getWordIdsInBook(db.bookDao().getByName("CET-6")!!.bookId)).hasSize(5_298)
+        assertThat(db.bookDao().getWordIdsInBook(cet4.bookId)).hasSize(4_070)
+        assertThat(db.bookDao().getWordIdsInBook(db.bookDao().getByName("CET-6")!!.bookId)).hasSize(5_341)
         assertThat(db.bookDao().getWordIdsInBook(db.bookDao().getByName("考研英语")!!.bookId)).hasSize(5_658)
 
         // Word content refreshed to the new asset...

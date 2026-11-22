@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -161,10 +161,11 @@ fun WordListScreen(
                         // cannot cover the last entries when scrolled to the end.
                         contentPadding = PaddingValues(start = 24.dp, top = 8.dp, end = 12.dp, bottom = 120.dp),
                     ) {
-                        items(state.words, key = { it.word.wordId }) { wordWithSenses ->
+                        itemsIndexed(state.words, key = { _, wordWithSenses -> wordWithSenses.word.wordId }) { index, wordWithSenses ->
                             WordRow(
                                 wordWithSenses = wordWithSenses,
                                 readOnly = readOnly,
+                                showSeparator = index > 0,
                                 onEditSense = { sense ->
                                     viewModel.openEditDialog(
                                         senseId = sense.senseId,
@@ -227,19 +228,33 @@ fun WordListScreen(
     }
 }
 
+/** Word entry in the book's list. The hairline separator sits BETWEEN rows (never
+ *  after the last one), centered by the same 14 dp vertical padding the Me tab's
+ *  setting rows use, so each entry reads as one even block instead of a divider
+ *  glued to the text above with a blank strip below. */
 @Composable
 private fun WordRow(
     wordWithSenses: WordWithSenses,
     readOnly: Boolean,
+    showSeparator: Boolean,
     onEditSense: (com.github.chsiching.worddrill.data.local.entity.Sense) -> Unit,
     onDeleteWord: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 14.dp),
-    ) {
-        Row(verticalAlignment = Alignment.Top) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (showSeparator) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.wordDrillColors.separator),
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 14.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
             Text(
                 text = wordWithSenses.word.text,
                 style = MaterialTheme.typography.titleSmall,
@@ -276,12 +291,6 @@ private fun WordRow(
                 }
             }
         }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(MaterialTheme.wordDrillColors.separator),
-        )
     }
 }
 

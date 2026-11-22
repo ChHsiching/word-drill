@@ -60,6 +60,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.BuildConfig
@@ -191,21 +192,6 @@ fun MeScreen(
                 label = stringResource(R.string.me_setting_check_update),
                 onClick = updateViewModel::manualCheck,
             )
-            when (val current = updateState) {
-                is UpdateUiState.UpToDate -> UpdateCheckStatusLine(
-                    text = stringResource(R.string.update_up_to_date),
-                    color = MaterialTheme.colorScheme.primary,
-                    clearAfterMs = 2_000,
-                    onClear = updateViewModel::dismissNotice,
-                )
-                is UpdateUiState.Notice -> UpdateCheckStatusLine(
-                    text = stringResource(current.messageRes),
-                    color = MaterialTheme.colorScheme.error,
-                    clearAfterMs = 4_000,
-                    onClear = updateViewModel::dismissNotice,
-                )
-                else -> Unit
-            }
             InGroupSeparator()
             AboutRow(onClick = { showAbout = true })
         }
@@ -214,6 +200,19 @@ fun MeScreen(
     // The update dialog for a manual check with something to install; the launch
     // check's dialog still comes from UpdateGate in MainActivity.
     UpdateDialogHost(viewModel = updateViewModel)
+
+    // Manual-check results (up to date / network error) in the standard dialog.
+    when (val current = updateState) {
+        is UpdateUiState.UpToDate -> UpdateResultDialog(
+            message = stringResource(R.string.update_up_to_date),
+            onDismiss = updateViewModel::dismissNotice,
+        )
+        is UpdateUiState.Notice -> UpdateResultDialog(
+            message = stringResource(current.messageRes),
+            onDismiss = updateViewModel::dismissNotice,
+        )
+        else -> Unit
+    }
 
     if (showAbout) {
         AboutDialog(onDismiss = { showAbout = false })
@@ -804,24 +803,21 @@ private fun AboutRow(onClick: () -> Unit) {
     }
 }
 
-/** Inline result under the check-update row; mirrors the export/import StatusLine style. */
+/** Manual check-update result (up to date / network error) in the app's standard dialog. */
 @Composable
-private fun UpdateCheckStatusLine(
-    text: String,
-    color: Color,
-    clearAfterMs: Long,
-    onClear: () -> Unit,
-) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = color,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+private fun UpdateResultDialog(message: String, onDismiss: () -> Unit) {
+    WordDrillDialog(
+        onDismissRequest = onDismiss,
+        title = stringResource(R.string.me_setting_check_update),
+        message = message,
+        buttons = {
+            DialogButton(
+                text = stringResource(R.string.library_confirm),
+                onClick = onDismiss,
+                style = DialogButtonStyle.Primary,
+            )
+        },
     )
-    LaunchedEffect(text) {
-        delay(clearAfterMs)
-        onClear()
-    }
 }
 
 @Composable
@@ -878,6 +874,17 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
+            )
+            // Word-count provenance note; same typography as the dialog's message.
+            Text(
+                text = stringResource(R.string.me_about_word_source),
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                lineHeight = (13 * 1.5).sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
             )
         },
         buttons = {
