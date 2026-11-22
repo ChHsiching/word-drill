@@ -564,7 +564,7 @@ class DrillScreenTest {
             composeRule.waitForIdle()
         }
 
-        composeRule.onNodeWithText("🎉 刷完了").assertIsDisplayed()
+        composeRule.onNodeWithText("刷完了").assertIsDisplayed()
         // The book name shows twice while the completion card is up: the top bar and
         // the card itself.
         composeRule.onAllNodesWithText("测试词书").assertCountEquals(2)
@@ -678,7 +678,7 @@ class DrillScreenTest {
             composeRule.onRoot().performTouchInput { swipeLeft() }
             composeRule.waitForIdle()
             composeRule.waitUntil(10_000L) {
-                composeRule.onAllNodesWithText("🎉 刷完了").fetchSemanticsNodes().isNotEmpty()
+                composeRule.onAllNodesWithText("刷完了").fetchSemanticsNodes().isNotEmpty()
             }
             composeRule.onNodeWithText("这是你第 1 遍刷完这本书").assertIsDisplayed()
 
@@ -689,7 +689,7 @@ class DrillScreenTest {
                 composeRule.onAllNodesWithText("1 / 2").fetchSemanticsNodes().isNotEmpty()
             }
             composeRule.onNodeWithText("apple").assertIsDisplayed()
-            composeRule.onNodeWithText("🎉 刷完了").assertDoesNotExist()
+            composeRule.onNodeWithText("刷完了").assertDoesNotExist()
             // The skipped word stays skipped and stays in the review book.
             runBlocking {
                 val review = db.bookDao().getByName(REVIEW_BOOK_NAME)!!
@@ -703,7 +703,7 @@ class DrillScreenTest {
                 composeRule.waitForIdle()
             }
             composeRule.waitUntil(10_000L) {
-                composeRule.onAllNodesWithText("🎉 刷完了").fetchSemanticsNodes().isNotEmpty()
+                composeRule.onAllNodesWithText("刷完了").fetchSemanticsNodes().isNotEmpty()
             }
             composeRule.onNodeWithText("这是你第 2 遍刷完这本书").assertIsDisplayed()
         } finally {

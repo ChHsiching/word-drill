@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,6 +64,8 @@ import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.local.WordPhonetics
 import com.github.chsiching.worddrill.data.local.WordWithSenses
 import com.github.chsiching.worddrill.data.settings.PhoneticPreference
+import com.github.chsiching.worddrill.ui.theme.DialogButton
+import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 import com.github.chsiching.worddrill.ui.theme.wordDrillTypography
 import kotlinx.coroutines.flow.Flow
@@ -492,10 +495,13 @@ private fun CenterText(text: String, modifier: Modifier) {
     }
 }
 
-/** The virtual card after the deck's last one (GLOSSARY.md, completion card): the
- *  book name, the pass count, and the two ways on — restart (R.string.drill_completion_restart,
- *  back to the first card of the current deck; skipped words stay skipped) primary,
- *  switch book (R.string.drill_completion_switch_book, Library) secondary. */
+/** The virtual card after the deck's last one (GLOSSARY.md, completion card). Pure
+ *  typography in the app's own grammar: the pass count as a StatCard-style hero
+ *  (第 N 遍, N in the tnum number style), the StatCard progress track rendered full
+ *  as the "complete" signal, and the two ways on in dialog-button form — restart
+ *  (R.string.drill_completion_restart, back to the first card of the current deck;
+ *  skipped words stay skipped) primary, switch book (R.string.drill_completion_switch_book,
+ *  Library) secondary. */
 @Composable
 private fun CompletionCard(
     bookName: String,
@@ -513,44 +519,85 @@ private fun CompletionCard(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
                 text = stringResource(R.string.drill_completion_title),
-                style = typography.word.copy(color = colors.onSurface),
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-0.3).sp,
                 textAlign = TextAlign.Center,
+                color = colors.onSurface,
             )
             Text(
                 text = bookName,
-                style = MaterialTheme.typography.titleMedium.copy(color = colors.onSurfaceVariant),
-                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp),
             )
-            Text(
-                text = stringResource(R.string.drill_completion_pass_line, passCount),
-                style = MaterialTheme.typography.bodyMedium.copy(color = colors.onSurfaceVariant),
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(24.dp))
-            Surface(
-                color = colors.onSurface,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.clickable(onClick = onRestart),
-            ) {
+            // The hero: the pass count in the StatCard number grammar, flanked by
+            // its ordinal units on the same baseline.
+            Row(modifier = Modifier.padding(top = 40.dp)) {
                 Text(
-                    text = stringResource(R.string.drill_completion_restart),
-                    style = MaterialTheme.typography.labelLarge.copy(color = colors.surface),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 36.dp, vertical = 14.dp),
+                    text = stringResource(R.string.drill_completion_pass_prefix),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier.alignByBaseline(),
+                )
+                Text(
+                    text = passCount.toString(),
+                    style = typography.statNumberLarge.copy(color = colors.onSurface),
+                    modifier = Modifier
+                        .padding(horizontal = 6.dp)
+                        .alignByBaseline(),
+                )
+                Text(
+                    text = stringResource(R.string.drill_completion_pass_suffix),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier.alignByBaseline(),
+                )
+            }
+            // The app's own completion vocabulary: the StatCard progress track, full.
+            Box(
+                modifier = Modifier
+                    .padding(top = 32.dp)
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .background(MaterialTheme.wordDrillColors.progressTrack, RoundedCornerShape(3.dp)),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .background(colors.onSurface, RoundedCornerShape(3.dp)),
                 )
             }
             Text(
-                text = stringResource(R.string.drill_completion_switch_book),
-                style = MaterialTheme.typography.bodyMedium.copy(color = colors.onSurfaceVariant),
+                text = stringResource(R.string.drill_completion_pass_line, passCount),
+                fontSize = 13.sp,
+                lineHeight = (13 * 1.5).sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .clickable(onClick = onSwitchBook)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                color = colors.onSurfaceVariant,
+                modifier = Modifier.padding(top = 10.dp),
             )
+            Row(
+                modifier = Modifier
+                    .padding(top = 48.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                DialogButton(
+                    text = stringResource(R.string.drill_completion_restart),
+                    onClick = onRestart,
+                    style = DialogButtonStyle.Primary,
+                )
+                DialogButton(
+                    text = stringResource(R.string.drill_completion_switch_book),
+                    onClick = onSwitchBook,
+                    style = DialogButtonStyle.Cancel,
+                )
+            }
         }
     }
 }
