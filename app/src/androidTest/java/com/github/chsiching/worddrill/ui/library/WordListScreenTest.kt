@@ -22,6 +22,7 @@ import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.data.local.entity.BookWord
 import com.github.chsiching.worddrill.data.local.entity.Sense
 import com.github.chsiching.worddrill.data.settings.DeckOrdering
+import com.github.chsiching.worddrill.data.settings.PhoneticPreference
 import com.github.chsiching.worddrill.ui.theme.WordDrillTheme
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.runBlocking
@@ -73,7 +74,12 @@ class WordListScreenTest {
             Unit
         }
 
-    private fun setContentFor(bookId: Long) {
+    private fun setContentFor(
+        bookId: Long,
+        hidePhonetic: Boolean = false,
+        phoneticPreference: com.github.chsiching.worddrill.data.settings.PhoneticPreference =
+            com.github.chsiching.worddrill.data.settings.PhoneticPreference.US,
+    ) {
         val vm = WordListViewModel(
             savedStateHandle = androidx.lifecycle.SavedStateHandle(
                 mapOf("bookId" to bookId.toString())
@@ -93,6 +99,8 @@ class WordListScreenTest {
                 Surface {
                     WordListScreen(
                         onBack = {},
+                        hidePhonetic = hidePhonetic,
+                        phoneticPreference = phoneticPreference,
                         viewModel = vm,
                     )
                 }
@@ -461,5 +469,119 @@ class WordListScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("没有匹配「zzz」的单词").assertIsDisplayed()
         composeRule.onNodeWithText("A", substring = false).assertDoesNotExist()
+    }
+
+    // --- Variant A rows: two-line anatomy, phonetics on line 1 ---
+
+    @Test
+    fun wordRow_twoLines_allSensesStackAsBlocks() {
+        runBlocking {
+            val appleId = db.wordDao().getByText("apple")!!.wordId
+            db.wordDao().insertSense(Sense(wordId = appleId, pos = "v.", meaning = "囤积"))
+        }
+        setContentFor(customBookId)
+
+        // Every sense renders in the list, each starting with its own pos label;
+        // the meaning sits in the column after its label (hanging indent).
+        composeRule.onNodeWithText("n.").assertIsDisplayed()
+        composeRule.onNodeWithText("苹果").assertIsDisplayed()
+        composeRule.onNodeWithText("v.").assertIsDisplayed()
+        composeRule.onNodeWithText("囤积").assertIsDisplayed()
+
+        val wordY = composeRule.onNodeWithText("apple", substring = false)
+            .fetchSemanticsNode().positionInRoot.y
+        val firstBlockY = composeRule.onNodeWithText("n.", substring = false)
+            .fetchSemanticsNode().positionInRoot.y
+        val firstMeaningX = composeRule.onNodeWithText("苹果")
+            .fetchSemanticsNode().positionInRoot.x
+        val firstMeaningY = composeRule.onNodeWithText("苹果")
+            .fetchSemanticsNode().positionInRoot.y
+        val secondBlockY = composeRule.onNodeWithText("v.", substring = false)
+            .fetchSemanticsNode().positionInRoot.y
+        val firstPosX = composeRule.onNodeWithText("n.", substring = false)
+            .fetchSemanticsNode().positionInRoot.x
+
+        // Sense blocks sit below the word line and stack downward.
+        assertThat(firstBlockY).isGreaterThan(wordY)
+        assertThat(secondBlockY).isGreaterThan(firstMeaningY)
+        // The meaning column starts after the pos label, not at the row edge.
+        assertThat(firstMeaningX).isGreaterThan(firstPosX)
+        Unit
+    }
+
+    private suspend fun seedAppleDictionaryPhonetics() {
+        db.dictionaryDao().insertAll(
+            listOf(
+                com.github.chsiching.worddrill.data.local.entity.DictionaryEntry(
+                    word = "apple", phonetic = "/uk/", phoneticUs = "/us/",
+                    pos = "n.", meaning = "苹果",
+                ),
+            )
+        )
+    }
+
+    @Test
+    fun wordRow_phonetic_sharesWordLine_resolvesUSPreference() {
+        runBlocking { seedAppleDictionaryPhonetics() }
+        setContentFor(customBookId, phoneticPreference = PhoneticPreference.US)
+        composeRule.onNodeWithText("/us/", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("/uk/", substring = false).assertDoesNotExist()
+
+        // Same line: the smaller phonetic sits inside the word's line box
+        // (baseline-shared, not stacked below it).
+        val wordNode = composeRule.onNodeWithText("apple", substring = false).fetchSemanticsNode()
+        val phoneticY = composeRule.onNodeWithText("/us/", substring = false)
+            .fetchSemanticsNode().positionInRoot.y
+        assertThat(phoneticY).isAtLeast(wordNode.positionInRoot.y)
+        assertThat(phoneticY).isAtMost(wordNode.positionInRoot.y + wordNode.size.height)
+        Unit
+    }
+
+    @Test
+    fun wordRow_phonetic_resolvesUKPreference() {
+        runBlocking { seedAppleDictionaryPhonetics() }
+        setContentFor(customBookId, phoneticPreference = PhoneticPreference.UK)
+        composeRule.onNodeWithText("/uk/", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("/us/", substring = false).assertDoesNotExist()
+        Unit
+    }
+
+    @Test
+    fun wordRow_phonetic_hideToggleOutranksPreference() {
+        runBlocking { seedAppleDictionaryPhonetics() }
+        setContentFor(customBookId, hidePhonetic = true, phoneticPreference = PhoneticPreference.BOTH)
+        composeRule.onNodeWithText("/uk/", substring = false).assertDoesNotExist()
+        composeRule.onNodeWithText("/us/", substring = false).assertDoesNotExist()
+        composeRule.onNodeWithText("apple", substring = false).assertIsDisplayed()
+        Unit
+    }
+
+    @Test
+    fun wordRow_phonetic_resolvesForWordAddedMidSession() {
+        runBlocking {
+            db.dictionaryDao().insertAll(
+                listOf(
+                    com.github.chsiching.worddrill.data.local.entity.DictionaryEntry(
+                        word = "balance", phonetic = "/ˈbæləns/", phoneticUs = "/ˈbæləns/",
+                        pos = "n.", meaning = "平衡",
+                    ),
+                )
+            )
+        }
+        setContentFor(customBookId)
+        composeRule.onNodeWithContentDescription("新增词条").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("单词").performTextInput("balance")
+        selectPosFromDropdown("n.")
+        composeRule.onNodeWithText("释义").performTextInput("平衡")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("确定").performClick()
+
+        // The phonetic map refreshes with the word set: no reopen needed.
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(
+                androidx.compose.ui.test.hasText("/ˈbæləns/", substring = false)
+            ).fetchSemanticsNodes().size == 1
+        }
     }
 }

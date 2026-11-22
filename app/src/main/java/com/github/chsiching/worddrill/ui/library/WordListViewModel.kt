@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import com.github.chsiching.worddrill.data.ProgressResetter
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
+import com.github.chsiching.worddrill.data.local.WordPhonetics
 import com.github.chsiching.worddrill.data.local.WordWithSenses
 import com.github.chsiching.worddrill.data.local.dao.BookDao
 import com.github.chsiching.worddrill.data.local.dao.REVIEW_BOOK_NAME
@@ -97,8 +98,12 @@ data class WordListUiState(
     val resumePosition: Int = 0,
     /** Ordering the displayed list is in (issue #60): the dealt mode when the
      *  drill published a sequence this session, alphabetical otherwise. The letter
-     * bar shows only in ALPHABETICAL — shuffle has no meaningful sections. */
+     *  bar shows only in ALPHABETICAL — shuffle has no meaningful sections. */
     val deckOrdering: DeckOrdering = DeckOrdering.ALPHABETICAL,
+    /** Phonetic variants per word, from the same source the drill card's map uses
+     *  (WordDao.getPhoneticsByBook, issue #58); the row resolves the displayed
+     *  variant at render so list and card agree. */
+    val phonetics: Map<Long, WordPhonetics> = emptyMap(),
 )
 
 /** Book-level inputs of the header, nested so the outer combine stays within the
@@ -109,6 +114,12 @@ private data class BookHeaderInputs(
     val isReviewBook: Boolean,
     val completionCount: Int,
     val resumeWordId: Long?,
+)
+
+/** The list's two word-dependent inputs, nested for the same reason. */
+private data class WordListInputs(
+    val words: List<WordWithSenses>,
+    val phonetics: Map<Long, WordPhonetics>,
 )
 
 @HiltViewModel
@@ -151,8 +162,19 @@ class WordListViewModel @Inject constructor(
         }
     }
 
+    /** Phonetic variants per row word: loaded from the same query the drill card's
+     *  map uses (issue #58), re-run whenever the book's word rows change so words
+     *  added or removed on this screen resolve too; distinctUntilChanged drops the
+     *  re-runs that did not change the map (e.g. a sense edit). */
+    private val phoneticsFlow = wordDao.observeWordsWithSensesByBook(bookId)
+        .map { wordDao.getPhoneticsByBook(bookId).associateBy { it.wordId } }
+        .distinctUntilChanged()
+
     val uiState: StateFlow<WordListUiState> = combine(
-        wordDao.observeWordsWithSensesByBook(bookId),
+        combine(
+            wordDao.observeWordsWithSensesByBook(bookId),
+            phoneticsFlow,
+        ) { words, phonetics -> WordListInputs(words, phonetics) },
         // Book meta plus the live header inputs (issue #60) nested so the outer
         // combine stays within the five-flow overload.
         combine(
@@ -170,8 +192,8 @@ class WordListViewModel @Inject constructor(
         // sorting on its own, so the two surfaces show one order. The lookup is
         // de-duplicated: another book's publish must not re-deal this list.
         deckSequence.sequences.map { it[bookId] }.distinctUntilChanged(),
-    ) { words, headerInputs, searchQuery, dialog, dealtDeck ->
-        val ordered = WordOrdering.byDeckSequence(words, dealtDeck?.wordIds)
+    ) { listInputs, headerInputs, searchQuery, dialog, dealtDeck ->
+        val ordered = WordOrdering.byDeckSequence(listInputs.words, dealtDeck?.wordIds)
         WordListUiState(
             bookName = headerInputs.bookName,
             isPreset = headerInputs.isPreset,
@@ -184,6 +206,7 @@ class WordListViewModel @Inject constructor(
             resumePosition = if (ordered.isEmpty()) 0
             else WordOrdering.resumeIndex(headerInputs.resumeWordId, ordered) + 1,
             deckOrdering = dealtDeck?.ordering ?: DeckOrdering.ALPHABETICAL,
+            phonetics = listInputs.phonetics,
         )
     }.stateIn(
         scope = viewModelScope,

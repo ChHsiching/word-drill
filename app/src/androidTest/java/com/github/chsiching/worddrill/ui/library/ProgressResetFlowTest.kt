@@ -3,7 +3,6 @@ package com.github.chsiching.worddrill.ui.library
 import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.viewModelScope
@@ -102,11 +101,23 @@ class ProgressResetFlowTest {
         composeRule.waitForIdle()
     }
 
+    /** The progress line's 重置 label and the dialog's confirm button share the
+     *  exact text while the dialog is open. The dialog window registers after the
+     *  main window, so the confirm button is the SECOND match in collection order. */
+    private fun clickDialogResetConfirm() {
+        val matches = composeRule.onAllNodes(
+            androidx.compose.ui.test.hasText("重置", substring = false)
+        )
+        assertThat(matches.fetchSemanticsNodes().size).isEqualTo(2)
+        matches[1].performClick()
+        composeRule.waitForIdle()
+    }
+
     @Test
     fun resetAction_offeredForCustomBook() = runBlocking {
         seedBook(801_101L, "流程词书", isPreset = false, "apple")
         setContentFor(801_101L)
-        composeRule.onNodeWithContentDescription("重置进度").assertIsDisplayed()
+        composeRule.onNodeWithText("重置", substring = false).assertIsDisplayed()
         Unit
     }
 
@@ -114,7 +125,7 @@ class ProgressResetFlowTest {
     fun resetAction_offeredForPresetBook() = runBlocking {
         seedBook(801_102L, "CET-4", isPreset = true, "balance")
         setContentFor(801_102L)
-        composeRule.onNodeWithContentDescription("重置进度").assertIsDisplayed()
+        composeRule.onNodeWithText("重置", substring = false).assertIsDisplayed()
         Unit
     }
 
@@ -125,7 +136,7 @@ class ProgressResetFlowTest {
         seedBook(801_103L, "CET-4", isPreset = true, "circle")
         val reviewId = db.bookDao().insert(Book(bookId = 801_903L, name = REVIEW_BOOK_NAME, isPreset = true))
         setContentFor(reviewId)
-        composeRule.onNodeWithContentDescription("重置进度").assertDoesNotExist()
+        composeRule.onNodeWithText("重置", substring = false).assertDoesNotExist()
         Unit
     }
 
@@ -140,7 +151,7 @@ class ProgressResetFlowTest {
         settings.setResumeWordId(bookId, db.wordDao().findIdByText("circle")!!)
 
         setContentFor(bookId)
-        composeRule.onNodeWithContentDescription("重置进度").performClick()
+        composeRule.onNodeWithText("重置", substring = false).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("重置进度", substring = false).assertIsDisplayed()
         composeRule.onNodeWithText("确定重置「确认词书」的进度？将回到第一张卡片，跳过的单词全部回到牌组并从复习移除；刷卡记录和统计保留。")
@@ -151,10 +162,9 @@ class ProgressResetFlowTest {
         composeRule.waitForIdle()
         assertThat(db.bookDao().getSkipped(bookId, skipped)).isTrue()
 
-        composeRule.onNodeWithContentDescription("重置进度").performClick()
-        composeRule.waitForIdle()
         composeRule.onNodeWithText("重置", substring = false).performClick()
         composeRule.waitForIdle()
+        clickDialogResetConfirm()
 
         assertThat(db.bookDao().getSkipped(bookId, skipped)).isFalse()
         assertThat(db.wordDao().getWordsWithSensesByBook(reviewId)).isEmpty()
@@ -184,10 +194,9 @@ class ProgressResetFlowTest {
         val logsBefore = logDao.getAll()
 
         setContentFor(bookId)
-        composeRule.onNodeWithContentDescription("重置进度").performClick()
-        composeRule.waitForIdle()
         composeRule.onNodeWithText("重置", substring = false).performClick()
         composeRule.waitForIdle()
+        clickDialogResetConfirm()
         composeRule.waitUntil(10_000L) {
             runBlocking { settings.resumeWordId(bookId) == null }
         }

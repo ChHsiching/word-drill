@@ -1,6 +1,5 @@
 package com.github.chsiching.worddrill.ui.library
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,13 +9,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,7 +22,6 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,15 +49,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.chsiching.worddrill.R
+import com.github.chsiching.worddrill.data.local.WordPhonetics
 import com.github.chsiching.worddrill.data.local.WordWithSenses
 import com.github.chsiching.worddrill.data.settings.DeckOrdering
+import com.github.chsiching.worddrill.data.settings.PhoneticPreference
+import com.github.chsiching.worddrill.ui.theme.CharisSilFontFamily
 import com.github.chsiching.worddrill.ui.theme.DialogButton
 import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
 import com.github.chsiching.worddrill.ui.theme.DialogTextField
@@ -72,6 +74,8 @@ import kotlinx.coroutines.launch
 fun WordListScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    hidePhonetic: Boolean = false,
+    phoneticPreference: PhoneticPreference = PhoneticPreference.US,
     viewModel: WordListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -98,26 +102,13 @@ fun WordListScreen(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!readOnly) {
-                        IconButton(onClick = viewModel::openAddDialog) {
-                            Icon(
-                                imageVector = Icons.Filled.Add,
-                                contentDescription = stringResource(R.string.word_list_add),
-                                tint = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                    // Reset makes no sense for the review book: it holds no skipped
-                    // words of its own, so there is no progress to reset.
-                    if (!state.isReviewBook) {
-                        IconButton(onClick = viewModel::openResetDialog) {
-                            Icon(
-                                imageVector = Icons.Outlined.RestartAlt,
-                                contentDescription = stringResource(R.string.word_list_reset),
-                                tint = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
+                if (!readOnly) {
+                    IconButton(onClick = viewModel::openAddDialog) {
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = stringResource(R.string.word_list_add),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
                     }
                 }
             }
@@ -125,19 +116,39 @@ fun WordListScreen(
 
         // Progress header (issue #60): completion count, resume position, deck size.
         // Lives above the search bar — it describes the book, not the filtered view.
-        Text(
-            text = stringResource(
-                R.string.word_list_progress_header,
-                state.completionCount,
-                state.resumePosition,
-                state.deckSize,
-            ),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // Reset sits on this line (not the top bar): plain text beside the numbers
+        // it clears. Hidden for the review book — it holds no skipped words of its
+        // own, so there is no progress to reset.
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 24.dp, top = 2.dp, end = 24.dp, bottom = 8.dp),
-        )
+                .padding(start = 24.dp, top = 2.dp, end = 14.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(
+                    R.string.word_list_progress_header,
+                    state.completionCount,
+                    state.resumePosition,
+                    state.deckSize,
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            if (!state.isReviewBook) {
+                Text(
+                    text = stringResource(R.string.word_list_reset_label),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        // The padding keeps the tap target >= 44dp wide even where
+                        // the touch-target expansion is disabled (tests).
+                        .clickable(onClick = viewModel::openResetDialog)
+                        .padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
+                )
+            }
+        }
 
         SearchBar(
             onQueryChange = viewModel::onSearchInput,
@@ -161,11 +172,13 @@ fun WordListScreen(
                         // cannot cover the last entries when scrolled to the end.
                         contentPadding = PaddingValues(start = 24.dp, top = 8.dp, end = 12.dp, bottom = 120.dp),
                     ) {
-                        itemsIndexed(state.words, key = { _, wordWithSenses -> wordWithSenses.word.wordId }) { index, wordWithSenses ->
+                        items(state.words, key = { wordWithSenses -> wordWithSenses.word.wordId }) { wordWithSenses ->
                             WordRow(
                                 wordWithSenses = wordWithSenses,
+                                phonetic = state.phonetics[wordWithSenses.word.wordId],
+                                phoneticPreference = phoneticPreference,
+                                hidePhonetic = hidePhonetic,
                                 readOnly = readOnly,
-                                showSeparator = index > 0,
                                 onEditSense = { sense ->
                                     viewModel.openEditDialog(
                                         senseId = sense.senseId,
@@ -228,67 +241,84 @@ fun WordListScreen(
     }
 }
 
-/** Word entry in the book's list. The hairline separator sits BETWEEN rows (never
- *  after the last one), centered by the same 14 dp vertical padding the Me tab's
- *  setting rows use, so each entry reads as one even block instead of a divider
- *  glued to the text above with a blank strip below. */
+/** Word entry in the book's list (variant A, owner-approved): line 1 pairs the
+ *  word with its phonetic, resolved exactly like the drill card
+ *  (PhoneticPreference.resolve; the hide toggle outranks it). Below it every sense
+ *  renders as its own block — dictionary typesetting: the meaning wraps inside the
+ *  column that starts after its pos label, so continuation lines hang-indent to
+ *  the meaning's first character. Rhythm comes from whitespace alone — no
+ *  separators, row backgrounds or cards. */
 @Composable
 private fun WordRow(
     wordWithSenses: WordWithSenses,
+    phonetic: WordPhonetics?,
+    phoneticPreference: PhoneticPreference,
+    hidePhonetic: Boolean,
     readOnly: Boolean,
-    showSeparator: Boolean,
     onEditSense: (com.github.chsiching.worddrill.data.local.entity.Sense) -> Unit,
     onDeleteWord: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        if (showSeparator) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MaterialTheme.wordDrillColors.separator),
-            )
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 14.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Text(
-                text = wordWithSenses.word.text,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.width(80.dp),
-            )
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, bottom = 14.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text(
+                    text = wordWithSenses.word.text,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.alignByBaseline(),
+                )
+                val displayPhonetic =
+                    phoneticPreference.resolve(phonetic?.phoneticUk, phonetic?.phoneticUs)
+                if (displayPhonetic != null && !hidePhonetic) {
+                    Text(
+                        text = displayPhonetic,
+                        fontFamily = CharisSilFontFamily,
+                        fontSize = 12.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.alignByBaseline(),
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.padding(top = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 wordWithSenses.senses.forEach { sense ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val editModifier = if (readOnly) Modifier
+                    else Modifier.clickable { onEditSense(sense) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
                             text = sense.pos,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                            fontSize = 13.sp,
+                            fontStyle = FontStyle.Italic,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = if (readOnly) Modifier else Modifier.clickable { onEditSense(sense) },
+                            modifier = Modifier.then(editModifier),
                         )
                         Text(
                             text = sense.meaning,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = if (readOnly) Modifier else Modifier.clickable { onEditSense(sense) },
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .weight(1f)
+                                .then(editModifier),
                         )
                     }
                 }
             }
-            if (!readOnly) {
-                IconButton(onClick = onDeleteWord, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        imageVector = Icons.Outlined.Delete,
-                        contentDescription = stringResource(R.string.word_list_delete),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+        }
+        if (!readOnly) {
+            IconButton(onClick = onDeleteWord, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = stringResource(R.string.word_list_delete),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

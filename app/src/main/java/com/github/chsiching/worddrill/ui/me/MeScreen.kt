@@ -875,17 +875,34 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-            // Word-count provenance note; same typography as the dialog's message.
-            Text(
-                text = stringResource(R.string.me_about_word_source),
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                lineHeight = (13 * 1.5).sp,
+            // Structured label/value facts (owner direction: no prose blobs), left
+            // aligned while the title and version stay centered. The count value's
+            // lines are broken manually in the string resource.
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
-            )
+                    .padding(top = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                AboutFact(
+                    label = stringResource(R.string.me_about_fact_source_label),
+                    lines = listOf(stringResource(R.string.me_about_fact_source_value)),
+                )
+                AboutFact(
+                    label = stringResource(R.string.me_about_fact_form_label),
+                    lines = listOf(stringResource(R.string.me_about_fact_form_value)),
+                )
+                AboutFact(
+                    label = stringResource(R.string.me_about_fact_count_label),
+                    // Manually broken short lines (owner direction): each line is
+                    // its own Text so no line can auto-wrap into an orphan.
+                    lines = listOf(
+                        stringResource(R.string.me_about_fact_count_line1),
+                        stringResource(R.string.me_about_fact_count_line2),
+                        stringResource(R.string.me_about_fact_count_line3),
+                    ),
+                )
+            }
         },
         buttons = {
             DialogButton(
@@ -895,4 +912,27 @@ private fun AboutDialog(onDismiss: () -> Unit) {
             )
         },
     )
+}
+
+/** One label/value pair of the About dialog's facts block; the value is one or
+ *  more manually broken lines, each its own Text. */
+@Composable
+private fun AboutFact(label: String, lines: List<String>) {
+    Column {
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            letterSpacing = 0.5.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        lines.forEachIndexed { index, line ->
+            Text(
+                text = line,
+                fontSize = 13.sp,
+                lineHeight = (13 * 1.55).sp,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = if (index == 0) Modifier.padding(top = 3.dp) else Modifier,
+            )
+        }
+    }
 }

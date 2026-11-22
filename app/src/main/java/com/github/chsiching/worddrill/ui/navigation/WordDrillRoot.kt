@@ -133,7 +133,11 @@ fun WordDrillRoot(modifier: Modifier = Modifier) {
                 route = WORD_LIST_ROUTE,
                 arguments = listOf(navArgument("bookId") { type = NavType.StringType }),
             ) {
-                WordListScreen(onBack = { navController.popBackStack() })
+                WordListScreen(
+                    onBack = { navController.popBackStack() },
+                    hidePhonetic = hidePhonetic,
+                    phoneticPreference = phoneticPreference,
+                )
             }
             composable(TopDestination.Me.route) {
                 MeScreen(onNavigateToRecycleBin = { navController.navigate(RECYCLE_BIN_ROUTE) })
