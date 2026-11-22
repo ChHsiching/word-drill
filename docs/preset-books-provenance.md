@@ -34,8 +34,9 @@ Extraction (`tools/extract_cet_syllabus.py`, requires PyMuPDF): the 词表 spans
 PDF pages 21–149 as family rows in up to four columns — column 1 holds the
 词目 (the counted syllabus headword), later columns hold derivatives aligned on
 the same baseline. Band-6 words carry a ★ in a separate span. The extractor
-takes only column-1 cells; derivatives are display material, not counted
-词目, and are excluded from the books.
+takes only column-1 cells for 词目; derivatives are display material, not
+counted 词目, and are excluded from the books — with one exception, the
+full-word second spellings of variant pairs (see below).
 
 Printed forms are canonicalized: `X/-yyy` variant spellings keep the primary
 form (`center/-tre` → `center`), parenthesized optional letters are dropped
@@ -55,14 +56,44 @@ Counts and known discrepancies:
   they are merged once. Four of them carry mixed star flags (`appropriate`,
   `converse`, `invalid`, `staple`); starred wins, so they sit in the band-6
   additions only.
-- Final: CET-4 = 4,035 distinct unstarred headwords; CET-6 = 5,298 distinct
+- Final: CET-4 = 4,070 distinct unstarred headwords; CET-6 = 5,341 distinct
   (the full 4+6 list — the CET-6 book is the cumulative band-6 load, as it
-  has always been). The ≈4,155 figure from the spec equals the printed claim
-  (5,418 − 1,263); the 120-word gap to 4,035 is exactly the 41 untypeset rows
-  plus the 79 duplicate merges.
+  has always been), both including the variant seconds below. Against the
+  printed 5,418 claim the −77 residual is the 41 untypeset rows plus the 79
+  duplicate merges, offset by the +43 variant seconds.
 - Odd entries verified against the rendered page: `advisor/-er` and
   `sober/-re` really print that way (the latter's variant is meaningless in
   English; the primary `sober` is kept). `Celsius/-cius` likewise.
+
+### Variant second spellings (owner decision, 2026-11-22)
+
+The syllabus prints spelling-variant pairs side by side (`anybody/anyone`,
+`check/cheque`, `advertisement/ad`) in the headword and derivative columns
+alike. The primary form is the counted 词目; per the owner's decision —
+"a word not collected is a word not learned" — the second spelling is now
+also emitted as a headword whenever it is a full word. Scope and rules:
+
+- Every printed `X/yyy` pair contributes its second form, whichever column
+  it prints in. Case-only repeats (`Internet/internet`, `Biblical/biblical`)
+  and suffix abbreviations (`advise/Ｇer`, i.e. advis-er) are the same word
+  and stay excluded. Case is kept as printed (`BBQ`, `TV`, `ad`; `apt.` →
+  `apt`), and the ★ band is inherited from the row.
+- 51 seconds qualify; 8 of them (`aesthetic`, `apt`, `despatch`, `enquire`,
+  `ensure`, `gaol`, `petrol`, `tire`) are already listed as their own rows
+  and merge — the syllabus itself double-lists them. That yields +43 new
+  headwords: CET-6 5,298 → 5,341, CET-4 4,035 → 4,070 (the unstarred 36 of
+  the 43; `despatch` moves to band-6 because the starred `dispatch/despatch`
+  row now contributes its ★ under the existing any-starred-wins merge).
+  Band-6 additions: 1,263 → 1,271 (7 starred seconds — `aesthetics`,
+  `manoeuvre`, `sceptic`, `sceptical`, `scepticism`, `speciality`,
+  `sulphur` — plus the `despatch` promotion).
+- The 4 abbreviation pairs (`ad`, `apt`, `BBQ`, `TV`) are included under the
+  same decision.
+- Two rows typeset a derivative close enough to the headword that the cell
+  splitter merged them (`esthetic/aesthetic` + `esthetics/aesthetics` on
+  p63, `refrigerator/fridge` + `refrigeration` on p114); a tighter
+  piece-level split (`split_pieces`) now separates them so the headword and
+  its variant pair parse cleanly.
 
 ## 考研
 
