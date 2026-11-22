@@ -352,9 +352,26 @@ class MeScreenTest {
         composeRule.onNodeWithText("关于 WordDrill").assertIsDisplayed()
         composeRule.onNodeWithText("WordDrill", substring = false).assertIsDisplayed()
         composeRule.onNodeWithText("版本 0.2.1").assertIsDisplayed()
-        // Word-count provenance note (owner fix): explains why the deck is smaller
-        // than the official syllabus word count.
-        composeRule.onNodeWithText("词表来自教育部考试中心", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun aboutDialog_showsStructuredFacts_notProseParagraph() {
+        renderWithVm(vm())
+        composeRule.onNodeWithText("关于", substring = false).performScrollTo()
+        composeRule.onNodeWithText("关于", substring = false).performClick()
+        composeRule.waitForIdle()
+        // Three label/value fact pairs replace the old provenance paragraph.
+        composeRule.onNodeWithText("词表来源", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("教育部 2016 版四六级考试大纲", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("词形说明", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("同一单词的不同拼写均已收录", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("词数说明", substring = false).assertIsDisplayed()
+        // The count value is manually broken into three short lines, each its own
+        // Text node.
+        composeRule.onNodeWithText("官方词表对拼写相同的词分行统计", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("本应用每种拼写仅保留一个词条", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("收录词汇与考试大纲完全一致", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("词表来自教育部考试中心", substring = true).assertDoesNotExist()
     }
 
     @Test
