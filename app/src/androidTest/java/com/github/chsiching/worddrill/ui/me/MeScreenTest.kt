@@ -352,6 +352,9 @@ class MeScreenTest {
         composeRule.onNodeWithText("关于 WordDrill").assertIsDisplayed()
         composeRule.onNodeWithText("WordDrill", substring = false).assertIsDisplayed()
         composeRule.onNodeWithText("版本 0.2.1").assertIsDisplayed()
+        // Word-count provenance note (owner fix): explains why the deck is smaller
+        // than the official syllabus word count.
+        composeRule.onNodeWithText("词表来自教育部考试中心", substring = true).assertIsDisplayed()
     }
 
     @Test
