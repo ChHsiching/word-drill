@@ -350,7 +350,6 @@ class MeScreenTest {
         composeRule.onNodeWithText("关于", substring = false).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("关于 WordDrill").assertIsDisplayed()
-        composeRule.onNodeWithText("WordDrill", substring = false).assertIsDisplayed()
         composeRule.onNodeWithText("版本 0.2.1").assertIsDisplayed()
     }
 

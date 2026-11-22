@@ -67,7 +67,6 @@
     <string name="me_theme_system">跟随系统</string>
     <string name="me_about">关于</string>
     <string name="me_about_title">关于 WordDrill</string>
-    <string name="me_about_app_name">WordDrill</string>
     <string name="me_about_version">版本 %1$s</string>
     <string name="me_about_fact_source_label">词表来源</string>
     <string name="me_about_fact_source_value">教育部 2016 版四六级考试大纲</string>

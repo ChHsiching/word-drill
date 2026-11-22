@@ -866,7 +866,6 @@ private fun AboutDialog(onDismiss: () -> Unit) {
     WordDrillDialog(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.me_about_title),
-        message = stringResource(R.string.me_about_app_name),
         content = {
             Text(
                 text = stringResource(R.string.me_about_version, BuildConfig.VERSION_NAME),
@@ -875,33 +874,42 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-            // Structured label/value facts (owner direction: no prose blobs), left
-            // aligned while the title and version stay centered. The count value's
-            // lines are broken manually in the string resource.
-            Column(
+            // Structured label/value facts (owner direction: no prose blobs). The
+            // facts sit in the app's group-card container so the left-aligned
+            // block reads as one deliberate inset; the count value's lines are
+            // broken manually in the string resource.
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(top = 14.dp)
+                    .background(
+                        MaterialTheme.wordDrillColors.chipBg,
+                        RoundedCornerShape(14.dp),
+                    )
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
             ) {
-                AboutFact(
-                    label = stringResource(R.string.me_about_fact_source_label),
-                    lines = listOf(stringResource(R.string.me_about_fact_source_value)),
-                )
-                AboutFact(
-                    label = stringResource(R.string.me_about_fact_form_label),
-                    lines = listOf(stringResource(R.string.me_about_fact_form_value)),
-                )
-                AboutFact(
-                    label = stringResource(R.string.me_about_fact_count_label),
-                    // Manually broken short lines (owner direction): each line is
-                    // its own Text so no line can auto-wrap into an orphan.
-                    lines = listOf(
-                        stringResource(R.string.me_about_fact_count_line1),
-                        stringResource(R.string.me_about_fact_count_line2),
-                        stringResource(R.string.me_about_fact_count_line3),
-                    ),
-                )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    AboutFact(
+                        label = stringResource(R.string.me_about_fact_source_label),
+                        lines = listOf(stringResource(R.string.me_about_fact_source_value)),
+                    )
+                    AboutFact(
+                        label = stringResource(R.string.me_about_fact_form_label),
+                        lines = listOf(stringResource(R.string.me_about_fact_form_value)),
+                    )
+                    AboutFact(
+                        label = stringResource(R.string.me_about_fact_count_label),
+                        // Manually broken short lines (owner direction): each line is
+                        // its own Text so no line can auto-wrap into an orphan.
+                        lines = listOf(
+                            stringResource(R.string.me_about_fact_count_line1),
+                            stringResource(R.string.me_about_fact_count_line2),
+                            stringResource(R.string.me_about_fact_count_line3),
+                        ),
+                    )
+                }
             }
         },
         buttons = {
