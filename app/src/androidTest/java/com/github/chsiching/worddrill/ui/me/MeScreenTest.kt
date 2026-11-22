@@ -279,13 +279,13 @@ class MeScreenTest {
         renderWithVm(vm())
         composeRule.onNodeWithText("单词顺序").performScrollTo().assertIsDisplayed()
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithText("按字母", substring = false).fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("字母顺序", substring = false).fetchSemanticsNodes().isNotEmpty()
         }
 
         // Tapping cycles to shuffled and persists the global setting (ADR 0002).
         composeRule.onNodeWithText("单词顺序").performClick()
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithText("乱序", substring = false).fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("随机顺序", substring = false).fetchSemanticsNodes().isNotEmpty()
         }
         assertThat(runBlocking { settings.deckOrdering.first() }).isEqualTo(DeckOrdering.SHUFFLED)
         Unit
@@ -303,7 +303,7 @@ class MeScreenTest {
         // Tapping cycles US -> BOTH -> UK and persists the global setting (issue #58).
         composeRule.onNodeWithText("音标偏好").performClick()
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithText("双语", substring = false).fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("英美", substring = false).fetchSemanticsNodes().isNotEmpty()
         }
         assertThat(runBlocking { settings.phoneticPreference.first() })
             .isEqualTo(PhoneticPreference.BOTH)
