@@ -15,7 +15,14 @@ import os
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from extract_cet_syllabus import cluster_rows, split_cells, canonicalize  # noqa: E402
+from extract_cet_syllabus import (  # noqa: E402
+    cluster_rows,
+    split_cells,
+    split_pieces,
+    canonicalize,
+    variant_second,
+    extract_entries,
+)
 
 
 # A span is (x0, x1, y, font, text); fonts match the real PDF: E-B4 words,
@@ -122,6 +129,135 @@ class TestCanonicalize:
 
     def test_accents_kept(self):
         assert canonicalize("résumé") == "résumé"
+
+
+class FakePage:
+    """Minimal page stand-in for collect_spans (rawdict shape)."""
+
+    def __init__(self, spans):
+        self._spans = spans
+
+    def get_text(self, _mode):
+        spans = []
+        for x0, x1, y, font, text in self._spans:
+            spans.append({
+                "size": 9.7,
+                "font": font,
+                "chars": [{"c": c} for c in text],
+                "bbox": (x0, y, x1, y),
+            })
+        return {"blocks": [{"lines": [{"spans": spans}]}]}
+
+
+class TestSplitPieces:
+    def test_variant_pieces_stay_one_piece(self):
+        spans = [
+            (81, 91, 72.9, WORD, "a"),
+            (85, 90, 72.9, PUNCT, "/"),
+            (91, 101, 72.9, WORD, "an"),
+        ]
+        assert split_pieces(spans) == ["a/an"]
+
+    def test_glued_column_mate_starts_new_piece(self):
+        # Real geometry (p63): the "esthetic/aesthetic" headword with the
+        # derivative pair "esthetics/aesthetics" typeset 3.7pt after it — too
+        # close for split_cells' column gap, separate typeset pieces.
+        spans = [
+            (81.27, 120.67, 172.11, WORD, "esthetic"),
+            (115.62, 125.33, 171.09, PUNCT, "/"),
+            (120.86, 165.01, 172.11, WORD, "aesthetic"),
+            (168.70, 212.56, 172.11, WORD, "esthetics"),
+            (207.32, 217.02, 171.09, PUNCT, "/"),
+            (212.56, 261.17, 172.11, WORD, "aesthetics"),
+        ]
+        assert split_pieces(spans) == ["esthetic/aesthetic", "esthetics/aesthetics"]
+
+    def test_plain_word(self):
+        assert split_pieces([(81, 95, 72.9, WORD, "abandon")]) == ["abandon"]
+
+
+class TestVariantSecond:
+    def test_full_word_second_returned(self):
+        assert variant_second("anybody/anyone") == "anyone"
+        assert variant_second("bicycle/bike") == "bike"
+        assert variant_second("a/an") == "an"
+        assert variant_second("math(ematics)/maths") == "maths"
+        assert variant_second("kilogram(me)/kilo") == "kilo"
+
+    def test_trailing_fullwidth_period_stripped(self):
+        assert variant_second("apartment/apt．") == "apt"
+
+    def test_case_kept_as_printed(self):
+        assert variant_second("barbecue/BBQ") == "BBQ"
+        assert variant_second("television/TV") == "TV"
+
+    def test_suffix_abbreviation_excluded(self):
+        # The hyphen glyph (fullwidth G) prefixes abbreviated suffixes:
+        # advise/Ｇer is advis-er, not a separate word.
+        assert variant_second("analyze/Ｇyse") is None
+        assert variant_second("center/Ｇtre") is None
+        assert variant_second("advise/Ｇer") is None
+
+    def test_case_only_pair_excluded(self):
+        # Same word, different capitalization — not a separate headword.
+        assert variant_second("Internet/internet") is None
+        assert variant_second("Biblical/biblical") is None
+
+    def test_no_variant(self):
+        assert variant_second("abandon") is None
+
+
+class TestExtractEntries:
+    def test_full_word_second_emitted_with_row_band(self):
+        page = FakePage([
+            (81, 130, 100.0, WORD, "anybody"),
+            (132, 137, 100.0, PUNCT, "/"),
+            (138, 175, 100.0, WORD, "anyone"),
+        ])
+        assert extract_entries([page]) == [("anybody", False), ("anyone", False)]
+
+    def test_second_inherits_star(self):
+        page = FakePage([
+            (69.63, 79.33, 101.41, STAR, "★"),
+            (81.27, 140.07, 102.11, WORD, "skeptical"),
+            (141.0, 146.0, 101.09, PUNCT, "/"),
+            (147.0, 200.0, 102.11, WORD, "sceptical"),
+        ])
+        assert extract_entries([page]) == [("skeptical", True), ("sceptical", True)]
+
+    def test_derivative_cell_pair_emitted(self):
+        # Variant pairs also print in derivative columns (inquiry/enquiry).
+        page = FakePage([
+            (81, 120, 200.0, WORD, "inquire"),
+            (169, 210, 200.0, WORD, "inquiry"),
+            (211, 216, 200.0, PUNCT, "/"),
+            (217, 260, 200.0, WORD, "enquiry"),
+        ])
+        assert extract_entries([page]) == [("inquire", False), ("enquiry", False)]
+
+    def test_case_only_and_suffix_not_emitted(self):
+        page = FakePage([
+            (81, 130, 300.0, WORD, "Internet"),
+            (131, 136, 300.0, PUNCT, "/"),
+            (137, 170, 300.0, WORD, "internet"),
+        ])
+        assert extract_entries([page]) == [("Internet", False)]
+
+    def test_glued_derivative_pair_emitted(self):
+        # Real geometry (p63): starred esthetic row with the derivative pair
+        # glued into the headword cell — both seconds inherit the star.
+        page = FakePage([
+            (69.63, 79.33, 171.41, STAR, "★"),
+            (81.27, 120.67, 172.11, WORD, "esthetic"),
+            (115.62, 125.33, 171.09, PUNCT, "/"),
+            (120.86, 165.01, 172.11, WORD, "aesthetic"),
+            (168.70, 212.56, 172.11, WORD, "esthetics"),
+            (207.32, 217.02, 171.09, PUNCT, "/"),
+            (212.56, 261.17, 172.11, WORD, "aesthetics"),
+        ])
+        assert extract_entries([page]) == [
+            ("esthetic", True), ("aesthetic", True), ("aesthetics", True),
+        ]
 
 
 if __name__ == "__main__":

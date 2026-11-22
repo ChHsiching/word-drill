@@ -1,4 +1,5 @@
 a
+an
 abandon
 abbreviation
 abide
@@ -66,6 +67,7 @@ adjacent
 adjective
 adjust
 administer
+administrate
 admire
 admit
 adolescent
@@ -80,6 +82,7 @@ adverb
 adversary
 adverse
 advertise
+ad
 advice
 advise
 advocate
@@ -124,6 +127,7 @@ air-conditioning
 aircraft
 airline
 airplane
+aeroplane
 airport
 aisle
 akin
@@ -219,12 +223,14 @@ antonym
 anxious
 any
 anybody
+anyone
 anyhow
 anything
 anyway
 anywhere
 apart
 apartment
+apt
 ape
 apology
 app
@@ -250,7 +256,6 @@ approve
 approximate
 April
 apron
-apt
 aptitude
 arbitrary
 arbitrate
@@ -411,6 +416,7 @@ banner
 banquet
 bar
 barbecue
+BBQ
 barber
 bare
 bargain
@@ -502,6 +508,7 @@ bias
 Bible
 bibliography
 bicycle
+bike
 bid
 big
 bilateral
@@ -806,6 +813,7 @@ certify
 chain
 chair
 chairman
+chairperson
 chalk
 challenge
 chamber
@@ -830,6 +838,7 @@ chat
 cheap
 cheat
 check
+cheque
 cheek
 cheer
 cheese
@@ -1347,6 +1356,7 @@ demand
 democracy
 demographic
 demonstrate
+demo
 denote
 denounce
 dense
@@ -1475,6 +1485,7 @@ disgust
 dish
 disintegrate
 disk
+disc
 dislike
 dismantle
 dismay
@@ -1534,6 +1545,7 @@ donkey
 doom
 door
 dormitory
+dorm
 dose
 dot
 double
@@ -1752,6 +1764,7 @@ establish
 estate
 esteem
 esthetic
+aesthetics
 estimate
 eternal
 ethic
@@ -2103,6 +2116,7 @@ garlic
 garment
 gas
 gasoline
+petrol
 gasp
 gate
 gather
@@ -2191,6 +2205,7 @@ grave
 gravitation
 gravity
 gray
+grey
 graze
 grease
 great
@@ -2238,6 +2253,7 @@ hall
 halt
 ham
 hamburger
+burger
 hammer
 hamper
 hand
@@ -2316,6 +2332,7 @@ here
 hereby
 heritage
 hero
+heroine
 heroin
 hers
 herself
@@ -2356,6 +2373,7 @@ homeland
 homework
 homogeneous
 homosexual
+homo
 honest
 honey
 honeymoon
@@ -2509,6 +2527,7 @@ inflate
 inflict
 influence
 influenza
+flu
 inform
 infrastructure
 infringe
@@ -2532,6 +2551,7 @@ innovate
 innumerable
 input
 inquire
+enquiry
 insane
 insect
 insert
@@ -2678,6 +2698,7 @@ kidnap
 kidney
 kill
 kilogram
+kilo
 kilometer
 kin
 kind
@@ -2701,6 +2722,7 @@ knowhow
 label
 labor
 laboratory
+lab
 lace
 lack
 lad
@@ -2713,6 +2735,7 @@ lame
 lamp
 land
 landlord
+landlady
 landmark
 landscape
 lane
@@ -2901,6 +2924,7 @@ man
 manage
 mandate
 maneuver
+manoeuvre
 manifest
 manipulate
 mankind
@@ -2940,6 +2964,7 @@ mate
 material
 maternal
 math
+maths
 matter
 mature
 maximum
@@ -2973,6 +2998,7 @@ melon
 melt
 member
 memorandum
+memo
 memorial
 memory
 menace
@@ -3264,6 +3290,7 @@ official
 offset
 offspring
 often
+oftentimes
 oil
 okay
 old
@@ -3511,7 +3538,6 @@ pesticide
 pet
 petition
 petrochemical
-petrol
 petroleum
 petty
 pharmacy
@@ -3576,6 +3602,7 @@ plenty
 plight
 plot
 plough
+plow
 plug
 plumber
 plumbing
@@ -3683,6 +3710,7 @@ primary
 prime
 primitive
 prince
+princess
 principal
 principle
 print
@@ -3803,6 +3831,7 @@ rage
 raid
 rail
 railway
+railroad
 rain
 rainbow
 raincoat
@@ -3875,6 +3904,7 @@ refrain
 refresh
 refreshment
 refrigerator
+fridge
 refuge
 refund
 refuse
@@ -4281,6 +4311,9 @@ size
 skate
 skeleton
 skeptical
+sceptical
+sceptic
+scepticism
 sketch
 ski
 skill
@@ -4391,6 +4424,7 @@ sovereign
 sow
 space
 spaceship
+spacecraft
 spade
 spaghetti
 span
@@ -4401,6 +4435,7 @@ speak
 spear
 special
 specialty
+speciality
 species
 specific
 specify
@@ -4428,12 +4463,14 @@ splendid
 split
 spoil
 spokesman
+spokeswoman
 sponge
 sponsor
 spontaneous
 spoon
 sport
 sportsman
+sportswoman
 spot
 spotlight
 spouse
@@ -4592,6 +4629,7 @@ suit
 suitcase
 suite
 sulfur
+sulphur
 sum
 summary
 summer
@@ -4701,13 +4739,16 @@ tease
 technical
 technique
 technology
+tech
 tedious
 teen
 teenager
 telecommunications
 telephone
+phone
 telescope
 television
+TV
 tell
 teller
 temper
@@ -5120,6 +5161,7 @@ wage
 wagon
 waist
 wait
+waitress
 waive
 wake
 walk
@@ -5191,6 +5233,7 @@ whereby
 whether
 which
 while
+whilst
 whip
 whirl
 whisky

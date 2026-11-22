@@ -16,6 +16,14 @@ The PDF prints its own totals (5,418 headwords / 2,551 derivatives) at the end
 of the list; the typeset rows actually present are fewer. This script takes
 the typeset content as ground truth and reports both counts.
 
+Spelling-variant pairs ("anybody/anyone") print in the headword and derivative
+columns alike. The primary form is the counted 词目; per the owner's decision
+(2026-11-22, "a word not collected is a word not learned") a second spelling
+that is a full word is also emitted as a headword, inheriting the row's band
+(★ → band-6). Case-only repeats ("Internet/internet") and suffix
+abbreviations ("advise/Ｇer", i.e. advis-er) are the same word and stay
+excluded.
+
 Output: tools/data/cet4_2016.txt (band-4 headwords) and
 tools/data/cet6_2016.txt (all headwords, the cumulative band-6 load — the
 CET-6 book has always been the full 4+6 list). Duplicated headword texts
@@ -41,6 +49,10 @@ ROW_TOL = 5.0
 # Spans closer than this belong to the same cell (variant pieces overlap or
 # nearly touch); columns are ~10pt+ apart.
 CELL_GAP = 8.0
+# Spans of one typeset word-form overlap or sit within ~1.5pt of each other;
+# a column-mate glued into the cell by typesetting starts >= ~3.7pt away
+# (measured across the whole list). Between the two, pieces split here.
+PIECE_GAP = 2.5
 
 FIRST_PAGE = 21   # 1-based, inclusive
 LAST_PAGE = 149   # 1-based, inclusive
@@ -84,6 +96,21 @@ def split_cells(spans):
     return cells
 
 
+def split_pieces(spans):
+    """Split one cell's spans into typeset word-form pieces (see PIECE_GAP).
+
+    Normally a cell holds one form; occasionally a derivative is typeset so
+    close to the headword that split_cells merges them into one cell.
+    """
+    pieces = []
+    for span in sorted(spans, key=lambda s: s[0]):
+        if not pieces or span[0] >= pieces[-1][-1][1] + PIECE_GAP:
+            pieces.append([span])
+        else:
+            pieces[-1].append(span)
+    return ["".join(s[4] for s in piece) for piece in pieces]
+
+
 def canonicalize(text):
     """Reduce a printed headword to the drilled word form."""
     cleaned = text.translate(CHARMAP).strip()
@@ -93,6 +120,26 @@ def canonicalize(text):
     cleaned = re.sub(r"\([^)]*\)", "", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned
+
+
+def variant_second(piece):
+    """Full-word second spelling of a printed "X/yyy" variant pair, or None.
+
+    None when the second form is absent, a suffix abbreviation (advise/Ｇer,
+    i.e. advis-er) or a case-only repeat (Internet/internet) — the same word,
+    not a separate headword. Case is kept as printed (BBQ, TV).
+    """
+    first, _, second = piece.partition("/")
+    second = second.translate(CHARMAP)
+    second = re.sub(r"\([^)]*\)", "", second)
+    second = re.sub(r"\s+", " ", second).strip().rstrip(".").strip()
+    if not second or second.startswith("-"):
+        return None
+    if not ALLOWED.match(second):
+        raise ValueError(f"unparsed variant second: {piece!r} -> {second!r}")
+    if second.lower() == canonicalize(first).lower():
+        return None
+    return second
 
 
 def collect_spans(page):
@@ -109,14 +156,18 @@ def collect_spans(page):
     return spans
 
 
-def extract(pdf_path):
-    """Return the headwords in print order as a list of (word, starred)."""
-    doc = pymupdf.open(pdf_path)
+def extract_entries(pages):
+    """Collect (word, starred) entries from word-list pages: each row's
+    headword plus the full-word second spellings of every variant pair the
+    row prints (headword or derivative column), all inheriting the row's ★.
+    """
     entries = []
-    for pno in range(FIRST_PAGE - 1, min(LAST_PAGE, doc.page_count)):
-        for spans in cluster_rows(collect_spans(doc[pno])):
+    for page in pages:
+        for spans in cluster_rows(collect_spans(page)):
             cells = split_cells(spans)
-            head = "".join(s[4] for s in cells[0] if s[3] != STAR_FONT)
+            cell0 = [s for s in cells[0] if s[3] != STAR_FONT]
+            pieces = split_pieces(cell0)
+            head = pieces[0] if pieces else ""
             if FULLWIDTH_DIGITS.match(head):
                 continue  # the totals printed after the last entry
             starred = any(s[3] == STAR_FONT for s in cells[0])
@@ -124,7 +175,20 @@ def extract(pdf_path):
             if not ALLOWED.match(word):
                 raise ValueError(f"unparsed headword form: {head!r} -> {word!r}")
             entries.append((word, starred))
+            for cell in cells:
+                for piece in split_pieces(s for s in cell if s[3] != STAR_FONT):
+                    if "/" in piece:
+                        second = variant_second(piece)
+                        if second is not None:
+                            entries.append((second, starred))
     return entries
+
+
+def extract(pdf_path):
+    """Return the headwords in print order as a list of (word, starred)."""
+    doc = pymupdf.open(pdf_path)
+    pages = [doc[pno] for pno in range(FIRST_PAGE - 1, min(LAST_PAGE, doc.page_count))]
+    return extract_entries(pages)
 
 
 def main():
@@ -152,7 +216,7 @@ def main():
             f.write("\n".join(words) + "\n")
         print(f"wrote {path} ({len(words)} words)")
 
-    print(f"headword rows: {len(entries)} (PDF claims 5,418)")
+    print(f"headword entries incl. variant seconds: {len(entries)} (PDF claims 5,418)")
     print(f"distinct headwords: {len(merged)}")
     print(f"band-6 (starred) additions: {sum(1 for s in merged.values() if s)}")
 

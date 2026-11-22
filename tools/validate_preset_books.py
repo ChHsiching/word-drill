@@ -26,8 +26,8 @@ WORDS_JSON = os.path.join(REPO_ROOT, "app", "src", "main", "assets", "words.json
 
 # book name -> (reference file, official printed syllabus size, size note)
 BOOKS = {
-    "CET-4": ("cet4_2016.txt", 4155, "2016 syllabus band-4 headwords, printed claim 5,418 - 1,263 starred"),
-    "CET-6": ("cet6_2016.txt", 5418, "2016 syllabus printed headword total"),
+    "CET-4": ("cet4_2016.txt", 4155, "2016 syllabus band-4 headwords incl. variant seconds, printed claim 5,418 - 1,263 starred"),
+    "CET-6": ("cet6_2016.txt", 5418, "2016 syllabus headwords incl. variant seconds, printed total 5,418"),
     "考研英语": ("kaoyan.txt", 5500, "考研大纲 printed vocabulary size (约5,500)"),
 }
 

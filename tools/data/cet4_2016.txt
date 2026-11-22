@@ -1,4 +1,5 @@
 a
+an
 abandon
 able
 aboard
@@ -53,6 +54,7 @@ adequate
 adjective
 adjust
 administer
+administrate
 admire
 admit
 adopt
@@ -62,6 +64,7 @@ advantage
 adventure
 adverb
 advertise
+ad
 advice
 advise
 advocate
@@ -93,6 +96,7 @@ air-conditioning
 aircraft
 airline
 airplane
+aeroplane
 airport
 aisle
 alarm
@@ -157,6 +161,7 @@ antique
 anxious
 any
 anybody
+anyone
 anyhow
 anything
 anyway
@@ -301,6 +306,7 @@ banner
 banquet
 bar
 barbecue
+BBQ
 barber
 bare
 bargain
@@ -374,6 +380,7 @@ beyond
 bias
 Bible
 bicycle
+bike
 bid
 big
 bill
@@ -616,6 +623,7 @@ certificate
 chain
 chair
 chairman
+chairperson
 chalk
 challenge
 champagne
@@ -636,6 +644,7 @@ chat
 cheap
 cheat
 check
+cheque
 cheek
 cheer
 cheese
@@ -1021,6 +1030,7 @@ deliver
 demand
 democracy
 demonstrate
+demo
 dense
 dent
 dental
@@ -1044,7 +1054,6 @@ desire
 desk
 desktop
 despair
-despatch
 despite
 dessert
 destination
@@ -1112,6 +1121,7 @@ disgust
 dish
 disintegrate
 disk
+disc
 dislike
 dismiss
 disorder
@@ -1149,6 +1159,7 @@ donkey
 doom
 door
 dormitory
+dorm
 dose
 dot
 double
@@ -1591,6 +1602,7 @@ garden
 garment
 gas
 gasoline
+petrol
 gate
 gather
 gay
@@ -1665,6 +1677,7 @@ grave
 gravitation
 gravity
 gray
+grey
 great
 green
 greenhouse
@@ -1703,6 +1716,7 @@ hall
 halt
 ham
 hamburger
+burger
 hammer
 hand
 handbook
@@ -1767,6 +1781,7 @@ here
 hereby
 heritage
 hero
+heroine
 hers
 herself
 hesitate
@@ -1797,6 +1812,7 @@ home
 homeland
 homework
 homosexual
+homo
 honest
 honey
 honeymoon
@@ -1901,6 +1917,7 @@ infinite
 inflate
 influence
 influenza
+flu
 inform
 infrastructure
 ingredient
@@ -1917,6 +1934,7 @@ innocent
 innovate
 input
 inquire
+enquiry
 insane
 insect
 insert
@@ -2028,6 +2046,7 @@ kick
 kid
 kill
 kilogram
+kilo
 kilometer
 kin
 kind
@@ -2049,6 +2068,7 @@ knowhow
 label
 labor
 laboratory
+lab
 lace
 lack
 ladder
@@ -2060,6 +2080,7 @@ lame
 lamp
 land
 landlord
+landlady
 landscape
 lane
 language
@@ -2229,6 +2250,7 @@ match
 mate
 material
 math
+maths
 matter
 mature
 maximum
@@ -2257,6 +2279,7 @@ melon
 melt
 member
 memorandum
+memo
 memorial
 memory
 mend
@@ -2485,6 +2508,7 @@ office
 officer
 official
 often
+oftentimes
 oil
 okay
 old
@@ -2667,7 +2691,6 @@ perspective
 persuade
 pessimism
 pet
-petrol
 petroleum
 petty
 phase
@@ -2722,6 +2745,7 @@ pledge
 plenty
 plot
 plough
+plow
 plug
 plunge
 plural
@@ -2800,6 +2824,7 @@ primary
 prime
 primitive
 prince
+princess
 principal
 principle
 print
@@ -2896,6 +2921,7 @@ rage
 raid
 rail
 railway
+railroad
 rain
 rainbow
 raincoat
@@ -2948,6 +2974,7 @@ refrain
 refresh
 refreshment
 refrigerator
+fridge
 refuse
 regard
 regarding
@@ -3345,6 +3372,7 @@ souvenir
 sow
 space
 spaceship
+spacecraft
 spade
 span
 spare
@@ -3372,11 +3400,13 @@ splendid
 split
 spoil
 spokesman
+spokeswoman
 sponsor
 spontaneous
 spoon
 sport
 sportsman
+sportswoman
 spot
 spouse
 spray
@@ -3569,13 +3599,16 @@ tear
 technical
 technique
 technology
+tech
 tedious
 teen
 teenager
 telecommunications
 telephone
+phone
 telescope
 television
+TV
 tell
 teller
 temper
@@ -3886,6 +3919,7 @@ wage
 wagon
 waist
 wait
+waitress
 wake
 walk
 wall
@@ -3947,6 +3981,7 @@ whereas
 whether
 which
 while
+whilst
 whip
 whisky
 whisper
