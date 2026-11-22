@@ -367,9 +367,9 @@ class MeScreenTest {
         composeRule.onNodeWithText("词数说明", substring = false).assertIsDisplayed()
         // The count value is manually broken into three short lines, each its own
         // Text node.
-        composeRule.onNodeWithText("官方词表对拼写相同的词分行统计", substring = false).assertIsDisplayed()
-        composeRule.onNodeWithText("本应用每种拼写仅保留一个词条", substring = false).assertIsDisplayed()
-        composeRule.onNodeWithText("收录词汇与考试大纲完全一致", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("由于官方词表对拼写相同的词重复计数", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("因此词数略少于官方数字", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("但收录词汇与考试大纲完全一致", substring = false).assertIsDisplayed()
         composeRule.onNodeWithText("词表来自教育部考试中心", substring = true).assertDoesNotExist()
     }
 

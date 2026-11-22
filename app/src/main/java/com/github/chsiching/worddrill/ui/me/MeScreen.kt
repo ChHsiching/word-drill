@@ -907,6 +907,7 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                             stringResource(R.string.me_about_fact_count_line1),
                             stringResource(R.string.me_about_fact_count_line2),
                             stringResource(R.string.me_about_fact_count_line3),
+                            stringResource(R.string.me_about_fact_count_line4),
                         ),
                     )
                 }

@@ -73,9 +73,10 @@
     <string name="me_about_fact_form_label">词形说明</string>
     <string name="me_about_fact_form_value">同一单词的不同拼写均已收录</string>
     <string name="me_about_fact_count_label">词数说明</string>
-    <string name="me_about_fact_count_line1">官方词表对拼写相同的词分行统计</string>
-    <string name="me_about_fact_count_line2">本应用每种拼写仅保留一个词条</string>
-    <string name="me_about_fact_count_line3">收录词汇与考试大纲完全一致</string>
+    <string name="me_about_fact_count_line1">由于官方词表对拼写相同的词重复计数</string>
+    <string name="me_about_fact_count_line2">本应用对每种拼写仅保留一个词条</string>
+    <string name="me_about_fact_count_line3">因此词数略少于官方数字</string>
+    <string name="me_about_fact_count_line4">但收录词汇与考试大纲完全一致</string>
     <string name="me_about_close">关闭</string>
     <string name="me_data">数据</string>
     <string name="me_export">导出</string>
