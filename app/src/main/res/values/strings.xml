@@ -101,7 +101,9 @@
     <string name="drill_swipe_hint">← 左右滑动切换 →</string>
     <string name="drill_completion_pass_prefix">第</string>
     <string name="drill_completion_pass_suffix">遍</string>
-    <string name="drill_completion_status">%1$s · 已刷完</string>
+    <string name="drill_completion_status">已刷完</string>
+    <string name="drill_phonetic_uk">英</string>
+    <string name="drill_phonetic_us">美</string>
     <string name="drill_completion_restart">重新刷</string>
     <string name="drill_completion_switch_book">换一本书</string>
     <string name="library_large_title">词库</string>

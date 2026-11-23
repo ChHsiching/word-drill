@@ -34,6 +34,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -78,6 +82,17 @@ import kotlinx.coroutines.launch
  *  composition (leaving the drill route, whose nav backstack retains the ViewModel
  *  across tab switches, so disposal is the leave signal) and on app ON_STOP.
  *  Re-entering always starts idle. */
+// Sense-block auto-shrink constants (owner direction): cap total sense height;
+// stage 1 shrinks the meaning text alone down to the part-of-speech size (15sp),
+// stage 2 shrinks both together toward a 12sp hard floor.
+private val SensesMaxHeight = 300.dp
+private const val MeaningBaseSize = 22f
+private const val MeaningBaseLineHeight = 30f
+private const val MeaningFloorRatio = 15f / 22f
+private const val PosBaseSize = 15f
+private const val PosBaseLineHeight = 20f
+private const val UniformFloorRatio = 12f / 15f
+
 @Composable
 private fun AutoAdvanceLifecycle(isPlaying: Boolean, onStopPlayback: () -> Unit) {
     val view = LocalView.current
@@ -438,15 +453,41 @@ private fun WordCard(
                 textAlign = TextAlign.Center,
             )
             // Phonetic preference (issue #58): resolve UK/US/both per word at render
-            // time; the hide toggle outranks the preference.
-            val displayPhonetic =
-                phoneticPreference.resolve(phonetic?.phoneticUk, phonetic?.phoneticUs)
-            if (displayPhonetic != null && !hidePhonetic) {
-                Text(
-                    text = displayPhonetic,
-                    style = typography.phonetic.copy(color = colors.onSurfaceVariant),
+            // time; the hide toggle outranks the preference. Each segment carries a
+            // 英/美 label so the two variants are tellable apart; the identical-form
+            // dedupe shows one unlabeled phonetic.
+            val phoneticSegments =
+                phoneticPreference.segments(phonetic?.phoneticUk, phonetic?.phoneticUs)
+            if (phoneticSegments.isNotEmpty() && !hidePhonetic) {
+                Row(
                     modifier = Modifier.padding(top = 10.dp),
-                )
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    phoneticSegments.forEach { segment ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            if (segment.kind != PhoneticPreference.Kind.SHARED) {
+                                Text(
+                                    text = stringResource(
+                                        when (segment.kind) {
+                                            PhoneticPreference.Kind.UK -> R.string.drill_phonetic_uk
+                                            else -> R.string.drill_phonetic_us
+                                        }
+                                    ),
+                                    fontSize = 12.sp,
+                                    letterSpacing = 1.sp,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colors.onSurfaceVariant,
+                                    modifier = Modifier.alignByBaseline(),
+                                )
+                            }
+                            Text(
+                                text = segment.text,
+                                style = typography.phonetic.copy(color = colors.onSurfaceVariant),
+                                modifier = Modifier.alignByBaseline(),
+                            )
+                        }
+                    }
+                }
             }
             Box(
                 modifier = Modifier
@@ -455,9 +496,33 @@ private fun WordCard(
                     .height(1.dp)
                     .background(MaterialTheme.wordDrillColors.separatorStrong),
             )
+            // Sense block with an auto-shrink cap (owner direction): total height is
+            // capped; on overflow the meaning font shrinks first, never below the
+            // part-of-speech size, so the pos labels stay readable. The scale only
+            // ever decreases for a given word (reset on word change).
+            val sensesCapPx = with(LocalDensity.current) { SensesMaxHeight.toPx() }
+            var meaningScale by remember(word.word.wordId) { mutableFloatStateOf(1f) }
+            var uniformScale by remember(word.word.wordId) { mutableFloatStateOf(1f) }
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.onGloballyPositioned { coords ->
+                    val heightPx = coords.size.height.toFloat()
+                    if (heightPx > sensesCapPx) {
+                        val nextMeaning = maxOf(
+                            sensesCapPx / heightPx * meaningScale,
+                            MeaningFloorRatio,
+                        )
+                        if (nextMeaning < meaningScale) {
+                            meaningScale = nextMeaning
+                        } else if (uniformScale > UniformFloorRatio) {
+                            uniformScale = maxOf(
+                                sensesCapPx / heightPx * uniformScale,
+                                UniformFloorRatio,
+                            )
+                        }
+                    }
+                },
             ) {
                 if (word.senses.isEmpty()) {
                     // Imported word the dictionary does not know: say so instead of
@@ -475,11 +540,19 @@ private fun WordCard(
                     ) {
                         Text(
                             text = sense.pos,
-                            style = typography.partOfSpeech.copy(color = colors.onSurfaceVariant),
+                            style = typography.partOfSpeech.copy(
+                                color = colors.onSurfaceVariant,
+                                fontSize = (PosBaseSize * uniformScale).sp,
+                                lineHeight = (PosBaseLineHeight * uniformScale).sp,
+                            ),
                         )
                         Text(
                             text = sense.meaning,
-                            style = typography.meaning.copy(color = colors.onSurface),
+                            style = typography.meaning.copy(
+                                color = colors.onSurface,
+                                fontSize = (MeaningBaseSize * meaningScale * uniformScale).sp,
+                                lineHeight = (MeaningBaseLineHeight * meaningScale * uniformScale).sp,
+                            ),
                         )
                     }
                 }
@@ -523,7 +596,7 @@ private fun CompletionCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .padding(top = 80.dp),
+                .padding(top = 144.dp),
         ) {
             // The hero: the pass count in the StatCard number grammar, flanked by
             // its ordinal units on the same baseline — the word slot of the card.
@@ -550,7 +623,7 @@ private fun CompletionCard(
             }
             // The phonetic slot: book name + done status in one secondary line.
             Text(
-                text = stringResource(R.string.drill_completion_status, bookName),
+                text = stringResource(R.string.drill_completion_status),
                 style = typography.phonetic.copy(color = colors.onSurfaceVariant),
                 modifier = Modifier.padding(top = 10.dp),
             )

@@ -7,21 +7,46 @@ enum class PhoneticPreference {
     US,
     BOTH;
 
-    /** Card display string for this preference given a word's UK/US variants
-     *  (ADR 0003 fallback): the chosen variant, the available one when the chosen is
-     *  missing for that word, both joined by a space for BOTH (shown once when the
-     *  two variants are identical), null when neither exists. Blank variants count
-     *  as missing. */
-    fun resolve(phoneticUk: String?, phoneticUs: String?): String? {
+    /** Which variant a display segment carries; SHARED marks the identical-form
+     *  dedupe of BOTH, which carries no label (no ambiguity to resolve). */
+    enum class Kind { UK, US, SHARED }
+
+    /** One labeled phonetic for card display. */
+    data class Segment(val kind: Kind, val text: String)
+
+    /** Labeled display segments (ADR 0003 fallback): the chosen variant, the
+     *  available one when the chosen is missing, both side by side for BOTH
+     *  (identical forms shown once as SHARED). Blank variants count as missing. */
+    fun segments(phoneticUk: String?, phoneticUs: String?): List<Segment> {
         val uk = phoneticUk?.takeIf { it.isNotBlank() }
         val us = phoneticUs?.takeIf { it.isNotBlank() }
         return when (this) {
-            UK -> uk ?: us
-            US -> us ?: uk
-            BOTH -> if (uk != null && us != null && uk == us) uk
-            else listOfNotNull(uk, us).joinToString(" ").ifEmpty { null }
+            UK -> when {
+                uk != null -> listOf(Segment(Kind.UK, uk))
+                us != null -> listOf(Segment(Kind.US, us))
+                else -> emptyList()
+            }
+            US -> when {
+                us != null -> listOf(Segment(Kind.US, us))
+                uk != null -> listOf(Segment(Kind.UK, uk))
+                else -> emptyList()
+            }
+            BOTH -> when {
+                uk != null && us != null && uk == us -> listOf(Segment(Kind.SHARED, uk))
+                else -> listOfNotNull(
+                    uk?.let { Segment(Kind.UK, it) },
+                    us?.let { Segment(Kind.US, it) },
+                )
+            }
         }
     }
+
+    /** Plain joined string (compact surfaces like the word-list rows);
+     *  semantics identical to [segments]. */
+    fun resolve(phoneticUk: String?, phoneticUs: String?): String? =
+        segments(phoneticUk, phoneticUs)
+            .joinToString(" ") { it.text }
+            .ifEmpty { null }
 
     /** Setting-row tap cycle (issue #58): UK -> US -> BOTH -> UK. */
     fun next(): PhoneticPreference = when (this) {

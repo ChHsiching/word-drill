@@ -78,4 +78,29 @@ class PhoneticPreferenceTest {
         assertThat(PhoneticPreference.US.resolve("  ", "/ʌs/")).isEqualTo("/ʌs/")
         assertThat(PhoneticPreference.US.resolve("", "")).isNull()
     }
+    @Test
+    fun segments_bothDiffering_labelsEachVariant() {
+        val segs = PhoneticPreference.BOTH.segments("/ʌk/", "/ʌs/")
+        assertThat(segs).hasSize(2)
+        assertThat(segs[0].kind).isEqualTo(PhoneticPreference.Kind.UK)
+        assertThat(segs[0].text).isEqualTo("/ʌk/")
+        assertThat(segs[1].kind).isEqualTo(PhoneticPreference.Kind.US)
+        assertThat(segs[1].text).isEqualTo("/ʌs/")
+    }
+
+    @Test
+    fun segments_bothIdentical_singleUnlabeledSegment() {
+        val segs = PhoneticPreference.BOTH.segments("/ə/", "/ə/")
+        assertThat(segs).hasSize(1)
+        assertThat(segs[0].kind).isEqualTo(PhoneticPreference.Kind.SHARED)
+        assertThat(segs[0].text).isEqualTo("/ə/")
+    }
+
+    @Test
+    fun segments_fallbackKeepsOriginLabel() {
+        val segs = PhoneticPreference.US.segments("/ʌk/", null)
+        assertThat(segs).hasSize(1)
+        assertThat(segs[0].kind).isEqualTo(PhoneticPreference.Kind.UK)
+    }
+
 }
