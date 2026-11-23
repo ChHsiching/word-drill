@@ -60,8 +60,8 @@ fun provideWordDrillTypography(): WordDrillTypography {
         ),
         meaning = TextStyle(
             fontWeight = FontWeight.Normal,
-            fontSize = 22.sp,
-            lineHeight = 30.sp,
+            fontSize = 17.sp,
+            lineHeight = 24.sp,
             lineHeightStyle = DefaultLineHeightStyle,
         ),
         statNumber = TextStyle(

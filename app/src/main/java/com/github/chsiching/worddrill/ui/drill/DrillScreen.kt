@@ -86,12 +86,12 @@ import kotlinx.coroutines.launch
 // stage 1 shrinks the meaning text alone down to the part-of-speech size (15sp),
 // stage 2 shrinks both together toward a 12sp hard floor.
 private val SensesMaxHeight = 300.dp
-private const val MeaningBaseSize = 22f
-private const val MeaningBaseLineHeight = 30f
-private const val MeaningFloorRatio = 15f / 22f
+private const val MeaningBaseSize = 17f
+private const val MeaningBaseLineHeight = 24f
 private const val PosBaseSize = 15f
 private const val PosBaseLineHeight = 20f
-private const val UniformFloorRatio = 12f / 15f
+private const val MeaningFloorRatio = PosBaseSize / MeaningBaseSize
+private const val UniformFloorRatio = 12f / PosBaseSize
 
 @Composable
 private fun AutoAdvanceLifecycle(isPlaying: Boolean, onStopPlayback: () -> Unit) {
