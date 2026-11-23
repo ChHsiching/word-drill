@@ -21,19 +21,27 @@ phonetic alongside the existing (UK) phonetic:
 Validation rules (issue #49, ADR 0003): every entry has a word and at least
 one sense; no duplicate (word, pos) pairs (the Room import dedupes on that
 key); meaning punctuation normalized (normalize_meaning is idempotent on its
-own output). Hard gate: every word of the three preset-book word lists
-(tools/data/) that HAS a dictionary entry must also carry a phonetic (UK or
-US) — words Youdao genuinely gives no phonetic for may pass only via
-PHONETIC_GATE_EXCEPTIONS. Words Youdao has no entry for are excluded from the
-output. Overall phonetic coverage is reported, not gated. Missing phonetic
+own output). Hard gate: EVERY word of the three preset-book word lists
+(tools/data/) has a dictionary entry, and each entry carries a phonetic (UK or
+US). Preset words Youdao genuinely gives no phonetic for may pass only via
+PHONETIC_GATE_EXCEPTIONS. A syllabus spelling Youdao does not list under that
+exact form is covered by PRESET_LOOKUP_ALIASES (the lookup word's entries are
+also emitted under the syllabus spelling). Non-preset words Youdao has no
+entry for are excluded from the output. Overall phonetic coverage is reported,
+not gated. Missing phonetic
 variants are gap-filled from English Wiktionary IPA (tools/
 wiktionary_phonetic_fill.py, per the amended ADR 0003): Youdao values always
 win, and the build reports the fill counts.
 
-Youdao renders domain labels as full-width parens, e.g. （电信）切换; the app
-data uses bracket labels per ADR 0001, e.g. 【电信】切换. Only parentheticals
-whose whole content (parts split by ／) is in DOMAIN_LABELS convert —
-qualifiers like （因危险） or （美） stay parenthetical.
+Youdao marks subject labels and ordinary qualifiers the same way, with
+full-width parens or angle brackets. Examples are （电信）切换, <史>毁船打劫
+and 理解（力）. Notation alone cannot tell them apart. A marker becomes a 【】
+label (the app data's form, ADR 0001) only when it opens a sense segment and
+every ／ ， 、-separated part is in DOMAIN_LABELS. Everything else stays a
+parenthetical, for example （因危险）, <美> or 理解（力）. Other punctuation is
+unified. Half-width pairs in Chinese text, every ellipsis spelling and
+stray spaces are normalized. Youdao's person-name line becomes an entry of
+its own (pos "").
 
 Usage:
   python tools/build_youdao_dictionary.py [--state-dir DIR] [--out FILE]
@@ -55,31 +63,64 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from youdao_crawler import DEFAULT_STATE_DIR, load_raw  # noqa: E402
 
-# Subject-domain labels Youdao marks with full-width parens. Extend as the
-# full crawl surfaces more; a parenthetical converts to a 【】 label only when
-# every ／-separated part is listed here.
+# Subject-domain labels. Youdao marks them with full-width parens or angle
+# brackets, as in （电信）, <史> and 〈史〉. It marks ordinary qualifiers the
+# same way, as in "理解（力）" and "使（计算机）联网", so notation alone cannot
+# tell a label from a qualifier. A marker becomes a 【】 label only when it
+# opens a sense segment. That is the position right after the POS or a "；",
+# and a register marker such as <非正式> may sit in front. Every ／ ，
+# 、-separated part must be listed here too. The inventory was closed by
+# reading every preset-word line (2026-11-23). "物" is deliberately absent,
+# because "（物）" opens segments meaning "of a thing" (live, slim, unemployed)
+# as often as "physics". "（物理）" is the unambiguous spelling.
 DOMAIN_LABELS = {
-    "电信", "无线电", "计算机", "电子技术", "电子学", "网络", "通信",
-    "计", "电", "机", "数", "医", "律", "经", "化", "物", "生", "军",
-    "航", "海", "气", "天", "地质", "地理", "矿", "农", "药", "印",
-    "纺", "冶", "光", "力", "测", "体育", "音乐", "棋", "语法", "宗教",
-    "圣经", "铁路", "汽车", "航空", "航海", "气象", "印刷", "古生",
+    "电信", "无线电", "计算机", "电子技术", "电子学", "网络", "互联网", "通信",
+    "信息科学", "技术",
+    "计", "电", "机", "数", "数学", "医", "医学", "医疗", "外科", "律", "法律",
+    "经", "经济", "财政", "金融", "贸易", "会计", "化", "化学", "生", "生物",
+    "生物学", "生化", "生物化学", "分子生物", "遗传", "遗传学", "农学", "军",
+    "军事", "航", "航海", "航空", "海", "气", "气象", "天", "天文", "地质",
+    "地理", "考古", "矿", "农", "农业", "药", "印", "印刷", "纺", "冶",
+    "光", "光学", "力", "测", "测绘", "体育", "音乐", "棋", "语法",
+    "宗教", "宗教学", "神学", "圣经", "铁路", "铁道", "交通", "汽车", "古生",
+    "史", "乐", "哲", "哲学", "逻", "逻辑", "解剖", "剖", "统计",
+    "心理", "心理学", "心理分析", "生理", "生理学", "动", "动物学", "植",
+    "植物学", "昆", "占星", "建筑", "建", "电子", "机械",
+    "机械学", "摄影", "摄", "教育", "艺术", "语言", "语言学", "语音", "语音学",
+    "词汇", "词形", "伦理学", "修辞", "免疫", "外交", "生态", "进化", "分化",
+    "技", "渔", "猎", "诗", "诗韵", "鸣钟术", "纹章", "几何", "物理",
 }
 
 POS_PREFIXES = (
     "prep.", "pron.", "conj.", "interj.", "adv.", "num.", "art.", "aux.",
     "int.", "abbr.", "adj.", "det.", "vt.", "vi.", "n.", "v.", "a.",
+    "comb.", "pref.",
 )
-POS_RE = re.compile(r"^(" + "|".join(re.escape(p) for p in POS_PREFIXES) + r")")
+# Spellings Youdao also uses for a POS above, and its one "cn." typo
+# (friendly "cn. 友谊赛"), mapped onto that POS.
+POS_ALIASES = {"inter.": "int.", "pronoun.": "pron.", "cn.": "n."}
+POS_RE = re.compile(r"^([A-Za-z]{1,8})[．.]")
+_KNOWN_POS = frozenset(POS_PREFIXES)
 
 # CJK ideographs + CJK punctuation/full-width forms, for adjacency tests.
 CJK_RE = r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3000-\u303f\uff00-\uffef]"
+CJK_CHAR_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
 
 HALF_TO_FULL = {",": "，", ";": "；", ":": "：", "?": "？", "!": "！"}
 
-# <美>, <美，非正式>, <美， 非正式> style region/register markers ->
-# full-width parens (inner spaces allowed and dropped).
-ANGLE_MARKER_RE = re.compile(r"<([\u4e00-\u9fff][\u4e00-\u9fff，、 ]{0,11})>")
+# Markers that may open a sense segment: <美>, 〈史〉, （非正式）, [古生]
+# (grouped: angle-bracket body, paren body, square-bracket body).
+SEGMENT_MARKER_RE = re.compile(
+    r"^(?:[<〈]([^<>〈〉]{1,18})[>〉]|（([^（）]+)）|\[([^\[\]]+)\])")
+# Any remaining <美>, 〈英，旧〉, <澳/新，非正式> marker inside a segment.
+# The body must start with a Chinese character, so "x <y> z" is no marker.
+ANGLE_MARKER_RE = re.compile(r"[<〈]([\u4e00-\u9fff][^<>〈〉]{0,17})[>〉]")
+HALF_PAIR_RE = re.compile(r"\(([^()]*)\)")
+SQUARE_PAIR_RE = re.compile(r"\[([^\[\]]+)\]")
+# Every ellipsis spelling Youdao uses: "......", "…...", "…", "······".
+ELLIPSIS_RUN_RE = re.compile(r"[.…·]{2,}")
+LONE_ELLIPSIS_RE = re.compile(r"(?<![.…·])…(?![.…·])")
+NAME_TAG_RE = re.compile(r"(【名】)\1+")
 
 # ADR 0003 hard gate: the three preset-book word lists, files in tools/data/.
 PRESET_BOOK_FILES = ("cet4_2016.txt", "cet6_2016.txt", "kaoyan.txt")
@@ -90,50 +131,155 @@ PRESET_BOOK_FILES = ("cet4_2016.txt", "cet6_2016.txt", "kaoyan.txt")
 # else failing it is an error. Growing this list is an owner decision.
 PHONETIC_GATE_EXCEPTIONS = ("according to", "owing to")
 
+# Syllabus spellings Youdao does not list under that exact form. The official
+# CET list prints "babyboom" closed up; Youdao only has "baby boom". The lookup
+# word's entries are also emitted under the syllabus spelling, so every preset
+# word has a definition (owner ruling 2026-11-23). The content stays 100%
+# Youdao. Each pair must be verified against live Youdao (the syllabus spelling
+# absent, the lookup present); growing this table is an owner decision.
+PRESET_LOOKUP_ALIASES = {"babyboom": "baby boom"}
+
 
 def split_pos(line):
-    """Split a Youdao sense line into (pos, meaning); pos is "" when absent."""
+    """Split a Youdao sense line into (pos, meaning); pos is "" when absent.
+    The POS is matched case-insensitively, behind a full-width dot as well
+    ("n．"), and through POS_ALIASES."""
     m = POS_RE.match(line)
-    if not m:
-        return "", line
-    return m.group(1), line[m.end():].strip()
+    if m:
+        pos = m.group(1).lower() + "."
+        pos = POS_ALIASES.get(pos, pos)
+        if pos in _KNOWN_POS:
+            return pos, line[m.end():].strip()
+    return "", line
 
 
 def _is_domain_label(content):
-    parts = [p.strip() for p in content.split("／")]
+    parts = [p.strip() for p in re.split(r"[／/，,、]", content)]
     return bool(parts) and all(p in DOMAIN_LABELS for p in parts)
+
+
+def _widen_mismatched_paren_pairs(text):
+    """Give a mismatched paren pair one width: Youdao typos seen on live data
+    are "(未经证实地）宣称" and "（Bike)比克". Only a pair whose opener and
+    closer differ is touched (both become full-width); balanced pairs and
+    stray closers stay exactly as sourced."""
+    chars = list(text)
+    openers = []
+    for i, ch in enumerate(chars):
+        if ch in "（(":
+            openers.append(i)
+        elif ch in "）)" and openers:
+            opener = openers.pop()
+            if (chars[opener] == "（") != (ch == "）"):
+                chars[opener] = "（"
+                chars[i] = "）"
+    return "".join(chars)
+
+
+def _convert_segment_start(segment):
+    """Convert the markers that open one sense segment. They may stack, as in
+    "<非正式>（医）刮宫". A subject label becomes a 【】 label. Any other
+    angle-bracket marker becomes （） with inner spaces dropped. A non-label
+    [ ] holding Chinese becomes （）. An ordinary （） marker is kept as
+    sourced and peeling goes on, since a label may follow one."""
+    out = []
+    rest = segment.lstrip()
+    while True:
+        m = SEGMENT_MARKER_RE.match(rest)
+        if not m:
+            break
+        angle, paren, square = m.groups()
+        if angle is not None and not CJK_CHAR_RE.search(angle):
+            break  # "<y>" is no marker
+        body = angle if angle is not None else (
+            paren if paren is not None else square)
+        if _is_domain_label(body):
+            out.append(f"【{body}】")
+        elif angle is not None:
+            out.append("（" + body.replace(" ", "") + "）")
+        elif square is not None and CJK_CHAR_RE.search(body):
+            out.append(f"（{body}）")
+        else:
+            out.append(m.group(0))
+        rest = rest[m.end():]
+    return "".join(out) + rest
+
+
+def _in_chinese_context(text, start, end, inner):
+    """True when a pair sits in Chinese text: Chinese inside it, or the
+    nearest non-space character on either side is Chinese or full-width.
+    "call (sb) up" has neither and keeps its half-width parens."""
+    if CJK_CHAR_RE.search(inner):
+        return True
+    before = text[:start].rstrip()[-1:]
+    after = text[end:].lstrip()[:1]
+    return bool((before and re.match(CJK_RE, before)) or
+                (after and re.match(CJK_RE, after)))
+
+
+def _widen_half_width_pairs(text):
+    """A balanced half-width ( ) pair in Chinese context gets the full width.
+    Youdao itself writes such pairs full-width, for example （=night owl）.
+    _widen_mismatched_paren_pairs has already widened the mismatched ones."""
+    def widen(m):
+        if _in_chinese_context(text, m.start(), m.end(), m.group(1)):
+            return f"（{m.group(1)}）"
+        return m.group(0)
+    return HALF_PAIR_RE.sub(widen, text)
+
+
+def _unify_ellipsis(text):
+    """Every ellipsis spelling -> "……". A run of dots is one only when it
+    holds a "…" or a "·", or touches Chinese text, so "Sep." stays "Sep."."""
+    def widen(m):
+        run = m.group(0)
+        if "…" in run or "·" in run or _in_chinese_context(
+                text, m.start(), m.end(), run):
+            return "……"
+        return run
+    text = ELLIPSIS_RUN_RE.sub(widen, text)
+    return LONE_ELLIPSIS_RE.sub(
+        lambda m: "……" if _in_chinese_context(text, m.start(), m.end(), "…")
+        else m.group(0), text)
 
 
 def normalize_meaning(text):
     """Normalize punctuation in a Chinese sense text:
     1. collapse whitespace runs to one space and strip;
-    2. half-width , ; : ? ! -> full-width when adjacent to CJK;
-    3. <美> style markers -> （美） (after widening — markers may hold a
-       half-width comma, "<美,非正式>");
-    4. （电信） and [古生] domain labels -> 【】 form;
-    5. strip spaces hugging full-width separators, labels, and close parens.
+    2. widen a paren pair whose opener and closer have different widths;
+    3. half-width , ; : ? ! -> full-width when adjacent to CJK;
+    4. the markers opening each "；"-separated segment. A subject label
+       (<史>, （电信）, [古生]) becomes 【史】 or 【电信】. Any other
+       angle-bracket marker becomes （美）. The step runs after the comma
+       rule, since a marker may hold a half-width comma, as in "<美,非正式>");
+    5. any remaining <美> / 〈英，旧〉 marker -> （美）;
+    6. a half-width ( ) pair in Chinese context -> （ ）, a [ ] pair holding
+       Chinese -> （ ）;
+    7. every ellipsis spelling (......  …...  …  ······) -> ……;
+    8. strip spaces hugging full-width punctuation and closing brackets, and
+       spaces sandwiched between Chinese characters ("航空站 （港）");
+    9. collapse a doubled name tag, "【名】【名】" -> "【名】".
     Idempotent on its own output.
     """
     text = re.sub(r"\s+", " ", text).strip()
+    text = _widen_mismatched_paren_pairs(text)
     for half, full in HALF_TO_FULL.items():
         text = re.sub(f"(?<={CJK_RE}){re.escape(half)}", full, text)
         text = re.sub(f"{re.escape(half)}(?={CJK_RE})", full, text)
-    # After the widening pass: markers may hold half-width commas
-    # ("<美,非正式>") or stray spaces ("<美， 非正式>").
+    text = "；".join(_convert_segment_start(seg) for seg in text.split("；"))
     text = ANGLE_MARKER_RE.sub(
         lambda m: "（" + m.group(1).replace(" ", "") + "）", text)
-
-    def repl(m):
-        content = m.group(1)
-        return f"【{content}】" if _is_domain_label(content) else m.group(0)
-
-    text = re.sub(r"（([^（）]+)）", repl, text)
-    # Youdao also marks domains with square brackets: "[古生] 赤道部".
-    text = re.sub(r"\[([^[\]]+)\]", repl, text)
-    # No space hugs full-width separators, labels, or close parens:
+    text = _widen_half_width_pairs(text)
+    text = SQUARE_PAIR_RE.sub(
+        lambda m: f"（{m.group(1)}）" if CJK_CHAR_RE.search(m.group(1))
+        else m.group(0), text)
+    text = _unify_ellipsis(text)
+    # No space hugs full-width separators, labels, or brackets:
     # "苹果， 梨" -> "苹果，梨"; "（非正式） （尤指…）" -> "（非正式）（尤指…）".
-    text = re.sub(r" +([，；：？！】）])", r"\1", text)
-    return re.sub(r"([，；：？！】）]) +", r"\1", text)
+    text = re.sub(r" +([，；：？！、】）])", r"\1", text)
+    text = re.sub(r"([，；：？！、】）]) +", r"\1", text)
+    text = re.sub(f"(?<={CJK_RE}) +(?={CJK_RE})", "", text)
+    return NAME_TAG_RE.sub(r"\1", text)
 
 
 def wrap_phonetic(raw):
@@ -172,28 +318,61 @@ def parse_ec(ec):
     return uk, us, lines
 
 
+# Grouping key for Youdao's person-name line, so it never merges with the
+# senses of any POS (nor with a "comb." line that once shared its empty POS).
+NAME_LINE = object()
+NULL_PREFIX_RE = re.compile(r"^null\s+")
+
+
+def _is_name_line(pos, content):
+    """Youdao's person-name line: tagged 【名】, whatever POS prefix it
+    carries, or an untagged POS-less line that names somebody ("【英】
+    （Dash）…（人名）")."""
+    return content.startswith("【名】") or (pos == "" and "人名" in content)
+
+
 def extract_entries(word, trimmed):
     """Output entries for one word. Youdao may repeat a POS across sense lines
     ("v. 疏通", "v. 使通畅"); the Room import dedupes on (word, pos), so
-    same-POS senses merge into one entry joined by "；". Sense lines that
-    normalize to nothing are dropped, so every entry has a non-empty meaning."""
+    same-POS senses merge into one entry joined by "；". A sense segment that
+    repeats an earlier one (inside one line or across lines) is kept once.
+    The comparison ignores the 【名】 tag, since Youdao repeats name lines
+    with and without it. The person-name line becomes an entry of its
+    own (pos ""). Youdao's literal "null" placeholder and a line-final "。"
+    (generated prose) are dropped, so every entry has a non-empty meaning."""
     uk, us, lines = parse_ec(trimmed.get("ec"))
+    parsed = [split_pos(NULL_PREFIX_RE.sub("", line).rstrip("。")) for line in lines]
+    # The name line gets its own entry unless the word also has a POS-less
+    # sense line. (word, pos) must stay unique, so the two then share one
+    # entry in source order. 51 crawled proper nouns, e.g. Ortega, have both.
+    own_name_entry = not any(
+        pos == "" and not _is_name_line(pos, content) for pos, content in parsed)
     by_pos = {}
-    for line in lines:
-        pos, meaning = split_pos(line)
-        meaning = normalize_meaning(meaning)
+    seen = {}
+    for pos, content in parsed:
+        meaning = normalize_meaning(content)
         if not meaning:
             continue
-        by_pos.setdefault(pos, []).append(meaning)
+        key = NAME_LINE if (_is_name_line(pos, content) and own_name_entry) else pos
+        segments = by_pos.setdefault(key, [])
+        keys = seen.setdefault(key, set())
+        for segment in meaning.split("；"):
+            segment = segment.strip()
+            dedup_key = segment.removeprefix("【名】")
+            if segment and segment != "null" and dedup_key not in keys:
+                segments.append(segment)
+                keys.add(dedup_key)
     return [
         {
             "word": word,
             "phonetic": wrap_phonetic(uk),
             "phonetic_us": wrap_phonetic(us),
-            "pos": pos,
-            "meaning": "；".join(meanings),
+            "pos": "" if pos is NAME_LINE else pos,
+            # Re-normalized as a whole: two sense lines can hold the halves of
+            # one paren pair, which only meet after they are joined.
+            "meaning": normalize_meaning("；".join(segments)),
         }
-        for pos, meanings in by_pos.items()
+        for pos, segments in by_pos.items()
     ]
 
 
@@ -214,8 +393,8 @@ def validate_entries(entries, preset_books=()):
     """Return (errors, report). errors is a list of strings; report carries
     the counts printed by the CLI.
 
-    ADR 0003 hard gate: every preset-book word that HAS a dictionary entry
-    must also carry a phonetic (UK or US); words in PHONETIC_GATE_EXCEPTIONS
+    ADR 0003 hard gate: every preset-book word has a dictionary entry, and
+    each entry carries a phonetic (UK or US); words in PHONETIC_GATE_EXCEPTIONS
     pass without one. Overall phonetic coverage is reported, not gated.
     """
     errors = []
@@ -266,6 +445,8 @@ def validate_entries(entries, preset_books=()):
         }
         for w in report["preset_books"][name]["no_phonetic"]:
             errors.append(f"{name}: preset word {w!r} has an entry but no phonetic")
+        for w in report["preset_books"][name]["without_entry"]:
+            errors.append(f"{name}: preset word {w!r} has no dictionary entry")
     return errors, report
 
 
@@ -305,6 +486,26 @@ def apply_phonetic_fill(entries, fill):
         "filled_us": len(filled_us),
         "still_missing": len(still_missing),
     }
+
+
+def apply_preset_aliases(entries):
+    """Emit the lookup word's entries under a syllabus spelling Youdao does not
+    use itself (PRESET_LOOKUP_ALIASES). A spelling that already has its own
+    entry is left alone. Returns (entries, errors); an alias whose lookup word
+    is missing from the crawl is reported, so it cannot pass silently."""
+    words = {e["word"] for e in entries}
+    errors = []
+    added = []
+    for spelling, lookup in PRESET_LOOKUP_ALIASES.items():
+        if spelling in words:
+            continue
+        lookup_entries = [e for e in entries if e["word"] == lookup]
+        if not lookup_entries:
+            errors.append(
+                f"alias {spelling!r} -> {lookup!r}: the lookup word has no crawl entry")
+            continue
+        added.extend({**e, "word": spelling} for e in lookup_entries)
+    return entries + added, errors
 
 
 def build_output(entries, source):
@@ -347,8 +548,10 @@ def main(argv=None):
     else:
         fill = {}
     entries, fill_stats = apply_phonetic_fill(entries, fill)
+    entries, alias_errors = apply_preset_aliases(entries)
 
     errors, report = validate_entries(entries, load_preset_books())
+    errors = alias_errors + errors
     print(f"raw words: {len(raw)} (no entries: {misses})")
     print(f"entries: {report['entries']} over {report['words']} words")
     print(f"phonetic coverage: {report['phonetic_coverage']:.1%} "

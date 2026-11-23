@@ -124,9 +124,44 @@ phrase entries both syllabi print. Result: 5,658 words, +2.9% against the
 
 `tools/gen_words_json.py` attaches content (phonetic, senses) from the
 bundled `assets/dictionary.json` (Youdao-sourced per ADR 0001/0003, built by
-`tools/build_youdao_dictionary.py`) by exact word match. Words Youdao has no
-entry for keep their slot with `phonetic: null` and empty senses (ADR 0003:
-importing them shows the not-found state).
+`tools/build_youdao_dictionary.py`) by exact word match.
+
+Every preset word has content; the build fails otherwise (owner ruling,
+2026-11-23: no syllabus word may ship without a definition):
+
+- **Spelling aliases.** `PRESET_LOOKUP_ALIASES` in the build script maps a
+  syllabus spelling Youdao does not list under that exact form to its headword
+  and emits the headword's entries under the syllabus spelling as well. One
+  pair, verified against live Youdao: `babyboom` (printed closed up in the
+  official CET list, absent from Youdao) -> `baby boom`. The content stays
+  Youdao's. Growing the table is an owner decision.
+- **Parts of speech.** The build recognises every POS spelling Youdao uses on
+  preset words, among them `comb.`, `pref.`, a full-width dot as in `n．` and
+  an uppercase `V.`. `inter.` and `pronoun.` are mapped onto `int.` and
+  `pron.`, and the one `cn.` typo (friendly) onto `n.`.
+- **Subject labels.** Youdao marks subject labels and ordinary qualifiers the
+  same way, with full-width parens or angle brackets. Examples are （电信）切换,
+  <史>毁船打劫 and 理解（力）. A marker becomes a 【】 label only when it opens
+  a sense segment and every part of it is in `DOMAIN_LABELS` in the build
+  script. Everything else stays a parenthetical. The inventory was closed by
+  reading every preset-word line on 2026-11-23. `物` is left out on purpose,
+  because （物） opens segments meaning "of a thing" as often as "physics", so
+  those stay parenthetical and （物理） carries the label.
+- **Punctuation.** A paren pair whose opener and closer have different widths
+  (Youdao typos such as `(未经证实地）` and `（Bike)`) is widened to one width.
+  A balanced half-width pair in Chinese text gets the full width, for example
+  `格雷丝 (女名)`. An English phrase such as `call (sb) up` keeps its
+  half-width parens. Every ellipsis spelling becomes `……`, and stray spaces
+  between Chinese characters are removed.
+- **Person-name lines.** Youdao's 【名】 line becomes an entry of its own with
+  an empty part of speech, so it never merges into the senses. Its literal
+  `null` placeholder is dropped, and a name line printed twice is kept once.
+- **Repeated senses.** A sense segment that repeats an earlier one under the
+  same part of speech is kept once (Youdao repeats senses inside one line; the
+  copies differ only by whitespace).
+
+Non-preset words Youdao has no entry for are excluded from the dictionary;
+importing them shows the not-found state (ADR 0003).
 
 ## Verification
 

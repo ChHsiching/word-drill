@@ -13,7 +13,9 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_youdao_dictionary import (  # noqa: E402
     PHONETIC_GATE_EXCEPTIONS,
+    PRESET_LOOKUP_ALIASES,
     apply_phonetic_fill,
+    apply_preset_aliases,
     extract_entries,
     load_preset_books,
     normalize_meaning,
@@ -83,6 +85,27 @@ class TestSplitPos:
     def test_pos_without_meaning(self):
         assert split_pos("n.") == ("n.", "")
 
+    # POS spellings found by reading every preset-word line (audit of
+    # 2026-11-23); each fixture is a real Youdao line.
+    def test_combining_form_and_prefix_forms_recognised(self):
+        assert split_pos("comb. 有……腿的(-legged)") == ("comb.", "有……腿的(-legged)")
+        assert split_pos("pref. 千（kilo-）") == ("pref.", "千（kilo-）")
+
+    def test_spelled_out_variants_map_to_the_short_form(self):
+        assert split_pos("inter. 天哪，哎呀") == ("int.", "天哪，哎呀")
+        assert split_pos("pronoun. 自己的，属于自己的") == ("pron.", "自己的，属于自己的")
+
+    def test_uppercase_letter_and_full_width_dot_recognised(self):
+        assert split_pos("V. 打手势，用动作示意") == ("v.", "打手势，用动作示意")
+        assert split_pos("n．前部，前面") == ("n.", "前部，前面")
+
+    def test_youdao_pos_typo_mapped(self):
+        # friendly: the only "cn." in the crawl; the sense is a noun.
+        assert split_pos("cn. 友谊赛") == ("n.", "友谊赛")
+
+    def test_abbreviation_that_merely_looks_like_a_pos_kept(self):
+        assert split_pos("e.g. 例如") == ("", "e.g. 例如")
+
 
 class TestNormalizeMeaning:
     def test_domain_paren_becomes_bracket_label(self):
@@ -139,7 +162,7 @@ class TestNormalizeMeaning:
         assert normalize_meaning("什么? ") == "什么？"
 
     def test_whitespace_collapsed_and_stripped(self):
-        assert normalize_meaning("  苹果   梨  ") == "苹果 梨"
+        assert normalize_meaning("  苹果   pear  ") == "苹果 pear"
 
     def test_already_normalized_idempotent(self):
         text = "抛弃，遗弃；【电信】切换；（美）收拾"
@@ -153,6 +176,150 @@ class TestNormalizeMeaning:
             "（非正式）（尤指通过暴露）使受热发烫"
         assert normalize_meaning("（美，非正式） 和善地戏弄") == \
             "（美，非正式）和善地戏弄"
+
+    def test_half_open_full_close_pair_widens(self):
+        # Youdao typo on live data (2026-11-23): "allege (未经证实地）宣称".
+        assert normalize_meaning("(未经证实地）宣称，指控") == "（未经证实地）宣称，指控"
+
+    def test_full_open_half_close_pair_widens(self):
+        # Youdao typos on live data (2026-11-23): "（Bike)比克", "布什（人名)".
+        assert normalize_meaning("（Bike)（土、土库、塞）比克") == \
+            "（Bike）（土、土库、塞）比克"
+        assert normalize_meaning("布什（人名)") == "布什（人名）"
+
+    def test_balanced_paren_pairs_untouched(self):
+        assert normalize_meaning("call (sb) up") == "call (sb) up"
+        assert normalize_meaning("（因危险）离开") == "（因危险）离开"
+
+    def test_unmatched_closer_untouched(self):
+        # No opener to pair with: the stray closer is left exactly as sourced.
+        assert normalize_meaning("a) b") == "a) b"
+
+    def test_paren_pair_widening_idempotent(self):
+        once = normalize_meaning("(未经证实地）宣称")
+        assert normalize_meaning(once) == once
+
+    def test_nested_mismatched_pairs_widen(self):
+        assert normalize_meaning("（甲(乙）丙)") == "（甲（乙）丙）"
+
+    # Subject labels, from the 2026-11-23 audit of all 6,366 preset words.
+    def test_parenthetical_mid_phrase_is_never_a_label(self):
+        # Youdao writes ordinary qualifiers in the same full-width parens as
+        # subject labels; a real label only ever opens a sense segment.
+        for text in ("紧抓，紧握；理解（力），领会",
+                     "使（计算机）联网；（尤指工作中）建立人脉",
+                     "非法将（汽车）改头换面",
+                     "封蜡，火漆；封蜡模（印），封铅模（印）"):
+            assert normalize_meaning(text) == text
+
+    def test_parenthetical_label_opening_a_segment_converts(self):
+        assert normalize_meaning("戒指，指环；（化）环；（数）环") == \
+            "戒指，指环；【化】环；【数】环"
+        assert normalize_meaning("（法律）原告，起诉人") == "【法律】原告，起诉人"
+        assert normalize_meaning("辅修课程；（乐）小调，小音程；（逻）小项，小前提") == \
+            "辅修课程；【乐】小调，小音程；【逻】小项，小前提"
+
+    def test_labels_joined_by_a_comma_convert_together(self):
+        assert normalize_meaning("感觉官能；（数，物理）指向，方向") == \
+            "感觉官能；【数，物理】指向，方向"
+        assert normalize_meaning("温和的；（外科，医疗）根治的；（变化）不大的") == \
+            "温和的；【外科，医疗】根治的；（变化）不大的"
+
+    def test_mixed_marker_stays_parenthetical(self):
+        # One non-label part keeps the whole marker parenthetical.
+        text = "突出的，显著的；（角）凸出的；（纹章，动物）后腿站立前爪举起的"
+        assert normalize_meaning(text) == text
+        assert normalize_meaning("收费表；<英，法律>量刑标准") == "收费表；（英，法律）量刑标准"
+
+    def test_angle_bracket_subject_labels_become_bracket_labels(self):
+        assert normalize_meaning("使遇难；<史>毁船打劫；拆") == "使遇难；【史】毁船打劫；拆"
+        assert normalize_meaning("三角铁（打击乐器）；<史>（系缚士兵以鞭打的）三戟刑具") == \
+            "三角铁（打击乐器）；【史】（系缚士兵以鞭打的）三戟刑具"
+        assert normalize_meaning("小雕像；〈史〉（步兵的）方阵") == \
+            "小雕像；【史】（步兵的）方阵"
+
+    def test_angle_bracket_register_markers_stay_parenthetical(self):
+        assert normalize_meaning("同意；〈正式〉签署（遗嘱，合同或其他文件）") == \
+            "同意；（正式）签署（遗嘱，合同或其他文件）"
+        assert normalize_meaning("使人苦恼的事；（喻）棘手的东西") == \
+            "使人苦恼的事；（喻）棘手的东西"
+
+    def test_mixed_and_slashed_angle_markers(self):
+        assert normalize_meaning("签字；〈英，史〉文书，抄写员") == "签字；（英，史）文书，抄写员"
+        assert normalize_meaning("（用布）擦干净；<澳/新，非正式>拒绝（某人）") == \
+            "（用布）擦干净；（澳/新，非正式）拒绝（某人）"
+
+    def test_label_after_a_register_marker_converts(self):
+        assert normalize_meaning("困境，窘境；<非正式>（医）刮宫") == \
+            "困境，窘境；（非正式）【医】刮宫"
+        assert normalize_meaning("窃听，窃听器；<英>（电） 分接头") == \
+            "窃听，窃听器；（英）【电】分接头"
+        assert normalize_meaning("较小的；<旧>（地质）中生代的") == "较小的；（旧）【地质】中生代的"
+
+    def test_wu_is_not_a_label(self):
+        # "（物）" opens segments meaning "of a thing" as often as "physics".
+        for text in ("苗条的，纤细的；单薄的；（物）狭长的",
+                     "未被雇用的，失业的；（物）闲置的，未用的"):
+            assert normalize_meaning(text) == text
+        assert normalize_meaning("强健的；（物理）强，强相互作用的") == \
+            "强健的；【物理】强，强相互作用的"
+
+    def test_subject_label_inventory(self):
+        # Every subject label met in the audit converts when it opens a segment.
+        for label in ("史", "乐", "哲", "逻", "法律", "军事", "解剖", "统计",
+                      "心理", "天文", "建筑", "经济", "财政", "数学", "物理", "化学",
+                      "医学", "哲学", "逻辑", "语言学", "生物学", "地质", "语音",
+                      "植物学", "动物学", "遗传", "会计", "教育", "音乐"):
+            assert normalize_meaning(f"甲；（{label}）乙") == f"甲；【{label}】乙"
+
+    # Ellipses.
+    def test_ellipsis_spellings_unified(self):
+        assert normalize_meaning("在......附近，靠近") == "在……附近，靠近"
+        assert normalize_meaning("一.....就，一旦") == "一……就，一旦"
+        assert normalize_meaning("把…...塞入，把…...藏入") == "把……塞入，把……藏入"
+        assert normalize_meaning("把..……打包") == "把……打包"
+        assert normalize_meaning("用………揉擦（皮肤、头发等）") == "用……揉擦（皮肤、头发等）"
+        assert normalize_meaning("给······姓氏，给······起别名") == "给……姓氏，给……起别名"
+        assert normalize_meaning("与……相似；和…一样，像") == "与……相似；和……一样，像"
+
+    def test_abbreviation_dots_untouched(self):
+        assert normalize_meaning("常缩写为 Sep. 或 Sept.") == "常缩写为 Sep. 或 Sept."
+        assert normalize_meaning("e.g. apples") == "e.g. apples"
+
+    # Half-width pairs and stray spaces in Chinese text.
+    def test_half_width_paren_pair_in_chinese_context_widens(self):
+        assert normalize_meaning("格雷丝 (女名)") == "格雷丝（女名）"
+        assert normalize_meaning("向内，向中心；向自己，向内心 (=inwards)") == \
+            "向内，向中心；向自己，向内心（=inwards）"
+        assert normalize_meaning("有......腿的(-legged)") == "有……腿的（-legged）"
+        assert normalize_meaning("不及物动词 (intransitive verb)") == \
+            "不及物动词（intransitive verb）"
+
+    def test_half_width_paren_pair_in_english_phrase_kept(self):
+        assert normalize_meaning("call (sb) up") == "call (sb) up"
+        assert normalize_meaning("jog (one's memory)") == "jog (one's memory)"
+
+    def test_square_bracket_qualifier_becomes_parenthetical(self):
+        # Real Youdao data: yours "你（们）的东西；你的责任[义务]".
+        assert normalize_meaning("你的责任[义务]") == "你的责任（义务）"
+
+    def test_space_between_cjk_characters_removed(self):
+        # Every CJK-space-CJK gap in the crawl (41 outside "） （"/"】 （") is a
+        # stray: "航空站 （港）", "（数字、 数量、价值）", "第九个小时 下午3点".
+        assert normalize_meaning("航空站 （港）") == "航空站（港）"
+        assert normalize_meaning("每日的祈祷 （=Divine Office）") == "每日的祈祷（=Divine Office）"
+        assert normalize_meaning("（数字、 数量、价值）增加") == "（数字、数量、价值）增加"
+        assert normalize_meaning("悠闲 （或漫不经心）地移动") == "悠闲（或漫不经心）地移动"
+        assert normalize_meaning("（法）格里夫 (人名)") == "（法）格里夫（人名）"
+
+    def test_space_between_cjk_and_latin_kept(self):
+        assert normalize_meaning("常缩略为 p") == "常缩略为 p"
+        assert normalize_meaning("九十（数字 90）") == "九十（数字 90）"
+
+    def test_doubled_name_tag_collapsed(self):
+        # Real Youdao data: holiday's name line is tagged "【名】 【名】".
+        assert normalize_meaning("【名】 【名】（Fit）（捷、罗）菲特（人名）") == \
+            "【名】（Fit）（捷、罗）菲特（人名）"
 
 
 class TestWrapPhonetic:
@@ -239,6 +406,122 @@ class TestExtractEntries:
         entries = extract_entries("x", trimmed)
         assert [(e["pos"], e["meaning"]) for e in entries] == [("n.", "猫"), ("vi.", "呕吐")]
 
+    def test_identical_sense_line_repeated_is_dropped(self):
+        # Real Youdao data (2026-11-23): bike's verb sense repeats its
+        # "deliver by bike" line verbatim; merged output would show it twice.
+        trimmed = {
+            "input": "bike",
+            "ec": {"word": [{"trs": [{"tr": [{"l": {"i": [
+                "v. 骑自行车",
+            ]}}]}, {"tr": [{"l": {"i": [
+                "v. 用自行车投递（信件，包裹）",
+            ]}}]}, {"tr": [{"l": {"i": [
+                "v. 用自行车投递（信件，包裹）",
+            ]}}]}]}]},
+        }
+        entries = extract_entries("bike", trimmed)
+        assert [e["meaning"] for e in entries] == \
+            ["骑自行车；用自行车投递（信件，包裹）"]
+
+    def test_repeated_segment_inside_one_sense_line_is_dropped(self):
+        # Real Youdao data (2026-11-23): the two copies of bike's "deliver by
+        # bike" sense sit inside ONE line and differ only by a space, so they
+        # are identical once normalized. One of them is noise.
+        trimmed = {
+            "input": "bike",
+            "ec": {"word": [{"trs": [{"tr": [{"l": {"i": [
+                "v. <非正式>骑自行车（单车）；<英> 用自行车（或摩托车）投递（信件，包裹）；"
+                "<英>用自行车（或摩托车）投递（信件，包裹）",
+            ]}}]}]}]},
+        }
+        entries = extract_entries("bike", trimmed)
+        assert [e["meaning"] for e in entries] == [
+            "（非正式）骑自行车（单车）；（英）用自行车（或摩托车）投递（信件，包裹）"]
+
+    # Name lines, placeholders and generated lines, from the 2026-11-23 audit
+    # of all 6,366 preset words. Every fixture is a real Youdao line.
+    def test_name_line_stays_apart_from_unrecognised_pos_lines(self):
+        # hand: the "comb." line and the 【名】 line both had no recognised POS,
+        # so they collapsed into one entry.
+        entries = extract_entries("hand", lines(
+            "n. 手；（钟表的）指针", "comb. 用……手的；手工", "v. 交，递；支持，搀扶",
+            "【名】 （Hand）（英、瑞典）汉德（人名）"))
+        assert [(e["pos"], e["meaning"]) for e in entries] == [
+            ("n.", "手；（钟表的）指针"), ("comb.", "用……手的；手工"),
+            ("v.", "交，递；支持，搀扶"), ("", "【名】（Hand）（英、瑞典）汉德（人名）")]
+
+    def test_name_line_with_its_own_pos_prefix_stays_apart(self):
+        # stark: Youdao's own "n." sits on the name line.
+        entries = extract_entries("stark", lines(
+            "adj. 荒凉的；严酷的", "adv. 完全地；彻底地",
+            "n. 【名】（Stark）（俄、罗）斯塔尔克（人名）"))
+        assert [(e["pos"], e["meaning"]) for e in entries] == [
+            ("adj.", "荒凉的；严酷的"), ("adv.", "完全地；彻底地"),
+            ("", "【名】（Stark）（俄、罗）斯塔尔克（人名）")]
+
+    def test_region_tagged_name_line(self):
+        # dash: the name line opens with 【英】 instead of 【名】.
+        entries = extract_entries("dash", lines(
+            "vi. 猛冲，飞奔", "【英】（Dash）（英、美、印）达什（人名）"))
+        assert [(e["pos"], e["meaning"]) for e in entries] == [
+            ("vi.", "猛冲，飞奔"), ("", "【英】（Dash）（英、美、印）达什（人名）")]
+
+    def test_null_placeholder_dropped(self):
+        # Youdao emits the literal string "null" as the POS of some name lines
+        # and, once, as a trailing sense.
+        entries = extract_entries("ass", lines(
+            "n. 傻瓜，笨蛋；屁股，臀部", "null 【名】（Ass）（俄）阿斯（人名）"))
+        assert [(e["pos"], e["meaning"]) for e in entries] == [
+            ("n.", "傻瓜，笨蛋；屁股，臀部"), ("", "【名】（Ass）（俄）阿斯（人名）")]
+        entries = extract_entries("stray", lines("null （Stray）（挪、美、英、俄）斯特雷（人名）"))
+        assert [(e["pos"], e["meaning"]) for e in entries] == [
+            ("", "（Stray）（挪、美、英、俄）斯特雷（人名）")]
+        entries = extract_entries("pull", lines("n. 拉，拽；草样，校样；null"))
+        assert [e["meaning"] for e in entries] == ["拉，拽；草样，校样"]
+
+    def test_doubled_name_tag_collapsed(self):
+        entries = extract_entries("holiday", lines(
+            "n. 假日；度假期", "【名】 【名】（Fit）（捷、罗）菲特（人名）"))
+        assert [(e["pos"], e["meaning"]) for e in entries] == [
+            ("n.", "假日；度假期"), ("", "【名】（Fit）（捷、罗）菲特（人名）")]
+
+    def test_name_line_repeated_inside_one_line_kept_once(self):
+        # serve prints its name twice, the second copy without the 【名】 tag;
+        # app and chap repeat theirs with the tag.
+        entries = extract_entries("serve", lines(
+            "n. （网球、排球等的）发球",
+            "【名】  （Serve）（法）塞尔夫（人名）；（Serve）（法）塞尔夫（人名）"))
+        assert [(e["pos"], e["meaning"]) for e in entries] == [
+            ("n.", "（网球、排球等的）发球"), ("", "【名】（Serve）（法）塞尔夫（人名）")]
+        entries = extract_entries("app", lines(
+            "【名】 （App）（美、德、巴）阿普（人名）；【名】 （App）（美、德、巴）阿普（人名）"))
+        assert [e["meaning"] for e in entries] == ["【名】（App）（美、德、巴）阿普（人名）"]
+
+    def test_name_line_joins_the_posless_entry_when_both_exist(self):
+        # Real Youdao data: crawled proper nouns such as Ortega carry a name
+        # line and a place line, both POS-less; (word, pos) must stay unique.
+        entries = extract_entries("Ortega", lines(
+            "奥尔特加（人名）", "奥尔特加（地名，阿根廷、哥伦比亚）"))
+        assert [(e["pos"], e["meaning"]) for e in entries] == [(
+            "", "奥尔特加（人名）；奥尔特加（地名，阿根廷、哥伦比亚）")]
+
+    def test_generated_lines_joined_without_a_stray_period(self):
+        # according to: generated prose, each line ending with "。"; joining
+        # the lines with "；" used to leave "。；" in the entry.
+        entries = extract_entries("according to", lines(
+            "根据：表示根据某人或某事的陈述、说法或信念。",
+            "按照：表示按照某个标准、规则或方法。"))
+        assert [(e["pos"], e["meaning"]) for e in entries] == [(
+            "", "根据：表示根据某人或某事的陈述、说法或信念；按照：表示按照某个标准、规则或方法")]
+
+
+def lines(*sense_lines, phonetic="x"):
+    """A trimmed response holding the given sense lines of one word."""
+    return {"input": "w", "ec": {"word": [{
+        "ukphone": phonetic,
+        "trs": [{"tr": [{"l": {"i": list(sense_lines)}}]}],
+    }]}}
+
 
 def make_entry(word, pos="n.", meaning="x", phonetic="/a/", phonetic_us=None):
     return {"word": word, "pos": pos, "meaning": meaning,
@@ -289,13 +572,15 @@ class TestValidateEntries:
             entries, preset_books=[("cet4_2016", {"a"})])
         assert errors == []
 
-    def test_preset_word_without_entry_reported_not_failed(self):
-        # ADR 0003: words Youdao has no entry for are excluded from the
-        # dictionary; that is reported per book, not a validation error.
+    def test_preset_word_without_entry_fails_gate(self):
+        # Owner ruling 2026-11-23: no preset word may ship without a
+        # definition, so a syllabus word missing from the dictionary is an
+        # error, not a report line.
         entries = [make_entry("a")]
         errors, report = validate_entries(
             entries, preset_books=[("cet4_2016", {"a", "not crawled"})])
-        assert errors == []
+        assert any("cet4_2016" in e and "'not crawled'" in e
+                   and "no dictionary entry" in e for e in errors), errors
         stats = report["preset_books"]["cet4_2016"]
         assert stats["with_entry"] == 1
         assert stats["without_entry"] == ["not crawled"]
@@ -338,6 +623,41 @@ class TestValidateEntries:
         errors, report = validate_entries(entries)
         assert not any("phonetic" in e for e in errors)
         assert report["us_coverage"] == 1.0
+
+
+class TestApplyPresetAliases:
+    def test_emits_lookup_entries_under_the_syllabus_spelling(self):
+        entries = [
+            make_entry("baby boom", meaning="婴儿潮",
+                       phonetic="/ˈbeɪbibuːm/", phonetic_us="/ˈbeɪbibuːm/"),
+            make_entry("baby boom", pos="adj.", meaning="婴儿潮的"),
+        ]
+        aliased, errors = apply_preset_aliases(entries)
+        assert errors == []
+        assert {(e["word"], e["pos"], e["meaning"]) for e in aliased} == {
+            ("baby boom", "n.", "婴儿潮"),
+            ("baby boom", "adj.", "婴儿潮的"),
+            ("babyboom", "n.", "婴儿潮"),
+            ("babyboom", "adj.", "婴儿潮的"),
+        }
+        copied = [e for e in aliased if e["word"] == "babyboom" and e["pos"] == "n."]
+        assert copied[0]["phonetic"] == "/ˈbeɪbibuːm/"
+        assert copied[0]["phonetic_us"] == "/ˈbeɪbibuːm/"
+
+    def test_keeps_the_spelling_own_entry_when_it_has_one(self):
+        entries = [make_entry("babyboom", meaning="自有释义"), make_entry("baby boom")]
+        aliased, errors = apply_preset_aliases(entries)
+        assert errors == []
+        assert [e["meaning"] for e in aliased if e["word"] == "babyboom"] == ["自有释义"]
+
+    def test_lookup_word_missing_from_the_crawl_is_an_error(self):
+        _, errors = apply_preset_aliases([make_entry("a")])
+        assert any("babyboom" in e and "baby boom" in e for e in errors), errors
+
+    def test_alias_table_locked(self):
+        # Each pair must be verified against live Youdao (the syllabus spelling
+        # absent, the lookup present); growing the table is an owner decision.
+        assert PRESET_LOOKUP_ALIASES == {"babyboom": "baby boom"}
 
 
 class TestApplyPhoneticFill:
