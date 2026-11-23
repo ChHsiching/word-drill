@@ -584,20 +584,17 @@ private fun CompletionCard(
 ) {
     val typography = MaterialTheme.wordDrillTypography
     val colors = MaterialTheme.colorScheme
-    // Mirrors the WordCard's vertical grammar (TopCenter + 80dp) so the
-    // completion moment balances the bottom nav exactly like a drill card.
-    Box(
+    // Proportional vertical layout (owner direction): the hero cluster centers
+    // between the page top and the action row with a slight upward bias, so any
+    // screen aspect self-balances instead of a fixed offset drifting on tall
+    // displays.
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 28.dp),
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .padding(top = 144.dp),
-        ) {
+        Spacer(modifier = Modifier.weight(0.44f))
             // The hero: the pass count in the StatCard number grammar, flanked by
             // its ordinal units on the same baseline — the word slot of the card.
             Row {
@@ -642,13 +639,10 @@ private fun CompletionCard(
                         .background(colors.onSurface, RoundedCornerShape(3.dp)),
                 )
             }
-        }
+        Spacer(modifier = Modifier.weight(0.56f))
         // Actions sit low in the thumb zone, clear of the floating nav.
         Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 140.dp)
-                .fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             DialogButton(
@@ -662,5 +656,6 @@ private fun CompletionCard(
                 style = DialogButtonStyle.Cancel,
             )
         }
+        Spacer(modifier = Modifier.height(140.dp))
     }
 }
