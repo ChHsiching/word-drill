@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,6 +51,8 @@ import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.local.dao.BookWithCount
 import com.github.chsiching.worddrill.ui.theme.DialogButton
 import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
+import com.github.chsiching.worddrill.ui.theme.DialogFact
+import com.github.chsiching.worddrill.ui.theme.DialogFacts
 import com.github.chsiching.worddrill.ui.theme.DialogTextField
 import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
@@ -185,16 +188,24 @@ private fun BookRow(
                     fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Text(
-                    text = stringResource(
-                        R.string.library_word_count_format,
-                        book.wordCount,
-                        stringResource(if (book.isPreset) R.string.library_preset_badge else R.string.library_custom_badge),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // Space, not a separator character, keeps the count and the kind apart.
+                Row(
                     modifier = Modifier.padding(top = 2.dp),
-                )
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.library_word_count_format, book.wordCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = stringResource(
+                            if (book.isPreset) R.string.library_preset_badge else R.string.library_custom_badge,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (!book.isPreset) {
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         TextButton(onClick = onRename, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
@@ -331,9 +342,27 @@ private fun ImportBookDialog(
     WordDrillDialog(
         onDismissRequest = { if (!state.working) onDismiss() },
         title = stringResource(R.string.library_import_title),
-        message = stringResource(R.string.library_import_message),
         content = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // What the importer accepts, stated as facts above the controls.
+                DialogFacts {
+                    DialogFact(
+                        label = stringResource(R.string.library_import_fact_format_label),
+                        lines = listOf(stringResource(R.string.library_import_fact_format_line)),
+                    )
+                    DialogFact(
+                        label = stringResource(R.string.library_import_fact_columns_label),
+                        lines = listOf(stringResource(R.string.library_import_fact_columns_line)),
+                    )
+                    DialogFact(
+                        label = stringResource(R.string.library_import_fact_meaning_label),
+                        lines = listOf(
+                            stringResource(R.string.library_import_fact_meaning_line1),
+                            stringResource(R.string.library_import_fact_meaning_line2),
+                        ),
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
                 OutlinedButton(
                     onClick = {
                         pickFileLauncher.launch(
@@ -425,17 +454,37 @@ private fun ImportDoneDialog(
 ) {
     // Name up to a few skipped words so the user can see WHAT was incomplete,
     // not just how much.
-    val message = if (summary.skippedWords.isEmpty()) {
-        stringResource(R.string.library_import_done, summary.success, summary.skipped)
+    val skippedNames = summary.skippedWords.joinToString("、")
+    val skippedLine = if (summary.skipped > summary.skippedWords.size) {
+        stringResource(R.string.library_import_fact_skipped_words_more, skippedNames)
     } else {
-        val names = summary.skippedWords.joinToString("、") +
-            if (summary.skipped > summary.skippedWords.size) "等" else ""
-        stringResource(R.string.library_import_done_with_words, summary.success, summary.skipped, names)
+        skippedNames
     }
     WordDrillDialog(
         onDismissRequest = onDismiss,
-        title = stringResource(R.string.library_import_title),
-        message = message,
+        title = stringResource(R.string.library_import_done_title),
+        content = {
+            DialogFacts {
+                DialogFact(
+                    label = stringResource(R.string.library_import_fact_success_label),
+                    lines = listOf(stringResource(R.string.library_import_fact_count, summary.success)),
+                )
+                DialogFact(
+                    label = stringResource(R.string.library_import_fact_skipped_label),
+                    lines = listOf(stringResource(R.string.library_import_fact_count, summary.skipped)),
+                )
+                if (summary.skippedWords.isNotEmpty()) {
+                    DialogFact(
+                        label = stringResource(R.string.library_import_fact_skipped_reason_label),
+                        lines = listOf(stringResource(R.string.library_import_fact_skipped_reason_line)),
+                    )
+                    DialogFact(
+                        label = stringResource(R.string.library_import_fact_skipped_words_label),
+                        lines = listOf(skippedLine),
+                    )
+                }
+            }
+        },
         buttons = {
             DialogButton(
                 text = stringResource(R.string.library_confirm),
@@ -455,7 +504,18 @@ private fun DeleteBookDialog(
     WordDrillDialog(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.library_delete_title),
-        message = stringResource(R.string.library_delete_message, name),
+        content = {
+            DialogFacts {
+                DialogFact(
+                    label = stringResource(R.string.dialog_fact_book_label),
+                    lines = listOf(name),
+                )
+                DialogFact(
+                    label = stringResource(R.string.dialog_fact_after_delete_label),
+                    lines = listOf(stringResource(R.string.dialog_fact_recoverable)),
+                )
+            }
+        },
         buttons = {
             DialogButton(
                 text = stringResource(R.string.library_cancel),

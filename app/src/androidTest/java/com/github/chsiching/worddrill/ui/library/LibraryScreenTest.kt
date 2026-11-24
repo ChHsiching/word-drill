@@ -79,7 +79,7 @@ class LibraryScreenTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("删除词书").assertIsDisplayed()
-        composeRule.onNodeWithText("确定删除「我的生词本」？可从回收站恢复。").assertIsDisplayed()
+        composeRule.onNodeWithText("可从回收站恢复").assertIsDisplayed()
         composeRule.onNodeWithText("取消").assertIsDisplayed()
     }
 

@@ -242,7 +242,7 @@ class WordListScreenTest {
         composeRule.onNodeWithContentDescription("删除").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("删除词条").assertIsDisplayed()
-        composeRule.onNodeWithText("确定删除「apple」？可从回收站恢复。").assertIsDisplayed()
+        composeRule.onNodeWithText("可从回收站恢复").assertIsDisplayed()
 
         composeRule.onAllNodes(androidx.compose.ui.test.hasText("删除", substring = false)).onFirst().performClick()
         composeRule.waitForIdle()
@@ -290,6 +290,37 @@ class WordListScreenTest {
     }
 
     @Test
+    fun addDialog_halfFilled_eachBlankFieldReportsItsOwnGap() {
+        setContentFor(customBookId)
+        composeRule.onNodeWithContentDescription("新增词条").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("单词").performTextInput("zzqq")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("词性不能为空").assertIsDisplayed()
+        composeRule.onNodeWithText("释义不能为空").assertIsDisplayed()
+        composeRule.onNodeWithText("单词不能为空").assertDoesNotExist()
+
+        selectPosFromDropdown("n.")
+        composeRule.onNodeWithText("词性不能为空").assertDoesNotExist()
+        composeRule.onNodeWithText("释义不能为空").assertIsDisplayed()
+
+        composeRule.onNodeWithText("释义").performTextInput("测试")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("释义不能为空").assertDoesNotExist()
+    }
+
+    @Test
+    fun editDialog_clearedPos_reportsOnlyThePosGap() {
+        setContentFor(customBookId)
+        composeRule.onNodeWithText("苹果").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("词性").performTextReplacement("")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("词性不能为空").assertIsDisplayed()
+        composeRule.onNodeWithText("释义不能为空").assertDoesNotExist()
+    }
+
+    @Test
     fun wordList_ordersMixedCase_interleaved() {
         seedOneWord(customBookId, "Zebra", "n.", "斑马")
         seedOneWord(customBookId, "core", "n.", "核心")
@@ -330,7 +361,7 @@ class WordListScreenTest {
         composeRule.onNodeWithText("搜索单词").performTextInput("zzz")
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("没有匹配「zzz」的单词").assertIsDisplayed()
+        composeRule.onNodeWithText("没有匹配的单词").assertIsDisplayed()
         composeRule.onNodeWithText("apple", substring = false).assertDoesNotExist()
     }
 
@@ -370,7 +401,8 @@ class WordListScreenTest {
         runBlocking { settings.setResumeWordId(bookId, db.wordDao().getByText("banana")!!.wordId) }
         setContentFor(bookId)
 
-        composeRule.onNodeWithText("刷过 3 遍 · 2 / 3 词", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("刷过 3 遍", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("2 / 3 词", substring = false).assertIsDisplayed()
     }
 
     @Test
@@ -383,15 +415,19 @@ class WordListScreenTest {
         runBlocking { settings.setResumeWordId(bookId, db.wordDao().getByText("apple")!!.wordId) }
         setContentFor(bookId)
 
-        composeRule.onNodeWithText("刷过 1 遍 · 1 / 2 词", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("刷过 1 遍", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("1 / 2 词", substring = false).assertIsDisplayed()
         runBlocking {
             settings.setResumeWordId(bookId, db.wordDao().getByText("banana")!!.wordId)
             db.bookDao().incrementCompletionCount(bookId)
         }
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodes(
-                androidx.compose.ui.test.hasText("刷过 2 遍 · 2 / 2 词", substring = false)
-            ).fetchSemanticsNodes().size == 1
+                androidx.compose.ui.test.hasText("刷过 2 遍", substring = false)
+            ).fetchSemanticsNodes().size == 1 &&
+                composeRule.onAllNodes(
+                    androidx.compose.ui.test.hasText("2 / 2 词", substring = false)
+                ).fetchSemanticsNodes().size == 1
         }
     }
 
@@ -490,7 +526,7 @@ class WordListScreenTest {
         // No results at all: nothing to navigate, the bar goes away.
         composeRule.onNodeWithText("an").performTextReplacement("zzz")
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("没有匹配「zzz」的单词").assertIsDisplayed()
+        composeRule.onNodeWithText("没有匹配的单词").assertIsDisplayed()
         composeRule.onNodeWithText("A", substring = false).assertDoesNotExist()
     }
 

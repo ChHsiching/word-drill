@@ -72,6 +72,8 @@ import com.github.chsiching.worddrill.data.settings.PhoneticPreference
 import com.github.chsiching.worddrill.data.settings.ThemeMode
 import com.github.chsiching.worddrill.ui.theme.DialogButton
 import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
+import com.github.chsiching.worddrill.ui.theme.DialogFact
+import com.github.chsiching.worddrill.ui.theme.DialogFacts
 import com.github.chsiching.worddrill.ui.theme.DialogTextField
 import com.github.chsiching.worddrill.ui.theme.LocalThemeRevealTrigger
 import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
@@ -703,14 +705,29 @@ private fun DataSection(
         WordDrillDialog(
             onDismissRequest = { showExportDialog = false },
             title = stringResource(R.string.me_export_title),
-            message = stringResource(R.string.me_export_message),
             content = {
-                DialogTextField(
-                    value = nicknameInput,
-                    onValueChange = { nicknameInput = it },
-                    label = stringResource(R.string.me_export_nickname_hint),
-                    singleLine = true,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DialogFacts {
+                        DialogFact(
+                            label = stringResource(R.string.me_export_fact_scope_label),
+                            lines = listOf(stringResource(R.string.me_export_fact_scope_line)),
+                        )
+                        DialogFact(
+                            label = stringResource(R.string.me_export_fact_format_label),
+                            lines = listOf(stringResource(R.string.me_export_fact_format_line)),
+                        )
+                        DialogFact(
+                            label = stringResource(R.string.me_export_fact_use_label),
+                            lines = listOf(stringResource(R.string.me_export_fact_use_line)),
+                        )
+                    }
+                    DialogTextField(
+                        value = nicknameInput,
+                        onValueChange = { nicknameInput = it },
+                        label = stringResource(R.string.me_export_nickname_hint),
+                        singleLine = true,
+                    )
+                }
             },
             buttons = {
                 DialogButton(
@@ -735,20 +752,32 @@ private fun DataSection(
         WordDrillDialog(
             onDismissRequest = { showImportDialog = false },
             title = stringResource(R.string.me_import_title),
-            message = stringResource(R.string.me_import_message),
+            content = {
+                DialogFacts {
+                    DialogFact(
+                        label = stringResource(R.string.me_import_fact_effect_label),
+                        lines = listOf(stringResource(R.string.me_import_fact_effect_line)),
+                    )
+                    DialogFact(
+                        label = stringResource(R.string.me_import_fact_undo_label),
+                        lines = listOf(stringResource(R.string.me_import_fact_undo_line)),
+                    )
+                }
+            },
             buttons = {
                 DialogButton(
                     text = stringResource(R.string.me_cancel),
                     onClick = { showImportDialog = false },
                     style = DialogButtonStyle.Cancel,
                 )
+                // Overwriting every existing record is as destructive as a delete.
                 DialogButton(
                     text = stringResource(R.string.me_import_confirm),
                     onClick = {
                         showImportDialog = false
                         importLauncher.launch(arrayOf("application/json", "*/*"))
                     },
-                    style = DialogButtonStyle.Primary,
+                    style = DialogButtonStyle.Destructive,
                 )
             },
         )
@@ -875,42 +904,27 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             )
             // Structured label/value facts (owner direction: no prose blobs). The
-            // facts sit in the app's group-card container so the left-aligned
-            // block reads as one deliberate inset; the count value's lines are
-            // broken manually in the string resource.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 14.dp)
-                    .background(
-                        MaterialTheme.wordDrillColors.chipBg,
-                        RoundedCornerShape(14.dp),
-                    )
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-            ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    AboutFact(
-                        label = stringResource(R.string.me_about_fact_source_label),
-                        lines = listOf(stringResource(R.string.me_about_fact_source_value)),
-                    )
-                    AboutFact(
-                        label = stringResource(R.string.me_about_fact_form_label),
-                        lines = listOf(stringResource(R.string.me_about_fact_form_value)),
-                    )
-                    AboutFact(
-                        label = stringResource(R.string.me_about_fact_count_label),
-                        // Manually broken short lines (owner direction): each line is
-                        // its own Text so no line can auto-wrap into an orphan.
-                        lines = listOf(
-                            stringResource(R.string.me_about_fact_count_line1),
-                            stringResource(R.string.me_about_fact_count_line2),
-                            stringResource(R.string.me_about_fact_count_line3),
-                            stringResource(R.string.me_about_fact_count_line4),
-                        ),
-                    )
-                }
+            // count value's lines are broken manually in the string resource.
+            DialogFacts {
+                DialogFact(
+                    label = stringResource(R.string.me_about_fact_source_label),
+                    lines = listOf(stringResource(R.string.me_about_fact_source_value)),
+                )
+                DialogFact(
+                    label = stringResource(R.string.me_about_fact_form_label),
+                    lines = listOf(stringResource(R.string.me_about_fact_form_value)),
+                )
+                DialogFact(
+                    label = stringResource(R.string.me_about_fact_count_label),
+                    // Manually broken short lines (owner direction): each line is
+                    // its own Text so no line can auto-wrap into an orphan.
+                    lines = listOf(
+                        stringResource(R.string.me_about_fact_count_line1),
+                        stringResource(R.string.me_about_fact_count_line2),
+                        stringResource(R.string.me_about_fact_count_line3),
+                        stringResource(R.string.me_about_fact_count_line4),
+                    ),
+                )
             }
         },
         buttons = {
@@ -921,27 +935,4 @@ private fun AboutDialog(onDismiss: () -> Unit) {
             )
         },
     )
-}
-
-/** One label/value pair of the About dialog's facts block; the value is one or
- *  more manually broken lines, each its own Text. */
-@Composable
-private fun AboutFact(label: String, lines: List<String>) {
-    Column {
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            letterSpacing = 0.5.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        lines.forEachIndexed { index, line ->
-            Text(
-                text = line,
-                fontSize = 13.sp,
-                lineHeight = (13 * 1.55).sp,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = if (index == 0) Modifier.padding(top = 3.dp) else Modifier,
-            )
-        }
-    }
 }

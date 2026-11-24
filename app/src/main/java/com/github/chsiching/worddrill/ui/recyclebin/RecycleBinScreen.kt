@@ -37,6 +37,8 @@ import com.github.chsiching.worddrill.data.local.dao.DeletedEntry
 import com.github.chsiching.worddrill.data.local.entity.Book
 import com.github.chsiching.worddrill.ui.theme.DialogButton
 import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
+import com.github.chsiching.worddrill.ui.theme.DialogFact
+import com.github.chsiching.worddrill.ui.theme.DialogFacts
 import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 
@@ -123,6 +125,12 @@ fun RecycleBinScreen(
     pendingPurge?.let { target ->
         PurgeConfirmDialog(
             displayName = target.displayName,
+            targetLabel = stringResource(
+                when (target) {
+                    is PurgeTarget.BookItem -> R.string.dialog_fact_book_label
+                    is PurgeTarget.EntryItem -> R.string.recycle_bin_purge_fact_entry_label
+                },
+            ),
             onConfirm = {
                 when (target) {
                     is PurgeTarget.BookItem -> viewModel.purgeBook(target.bookId)
@@ -230,13 +238,22 @@ private fun RowSeparator() {
 @Composable
 private fun PurgeConfirmDialog(
     displayName: String,
+    targetLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     WordDrillDialog(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.recycle_bin_purge_title),
-        message = stringResource(R.string.recycle_bin_purge_message, displayName),
+        content = {
+            DialogFacts {
+                DialogFact(label = targetLabel, lines = listOf(displayName))
+                DialogFact(
+                    label = stringResource(R.string.recycle_bin_purge_fact_after_label),
+                    lines = listOf(stringResource(R.string.recycle_bin_purge_fact_after_line)),
+                )
+            }
+        },
         buttons = {
             DialogButton(
                 text = stringResource(R.string.library_cancel),

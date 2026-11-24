@@ -195,7 +195,7 @@ class UpdateFlowTest {
             // Background check: no dialog and no banner unless a newer release
             // was found; failures surface only on the manual check path.
             composeRule.onNodeWithText("发现新版本").assertDoesNotExist()
-            composeRule.onNodeWithText("无法解析域名", substring = false).assertDoesNotExist()
+            composeRule.onNodeWithText("网络不可用，请检查网络连接", substring = false).assertDoesNotExist()
             composeRule.onNodeWithText("连接被中断，可能是网络限制", substring = false).assertDoesNotExist()
             composeRule.onNodeWithText("无法连接 GitHub", substring = false).assertDoesNotExist()
         }
@@ -208,10 +208,10 @@ class UpdateFlowTest {
             FakeInstaller(),
         )
         composeRule.runOnIdle { vm.manualCheck() }
-        awaitShown("无法解析域名", substring = false)
+        awaitShown("网络不可用，请检查网络连接", substring = false)
 
         composeRule.onNodeWithContentDescription("关闭").performClick()
 
-        awaitGone("无法解析域名", substring = false)
+        awaitGone("网络不可用，请检查网络连接", substring = false)
     }
 }

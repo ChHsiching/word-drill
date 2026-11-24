@@ -102,7 +102,7 @@ class RecycleBinScreenTest {
 
         composeRule.onNodeWithText("永久删除").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("永久删除「apple」？此操作不可撤销。").assertIsDisplayed()
+        composeRule.onNodeWithText("无法恢复").assertIsDisplayed()
 
         val purgeNodes = composeRule.onAllNodes(
             androidx.compose.ui.test.hasText("永久删除", substring = false) and

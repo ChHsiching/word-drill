@@ -379,11 +379,11 @@ class MeScreenTest {
         composeRule.onNodeWithText("导出数据").performScrollTo()
         composeRule.onNodeWithText("导出数据").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("将整库（词条池、词书、刷卡日志）导出为 JSON 文件，用于换机迁移。").assertIsDisplayed()
+        composeRule.onNodeWithText("换机后导入即可恢复").assertIsDisplayed()
         composeRule.onNodeWithText("可选昵称标签").assertIsDisplayed()
         composeRule.onNodeWithText("取消", substring = false).performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("将整库（词条池、词书、刷卡日志）导出为 JSON 文件，用于换机迁移。").assertIsNotDisplayed()
+        composeRule.onNodeWithText("换机后导入即可恢复").assertIsNotDisplayed()
     }
 
     @Test
@@ -393,7 +393,7 @@ class MeScreenTest {
         composeRule.onNodeWithText("导入数据").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("确认导入").assertIsDisplayed()
-        composeRule.onNodeWithText("导入将覆盖当前所有数据，此操作不可撤销。").assertIsDisplayed()
+        composeRule.onNodeWithText("当前全部数据被替换为文件中的数据").assertIsDisplayed()
         composeRule.onNodeWithText("覆盖导入").assertIsDisplayed()
         composeRule.onNodeWithText("取消", substring = false).performClick()
         composeRule.waitForIdle()

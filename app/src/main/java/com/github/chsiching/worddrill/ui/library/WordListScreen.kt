@@ -1,5 +1,6 @@
 package com.github.chsiching.worddrill.ui.library
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,6 +66,8 @@ import com.github.chsiching.worddrill.data.settings.PhoneticPreference
 import com.github.chsiching.worddrill.ui.theme.CharisSilFontFamily
 import com.github.chsiching.worddrill.ui.theme.DialogButton
 import com.github.chsiching.worddrill.ui.theme.DialogButtonStyle
+import com.github.chsiching.worddrill.ui.theme.DialogFact
+import com.github.chsiching.worddrill.ui.theme.DialogFacts
 import com.github.chsiching.worddrill.ui.theme.DialogTextField
 import com.github.chsiching.worddrill.ui.theme.WordDrillDialog
 import com.github.chsiching.worddrill.ui.theme.wordDrillColors
@@ -124,11 +127,17 @@ fun WordListScreen(
                 .fillMaxWidth()
                 .padding(start = 24.dp, top = 2.dp, end = 14.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
+            // Space, not a separator character, keeps the two figures apart.
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
+                text = stringResource(R.string.word_list_progress_completed, state.completionCount),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
                 text = stringResource(
-                    R.string.word_list_progress_header,
-                    state.completionCount,
+                    R.string.word_list_progress_position,
                     state.resumePosition,
                     state.deckSize,
                 ),
@@ -159,7 +168,7 @@ fun WordListScreen(
 
         when {
             state.words.isEmpty() && state.searchQuery.isNotBlank() ->
-                EmptyState(stringResource(R.string.word_list_search_empty, state.searchQuery))
+                EmptyState(stringResource(R.string.word_list_search_empty))
             state.words.isEmpty() -> EmptyState(if (readOnly) stringResource(R.string.word_list_preset_readonly) else state.bookName)
             else -> {
                 val listState = rememberLazyListState()
@@ -338,6 +347,11 @@ private fun AddWordDialog(
     onDismiss: () -> Unit,
 ) {
     var posExpanded by remember { mutableStateOf(false) }
+    // Once the form has a gap, each field reports only its own gap.
+    val invalid = state.error != null
+    val wordBlank = invalid && state.text.isBlank()
+    val posBlank = invalid && state.pos.isBlank()
+    val meaningBlank = invalid && state.meaning.isBlank()
 
     WordDrillDialog(
         onDismissRequest = onDismiss,
@@ -349,7 +363,8 @@ private fun AddWordDialog(
                     onValueChange = onTextInput,
                     label = stringResource(R.string.word_list_text_hint),
                     singleLine = true,
-                    isError = state.error != null,
+                    isError = wordBlank,
+                    supportingText = fieldMessage(wordBlank, R.string.validation_word_empty),
                 )
                 ExposedDropdownMenuBox(
                     expanded = posExpanded,
@@ -360,8 +375,9 @@ private fun AddWordDialog(
                         onValueChange = {},
                         label = stringResource(R.string.word_list_pos_dropdown_label),
                         singleLine = true,
-                        isError = state.error != null,
+                        isError = posBlank,
                         readOnly = true,
+                        supportingText = fieldMessage(posBlank, R.string.validation_pos_empty),
                         trailingIcon = {
                             ExposedDropdownMenuDefaults.TrailingIcon(posExpanded)
                         },
@@ -389,8 +405,8 @@ private fun AddWordDialog(
                     onValueChange = onMeaningInput,
                     label = stringResource(R.string.word_list_meaning_hint),
                     singleLine = true,
-                    isError = state.error != null,
-                    supportingText = if (state.error != null) ({ Text(stringResource(state.error)) }) else null,
+                    isError = meaningBlank,
+                    supportingText = fieldMessage(meaningBlank, R.string.validation_meaning_empty),
                 )
             }
         },
@@ -410,6 +426,11 @@ private fun AddWordDialog(
     )
 }
 
+/** The message under one field of a form dialog, or nothing while that field is fine. */
+@Composable
+private fun fieldMessage(show: Boolean, @StringRes message: Int): (@Composable () -> Unit)? =
+    if (show) ({ Text(stringResource(message)) }) else null
+
 @Composable
 private fun EditSenseDialog(
     state: WordListDialog.Edit,
@@ -418,6 +439,10 @@ private fun EditSenseDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    // Once the form has a gap, each field reports only its own gap.
+    val invalid = state.error != null
+    val posBlank = invalid && state.pos.isBlank()
+    val meaningBlank = invalid && state.meaning.isBlank()
     WordDrillDialog(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.word_list_edit),
@@ -429,15 +454,16 @@ private fun EditSenseDialog(
                     onValueChange = onPosInput,
                     label = stringResource(R.string.word_list_pos_hint),
                     singleLine = true,
-                    isError = state.error != null,
+                    isError = posBlank,
+                    supportingText = fieldMessage(posBlank, R.string.validation_pos_empty),
                 )
                 DialogTextField(
                     value = state.meaning,
                     onValueChange = onMeaningInput,
                     label = stringResource(R.string.word_list_meaning_hint),
                     singleLine = true,
-                    isError = state.error != null,
-                    supportingText = if (state.error != null) ({ Text(stringResource(state.error)) }) else null,
+                    isError = meaningBlank,
+                    supportingText = fieldMessage(meaningBlank, R.string.validation_meaning_empty),
                 )
             }
         },
@@ -466,7 +492,18 @@ private fun DeleteWordDialog(
     WordDrillDialog(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.word_list_delete_title),
-        message = stringResource(R.string.word_list_delete_message, wordText),
+        content = {
+            DialogFacts {
+                DialogFact(
+                    label = stringResource(R.string.word_list_delete_fact_word_label),
+                    lines = listOf(wordText),
+                )
+                DialogFact(
+                    label = stringResource(R.string.dialog_fact_after_delete_label),
+                    lines = listOf(stringResource(R.string.dialog_fact_recoverable)),
+                )
+            }
+        },
         buttons = {
             DialogButton(
                 text = stringResource(R.string.library_cancel),
@@ -491,7 +528,29 @@ private fun ResetProgressDialog(
     WordDrillDialog(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.word_list_reset_title),
-        message = stringResource(R.string.word_list_reset_message, bookName),
+        content = {
+            DialogFacts {
+                DialogFact(
+                    label = stringResource(R.string.dialog_fact_book_label),
+                    lines = listOf(bookName),
+                )
+                DialogFact(
+                    label = stringResource(R.string.word_list_reset_fact_start_label),
+                    lines = listOf(stringResource(R.string.word_list_reset_fact_start_line)),
+                )
+                DialogFact(
+                    label = stringResource(R.string.word_list_reset_fact_skipped_label),
+                    lines = listOf(
+                        stringResource(R.string.word_list_reset_fact_skipped_line1),
+                        stringResource(R.string.word_list_reset_fact_skipped_line2),
+                    ),
+                )
+                DialogFact(
+                    label = stringResource(R.string.word_list_reset_fact_kept_label),
+                    lines = listOf(stringResource(R.string.word_list_reset_fact_kept_line)),
+                )
+            }
+        },
         buttons = {
             DialogButton(
                 text = stringResource(R.string.library_cancel),
@@ -507,6 +566,7 @@ private fun ResetProgressDialog(
     )
 }
 
+/** Centered empty-state caption. */
 @Composable
 private fun EmptyState(text: String) {
     Box(

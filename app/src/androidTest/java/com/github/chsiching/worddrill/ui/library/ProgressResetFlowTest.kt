@@ -154,8 +154,8 @@ class ProgressResetFlowTest {
         composeRule.onNodeWithText("重置", substring = false).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("重置进度", substring = false).assertIsDisplayed()
-        composeRule.onNodeWithText("确定重置「确认词书」的进度？将回到第一张卡片，跳过的单词全部回到牌组并从复习移除；刷卡记录和统计保留。")
-            .assertIsDisplayed()
+        composeRule.onNodeWithText("回到第一张卡片").assertIsDisplayed()
+        composeRule.onNodeWithText("并从复习中移除").assertIsDisplayed()
 
         // Cancel first: nothing changes.
         composeRule.onNodeWithText("取消").performClick()
