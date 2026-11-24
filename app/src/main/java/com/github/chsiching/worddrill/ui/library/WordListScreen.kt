@@ -164,6 +164,9 @@ fun WordListScreen(
             else -> {
                 val listState = rememberLazyListState()
                 val scope = rememberCoroutineScope()
+                // A new query makes a new result list. Show it from the top
+                // instead of keeping the scroll position of the previous one.
+                LaunchedEffect(state.searchQuery) { listState.scrollToItem(0) }
                 Row(modifier = Modifier.fillMaxSize()) {
                     LazyColumn(
                         state = listState,

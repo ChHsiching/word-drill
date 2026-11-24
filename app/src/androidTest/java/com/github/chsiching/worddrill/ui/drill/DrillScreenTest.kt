@@ -4,6 +4,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -12,8 +13,12 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -39,6 +44,12 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+
+/** The sense block's overflow scroll container: the only vertical scroller on a
+ *  drill card (the pager scrolls horizontally). */
+private val hasVerticalScroll = SemanticsMatcher("hasVerticalScroll") {
+    it.config.contains(SemanticsProperties.VerticalScrollAxisRange)
+}
 
 @RunWith(AndroidJUnit4::class)
 class DrillScreenTest {
@@ -80,6 +91,65 @@ class DrillScreenTest {
     private fun cards() = runBlocking {
         val bookId = db.bookDao().getByName("测试词书")!!.bookId
         db.wordDao().getWordsWithSensesByBook(bookId)
+    }
+
+    @Test
+    fun wordWithExtremeSense_blockStaysCappedAndScrollsToItsEnd() {
+        // E2e defect (the "up" card): six long senses still measured ~600dp at the
+        // 12sp shrink floors, so the last senses were drawn under the floating nav
+        // and could not be read. Past the floors the block is capped and scrolls.
+        val tail = "最后一句结束标记"
+        runBlocking {
+            val bookId = db.bookDao().insert(Book(name = "极端释义词书", isPreset = false))
+            val wId = db.wordDao().findOrInsertWord("extremeword", null)
+            db.wordDao().insertSense(
+                Sense(wordId = wId, pos = "n.", meaning = "很长的释义".repeat(400) + tail)
+            )
+            db.bookDao().linkBookWord(BookWord(bookId, wId))
+        }
+        val cards = cardsOf("极端释义词书")
+        composeRule.setContent {
+            WordDrillTheme {
+                Surface {
+                    DrillPager(
+                        bookName = "极端释义词书",
+                        cards = cards,
+                        phonetics = emptyMap(),
+                        phoneticPreference = PhoneticPreference.US,
+                        completionCount = 0,
+                        onPageSettled = { _, _ -> },
+                        onSkip = { },
+                        isReviewBook = false,
+                        onRestore = { },
+                        onRestartBook = {},
+                        onSwitchBook = {},
+                        locked = false,
+                        onToggleLock = {},
+                        hidePhonetic = false,
+                        onToggleAutoAdvance = { },
+                        advance = emptyFlow(),
+                    )
+                }
+            }
+        }
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(hasVerticalScroll).fetchSemanticsNodes().isNotEmpty()
+        }
+        val block = composeRule.onNode(hasVerticalScroll)
+
+        // Capped: the block ends well above the bottom of the screen, clear of the
+        // nav zone, whatever the screen height.
+        val rootHeight = composeRule.onRoot().fetchSemanticsNode().boundsInRoot.height
+        val navZone = with(composeRule.density) { 120.dp.toPx() }
+        assertThat(block.fetchSemanticsNode().boundsInRoot.bottom).isLessThan(rootHeight - navZone)
+
+        // Scrollable: the sense is longer than the block, so the block has a
+        // scroll range, and one scroll reaches its end.
+        val range = block.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        assertThat(range.maxValue()).isGreaterThan(0f)
+        block.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, Float.MAX_VALUE) }
+        composeRule.waitForIdle()
+        assertThat(range.value()).isWithin(1f).of(range.maxValue())
     }
 
     private fun cardsOf(bookName: String) = runBlocking {

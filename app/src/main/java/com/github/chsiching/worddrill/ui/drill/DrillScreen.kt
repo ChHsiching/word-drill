@@ -20,13 +20,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
@@ -499,61 +502,69 @@ private fun WordCard(
             // Sense block with an auto-shrink cap (owner direction): total height is
             // capped; on overflow the meaning font shrinks first, never below the
             // part-of-speech size, so the pos labels stay readable. The scale only
-            // ever decreases for a given word (reset on word change).
+            // ever decreases for a given word (reset on word change). A sense that
+            // is still too long at the smallest size scrolls inside the capped
+            // block instead of running under the navigation bar.
             val sensesCapPx = with(LocalDensity.current) { SensesMaxHeight.toPx() }
             var meaningScale by remember(word.word.wordId) { mutableFloatStateOf(1f) }
             var uniformScale by remember(word.word.wordId) { mutableFloatStateOf(1f) }
             Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.onGloballyPositioned { coords ->
-                    val heightPx = coords.size.height.toFloat()
-                    if (heightPx > sensesCapPx) {
-                        val nextMeaning = maxOf(
-                            sensesCapPx / heightPx * meaningScale,
-                            MeaningFloorRatio,
+                modifier = Modifier
+                    .heightIn(max = SensesMaxHeight)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.onGloballyPositioned { coords ->
+                        val heightPx = coords.size.height.toFloat()
+                        if (heightPx > sensesCapPx) {
+                            val nextMeaning = maxOf(
+                                sensesCapPx / heightPx * meaningScale,
+                                MeaningFloorRatio,
+                            )
+                            if (nextMeaning < meaningScale) {
+                                meaningScale = nextMeaning
+                            } else if (uniformScale > UniformFloorRatio) {
+                                uniformScale = maxOf(
+                                    sensesCapPx / heightPx * uniformScale,
+                                    UniformFloorRatio,
+                                )
+                            }
+                        }
+                    },
+                ) {
+                    if (word.senses.isEmpty()) {
+                        // Imported word the dictionary does not know: say so instead of
+                        // showing a bare separator.
+                        Text(
+                            text = stringResource(R.string.drill_not_in_dictionary),
+                            style = typography.meaning.copy(color = colors.onSurfaceVariant),
+                            textAlign = TextAlign.Center,
                         )
-                        if (nextMeaning < meaningScale) {
-                            meaningScale = nextMeaning
-                        } else if (uniformScale > UniformFloorRatio) {
-                            uniformScale = maxOf(
-                                sensesCapPx / heightPx * uniformScale,
-                                UniformFloorRatio,
+                    }
+                    word.senses.forEach { sense ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = sense.pos,
+                                style = typography.partOfSpeech.copy(
+                                    color = colors.onSurfaceVariant,
+                                    fontSize = (PosBaseSize * uniformScale).sp,
+                                    lineHeight = (PosBaseLineHeight * uniformScale).sp,
+                                ),
+                            )
+                            Text(
+                                text = sense.meaning,
+                                style = typography.meaning.copy(
+                                    color = colors.onSurface,
+                                    fontSize = (MeaningBaseSize * meaningScale * uniformScale).sp,
+                                    lineHeight = (MeaningBaseLineHeight * meaningScale * uniformScale).sp,
+                                ),
                             )
                         }
-                    }
-                },
-            ) {
-                if (word.senses.isEmpty()) {
-                    // Imported word the dictionary does not know: say so instead of
-                    // showing a bare separator.
-                    Text(
-                        text = stringResource(R.string.drill_not_in_dictionary),
-                        style = typography.meaning.copy(color = colors.onSurfaceVariant),
-                        textAlign = TextAlign.Center,
-                    )
-                }
-                word.senses.forEach { sense ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            text = sense.pos,
-                            style = typography.partOfSpeech.copy(
-                                color = colors.onSurfaceVariant,
-                                fontSize = (PosBaseSize * uniformScale).sp,
-                                lineHeight = (PosBaseLineHeight * uniformScale).sp,
-                            ),
-                        )
-                        Text(
-                            text = sense.meaning,
-                            style = typography.meaning.copy(
-                                color = colors.onSurface,
-                                fontSize = (MeaningBaseSize * meaningScale * uniformScale).sp,
-                                lineHeight = (MeaningBaseLineHeight * meaningScale * uniformScale).sp,
-                            ),
-                        )
                     }
                 }
             }

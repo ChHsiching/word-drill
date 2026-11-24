@@ -334,6 +334,29 @@ class WordListScreenTest {
         composeRule.onNodeWithText("apple", substring = false).assertDoesNotExist()
     }
 
+    @Test
+    fun search_afterScrollingDown_showsFirstMatchAtTop() {
+        // E2e defect: a query typed while the list was scrolled down kept the stale
+        // scroll index, clamped it to the shorter result and showed the LAST
+        // matches instead of starting at the first one.
+        val bookId = runBlocking {
+            db.bookDao().insert(Book(name = "搜索定位词书", isPreset = false))
+        }
+        seedOneWord(bookId, "aaa", "n.", "首词")
+        for (i in 1..15) seedOneWord(bookId, "abo%02d".format(i), "n.", "匹配词")
+        for (i in 1..40) seedOneWord(bookId, "zz%02d".format(i), "n.", "填充词")
+        setContentFor(bookId)
+
+        composeRule.onNodeWithText("Z", substring = false).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("zz01", substring = false).assertIsDisplayed()
+
+        composeRule.onNodeWithText("搜索单词").performTextInput("abo")
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("abo01", substring = false).assertIsDisplayed()
+    }
+
     // --- Progress header and letter index bar (#60) ---
 
     @Test
