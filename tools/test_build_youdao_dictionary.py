@@ -514,6 +514,80 @@ class TestExtractEntries:
         assert [(e["pos"], e["meaning"]) for e in entries] == [(
             "", "根据：表示根据某人或某事的陈述、说法或信念；按照：表示按照某个标准、规则或方法")]
 
+    # Name entries dropped for the words of the preset books (owner decision
+    # 2026-11-25). Every fixture is a real Youdao line, some shortened.
+    def test_name_line_dropped_only_on_request(self):
+        trimmed = lines("n. 手；（钟表的）指针", "【名】 （Hand）（英、瑞典）汉德（人名）")
+        assert [e["pos"] for e in extract_entries("hand", trimmed)] == ["n.", ""]
+        assert [e["pos"] for e in extract_entries("hand", trimmed, True)] == ["n."]
+
+    def test_name_line_with_a_pos_prefix_dropped(self):
+        trimmed = lines("abbr. 上午（同 a.m.）", "n. （AM）（中、英）安（人名）")
+        assert [(e["pos"], e["meaning"]) for e in extract_entries("am", trimmed, True)] == [
+            ("abbr.", "上午（同 a.m.）")]
+
+    def test_name_run_appended_to_a_sense_dropped(self):
+        trimmed = lines(
+            "n. 灰色；暗淡的光线；戈瑞（吸收电离辐射剂量单位，符号 Gy）；（Gray）人名；（意）格拉伊；（英、法、葡、瑞典）格雷")
+        assert extract_entries("gray", trimmed, True)[0]["meaning"] == \
+            "灰色；暗淡的光线；戈瑞（吸收电离辐射剂量单位，符号 Gy）"
+        trimmed = lines("n. （非正式）爸爸，爹爹；（Dad）人名：（孟、巴基、阿富）达德；（泰）达")
+        assert [(e["pos"], e["meaning"]) for e in extract_entries("dad", trimmed, True)] == [
+            ("n.", "（非正式）爸爸，爹爹")]
+
+    def test_name_run_opening_with_the_headword_walked_back(self):
+        # be: the run opens with the headword and untagged fragments; only its
+        # last segment carries the mark.
+        trimmed = lines("v. 是；有，存在；做，成为；发生",
+                        "n. （Be）（缅）拜；（日）部（姓）；（朝）培；（中非）贝（人名）")
+        assert [e["pos"] for e in extract_entries("be", trimmed, True)] == ["v."]
+
+    def test_word_with_nothing_but_name_lines_keeps_them(self):
+        trimmed = lines("n. （Afford）（英、美）阿福德（人名）")
+        assert extract_entries("afford", trimmed, True) == extract_entries("afford", trimmed)
+
+    def test_senses_that_only_talk_about_names_kept(self):
+        trimmed = lines("n. （人名前表示地位、职业或婚姻状况的）头衔，称谓；职位名称")
+        assert extract_entries("title", trimmed, True) == extract_entries("title", trimmed)
+        trimmed = lines("adv. 永远；万岁（用在物或人名后，表示支持的口号）")
+        assert extract_entries("forever", trimmed, True) == extract_entries("forever", trimmed)
+
+    def test_capitalised_sense_in_front_of_a_name_run_kept(self):
+        trimmed = lines(
+            "n. 劳动，工作；劳方，工会组织；（Labor）工党，劳动党；（Labor）人名：（德、塞、法）拉博尔，（英）拉博")
+        assert extract_entries("labor", trimmed, True)[0]["meaning"] == \
+            "劳动，工作；劳方，工会组织；（Labor）工党，劳动党"
+
+    def test_semicolon_inside_parentheses_does_not_end_a_segment(self):
+        # vigor: the mark sits in "（人名；英、法）", and the first sense holds
+        # a "；" of its own.
+        trimmed = lines(
+            "n. 活力，精力（美式拼法；英式常作 vigour）；（文风、表达等的）气势，力度；（人名；英、法） Vigor，维戈尔")
+        assert extract_entries("vigor", trimmed, True)[0]["meaning"] == \
+            "活力，精力（美式拼法；英式常作 vigour）；（文风、表达等的）气势，力度"
+
+    def test_untagged_name_and_place_entries_dropped(self):
+        trimmed = lines("n. 自行车，脚踏车，单车；摩托车", "n. （Bike)（土、土库、塞）比克")
+        assert [(e["pos"], e["meaning"]) for e in extract_entries("bike", trimmed, True)] == [
+            ("n.", "自行车，脚踏车，单车；摩托车")]
+        trimmed = lines("n. 轮胎；轮箍；（Tyre）提尔")
+        assert [(e["pos"], e["meaning"]) for e in extract_entries("tyre", trimmed, True)] == [
+            ("n.", "轮胎；轮箍")]
+        trimmed = lines("adj. 美好的", "n. 尼斯（法国城市，Nice）")
+        assert [e["pos"] for e in extract_entries("nice", trimmed, True)] == ["adj."]
+
+    def test_untagged_place_entry_inside_a_sense_dropped(self):
+        trimmed = lines("n. 水井；韦尔斯（有矿泉的地方）（Wells）；（大量）来源，源泉")
+        assert extract_entries("well", trimmed, True)[0]["meaning"] == "水井；（大量）来源，源泉"
+
+    def test_capitalised_senses_that_are_no_names_kept(self):
+        trimmed = lines("n. （Pole）波兰人", "【名】 （Pole）波列（人名）")
+        assert [(e["pos"], e["meaning"]) for e in extract_entries("pole", trimmed, True)] == [
+            ("n.", "（Pole）波兰人")]
+        trimmed = lines("n. （Polish）波兰人；波兰语")
+        assert [(e["pos"], e["meaning"]) for e in extract_entries("polish", trimmed, True)] == [
+            ("n.", "（Polish）波兰人；波兰语")]
+
 
 def lines(*sense_lines, phonetic="x"):
     """A trimmed response holding the given sense lines of one word."""

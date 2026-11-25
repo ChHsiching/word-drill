@@ -1,5 +1,6 @@
 package com.github.chsiching.worddrill
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -114,13 +115,29 @@ class FreshInstallDictionaryContentTest {
         // The first book row's open arrow belongs to CET-4 (preset books sort first).
         openFirstBookWordList()
 
-        composeRule.onNodeWithText("搜索单词").performTextInput("Celsius")
+        composeRule.onNodeWithText("搜索单词").performTextInput("database")
         composeRule.waitForIdle()
 
-        // Celsius ships a domain-labeled sense in the bundled asset:
-        // a Chinese part-of-speech tag with region labels and a person-name gloss. The sense text is not the
-        // first item of the merged row, so the match must be substring-based.
-        composeRule.onNodeWithText("摄尔西乌斯", substring = true).assertIsDisplayed()
+        // database ships a domain-labeled sense in the bundled asset. The sense text is
+        // not the first item of the merged row, so the match must be substring-based.
+        composeRule.onNodeWithText("【计算机】数据库", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun freshInstall_examBookWordsCarryNoPersonNameLine() {
+        awaitDrillReady()
+        openLibrary()
+        // The first book row's open arrow belongs to CET-4 (preset books sort first).
+        openFirstBookWordList()
+
+        composeRule.onNodeWithText("搜索单词").performTextInput("able")
+        composeRule.waitForIdle()
+
+        // Youdao gives able a person-name line of its own. The exam books drop it
+        // (owner decision 2026-11-25), and the word keeps its ordinary sense.
+        composeRule.onNodeWithText("能够，有能力的", substring = true).assertIsDisplayed()
+        composeRule.onAllNodesWithText("【名】", substring = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText("人名", substring = true).assertCountEquals(0)
     }
 }
 

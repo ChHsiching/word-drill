@@ -156,6 +156,12 @@ Every preset word has content; the build fails otherwise (owner ruling,
 - **Person-name lines.** Youdao's 【名】 line becomes an entry of its own with
   an empty part of speech, so it never merges into the senses. Its literal
   `null` placeholder is dropped, and a name line printed twice is kept once.
+  The exam books carry no person-name entries (owner decision 2026-11-25). For
+  a preset word the build drops that line and the name entry Youdao appends to
+  a sense, plus the untagged person and place names listed in
+  `UNTAGGED_NAME_ENTRIES` in the build script. Other words of the dictionary
+  keep theirs, and usage notes that merely mention a name stay, such as
+  title's （人名前表示地位、职业或婚姻状况的）头衔.
 - **Repeated senses.** A sense segment that repeats an earlier one under the
   same part of speech is kept once (Youdao repeats senses inside one line; the
   copies differ only by whitespace).

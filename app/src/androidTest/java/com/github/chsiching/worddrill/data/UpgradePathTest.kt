@@ -135,8 +135,8 @@ class UpgradePathTest {
         // Settings survive: resume position, current book, and the bumped version keys.
         assertThat(settings.resumeWordId(cet4.bookId)).isEqualTo(a.wordId)
         assertThat(settings.currentBookId.first()).isEqualTo(cet4FixtureBookId)
-        assertThat(settings.dictionaryVersion.first()).isEqualTo(3L)
-        assertThat(settings.presetVersion.first()).isEqualTo(1L)
+        assertThat(settings.dictionaryVersion.first()).isEqualTo(4L)
+        assertThat(settings.presetVersion.first()).isEqualTo(2L)
         Unit
     }
 

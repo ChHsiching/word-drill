@@ -41,7 +41,10 @@ every ／ ， 、-separated part is in DOMAIN_LABELS. Everything else stays a
 parenthetical, for example （因危险）, <美> or 理解（力）. Other punctuation is
 unified. Half-width pairs in Chinese text, every ellipsis spelling and
 stray spaces are normalized. Youdao's person-name line becomes an entry of
-its own (pos "").
+its own (pos ""). For the words of the three preset books the person-name
+entries are dropped instead (owner decision 2026-11-25): the line of its own
+and the entry Youdao appends to a sense, plus the place names listed with them.
+Other words keep theirs.
 
 Usage:
   python tools/build_youdao_dictionary.py [--state-dir DIR] [--out FILE]
@@ -331,26 +334,120 @@ def _is_name_line(pos, content):
     return content.startswith("【名】") or (pos == "" and "人名" in content)
 
 
-def extract_entries(word, trimmed):
-    """Output entries for one word. Youdao may repeat a POS across sense lines
-    ("v. 疏通", "v. 使通畅"); the Room import dedupes on (word, pos), so
-    same-POS senses merge into one entry joined by "；". A sense segment that
-    repeats an earlier one (inside one line or across lines) is kept once.
-    The comparison ignores the 【名】 tag, since Youdao repeats name lines
-    with and without it. The person-name line becomes an entry of its
-    own (pos ""). Youdao's literal "null" placeholder and a line-final "。"
-    (generated prose) are dropped, so every entry has a non-empty meaning."""
-    uk, us, lines = parse_ec(trimmed.get("ec"))
-    parsed = [split_pos(NULL_PREFIX_RE.sub("", line).rstrip("。")) for line in lines]
+# Person-name entries are dropped for the words of the three preset books (owner
+# decision 2026-11-25). Youdao's names dictionary transliterates any spelling
+# that exists as a surname, so an ordinary word gets "【名】（Abuse）（英）阿比斯
+# （人名）". Besides the line of its own (_is_name_line), the entry can be a run of
+# segments Youdao appends to a sense: "蚂蚁；Ant（人名，…）", or "灰色；…；（Gray）
+# 人名；（意）格拉伊；（英、法、葡、瑞典）格雷".
+NAME_MARKS = ("人名", "姓氏")
+PAREN_GROUP_RE = re.compile(r"[（(]([^（）()]*)[）)]")
+# A tag group opens with the mark and nothing follows it but a separator,
+# as in （人名，土耳其、芬兰人名译作“安特”）. "（人名前表示地位、职业或婚姻状况的）
+# 头衔" is a usage note and does not match.
+_TAG_GROUP_RE = re.compile(r"^(?:人名|姓氏)(?=$|[，；：、\s])")
+# The run may open with the headword itself in parentheses, "（Be）（缅）拜".
+# A real sense keeps its punctuation or its length: "（Labor）工党，劳动党".
+_NAME_RUN_OPEN_RE = re.compile(
+    r"^[（(][^（）()]{1,40}[）)](?:[（(][^（）()]{1,12}[）)])*[\u4e00-\u9fff·]{1,6}$")
+# Fragments between the opening and the first tagged segment: a short label and
+# at most two characters, as in "（日）部（姓）" and "（朝）培".
+_NAME_RUN_STEP_RE = re.compile(
+    r"^(?:[（(][^（）()]{1,8}[）)][\u4e00-\u9fff·]{0,2})+(?:[（(][^（）()]{1,8}[）)])?$")
+# Name entries without any of these marks, one per preset word: a person name
+# and the place names found with it, each spelled into an ordinary sense. No
+# rule tells them from real senses such as （Pole）波兰人, so they are listed as
+# the text reads after normalization (from the cleaned senses of every preset
+# word, 2026-11-25).
+UNTAGGED_NAME_ENTRIES = {
+    "bike": "（Bike）（土、土库、塞）比克",
+    "highland": "海兰（苏格兰北部行政区）（Highland）",
+    "nice": "尼斯（法国城市，Nice）",
+    "plantation": "普兰泰申市（美国佛罗里达州城市名）",
+    "sunrise": "（Sunrise）森赖斯（弗罗里达州一城市）",
+    "thorn": "（Thorn）托伦（波兰城市，Toruń 的德语名）",
+    "tyre": "（Tyre）提尔",
+    "well": "韦尔斯（有矿泉的地方）（Wells）",
+}
+
+
+def _is_name_segment(segment):
+    """One "；"-separated segment of a sense that is a person-name entry."""
+    groups = PAREN_GROUP_RE.findall(segment)
+    latin_name = any(re.search(r"[A-Z]", g) for g in groups)
+    for g in groups:
+        if g in NAME_MARKS or _TAG_GROUP_RE.match(g):
+            return True
+        if latin_name and g.endswith(NAME_MARKS):
+            return True
+    if re.search(r"[）)](?:人名|姓氏)", segment):
+        return True
+    if re.search(r"[A-Z][A-Za-z]* 用作(?:人名|姓氏|绰号)", segment):
+        return True
+    if re.match(r"^[A-Z][A-Za-z]+[（(][^（）()]*(?:人名|姓氏)", segment):
+        return True
+    return bool(latin_name and re.search(r"(?:人名|姓氏)或(?:人名|姓氏)", segment))
+
+
+def _split_sense_segments(meaning):
+    """The "；"-separated segments of a sense. A "；" inside a parenthesis pair
+    stays where it is, as in （美式拼法；英式常作 vigour）."""
+    segments = [""]
+    depth = 0
+    for char in meaning:
+        if char == "；" and not depth:
+            segments.append("")
+        else:
+            segments[-1] += char
+        if char in "（(":
+            depth += 1
+        elif char in "）)" and depth:
+            depth -= 1
+    return segments
+
+
+def _strip_name_run(meaning, word):
+    """The sense without the name entries, on a normalized meaning: the word's
+    untagged entry wherever it sits, and everything from the first name segment
+    on. The person-name entry may open a few segments earlier, with the headword
+    in parentheses and no tag of its own, so short fragments are walked back to
+    such an opening."""
+    segments = _split_sense_segments(meaning)
+    untagged = UNTAGGED_NAME_ENTRIES.get(word)
+    if untagged:
+        segments = [seg for seg in segments if seg != untagged]
+        if not segments:
+            return ""
+    start = next((i for i, seg in enumerate(segments) if _is_name_segment(seg)), None)
+    if start is None:
+        return "；".join(segments)
+    back = start
+    while back > 0 and _NAME_RUN_STEP_RE.fullmatch(segments[back - 1]):
+        back -= 1
+    for i in range(start - 1, back - 1, -1):
+        first = PAREN_GROUP_RE.match(segments[i])
+        if first and first.group(1).lower() == word.lower() and \
+                _NAME_RUN_OPEN_RE.match(segments[i]):
+            start = i
+            break
+    return "；".join(segments[:start])
+
+
+def _entries_of(word, parsed, uk, us, drop_names):
+    """The output entries of one word's (pos, content) sense lines."""
     # The name line gets its own entry unless the word also has a POS-less
     # sense line. (word, pos) must stay unique, so the two then share one
     # entry in source order. 51 crawled proper nouns, e.g. Ortega, have both.
+    kept = [(pos, content) for pos, content in parsed
+            if not (drop_names and _is_name_line(pos, content))]
     own_name_entry = not any(
-        pos == "" and not _is_name_line(pos, content) for pos, content in parsed)
+        pos == "" and not _is_name_line(pos, content) for pos, content in kept)
     by_pos = {}
     seen = {}
-    for pos, content in parsed:
+    for pos, content in kept:
         meaning = normalize_meaning(content)
+        if drop_names:
+            meaning = _strip_name_run(meaning, word)
         if not meaning:
             continue
         key = NAME_LINE if (_is_name_line(pos, content) and own_name_entry) else pos
@@ -374,6 +471,27 @@ def extract_entries(word, trimmed):
         }
         for pos, segments in by_pos.items()
     ]
+
+
+def extract_entries(word, trimmed, drop_names=False):
+    """Output entries for one word. Youdao may repeat a POS across sense lines
+    ("v. 疏通", "v. 使通畅"); the Room import dedupes on (word, pos), so
+    same-POS senses merge into one entry joined by "；". A sense segment that
+    repeats an earlier one (inside one line or across lines) is kept once.
+    The comparison ignores the 【名】 tag, since Youdao repeats name lines
+    with and without it. The person-name line becomes an entry of its
+    own (pos ""). Youdao's literal "null" placeholder and a line-final "。"
+    (generated prose) are dropped, so every entry has a non-empty meaning.
+
+    drop_names removes the name entries, for the words of the preset books: the
+    person-name ones and the place names listed with them. A word whose every
+    line is a name entry keeps them, so no word is lost."""
+    uk, us, lines = parse_ec(trimmed.get("ec"))
+    parsed = [split_pos(NULL_PREFIX_RE.sub("", line).rstrip("。")) for line in lines]
+    entries = _entries_of(word, parsed, uk, us, drop_names)
+    if not entries and drop_names:
+        entries = _entries_of(word, parsed, uk, us, False)
+    return entries
 
 
 def load_preset_books(data_dir=None):
@@ -532,10 +650,16 @@ def main(argv=None):
     if not raw:
         sys.exit(f"ERROR: no crawl cache at {args.state_dir}/raw.jsonl")
 
+    # The preset books' words lose their person-name entries. A lookup alias
+    # contributes its entries to a preset spelling, so it counts too.
+    preset_words = set(PRESET_LOOKUP_ALIASES.values())
+    for _, words in load_preset_books():
+        preset_words |= words
+
     entries = []
     misses = 0
     for word in sorted(raw):
-        word_entries = extract_entries(word, raw[word])
+        word_entries = extract_entries(word, raw[word], drop_names=word in preset_words)
         if not word_entries:
             misses += 1
         entries.extend(word_entries)

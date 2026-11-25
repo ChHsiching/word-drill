@@ -33,6 +33,6 @@ class DictionaryImportOrchestrator @Inject constructor(
 
     companion object {
         /** Increment whenever dictionary.json changes; a stale stored version triggers a clear + re-import on launch. */
-        const val DICTIONARY_VERSION: Long = 3L
+        const val DICTIONARY_VERSION: Long = 4L
     }
 }
