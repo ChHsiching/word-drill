@@ -20,12 +20,17 @@ class PresetImportOrchestrator @Inject constructor(
     suspend fun ensurePresetImported() = withContext(Dispatchers.IO) {
         val stored = settings.presetVersion.first()
         if (stored >= PRESET_VERSION) return@withContext
+        refreshPresets()
+        settings.markPresetVersion(PRESET_VERSION)
+    }
+
+    /** Brings the exam books in line with the bundled words.json. importWords refreshes
+     *  in place, so a version bump over an old install reconciles membership and content
+     *  without touching user data. */
+    suspend fun refreshPresets() = withContext(Dispatchers.IO) {
         val json = context.assets.open(assetFile).use { it.readBytes().toString(Charsets.UTF_8) }
         val preset = PresetWordsParser.parse(json)
-        // importWords refreshes in place, so a version bump over an old install
-        // reconciles membership and content without touching user data.
         importer.importWords(preset)
-        settings.markPresetVersion(PRESET_VERSION)
     }
 
     companion object {

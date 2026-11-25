@@ -19,6 +19,8 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.github.chsiching.worddrill.R
+import com.github.chsiching.worddrill.data.PresetImportOrchestrator
+import com.github.chsiching.worddrill.data.PresetImporter
 import com.github.chsiching.worddrill.data.backup.BackupService
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.entity.Book
@@ -116,7 +118,8 @@ class MeScreenTest {
     private fun exportImportVm(): ExportImportViewModel {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val app = ctx.applicationContext as android.app.Application
-        return ExportImportViewModel(app, BackupService(db, db.bookDao(), db.wordDao(), db.swipeLogDao()))
+        val orchestrator = PresetImportOrchestrator(ctx, settings, PresetImporter(db, db.wordDao(), db.bookDao()))
+        return ExportImportViewModel(app, BackupService(db, db.bookDao(), db.wordDao(), db.swipeLogDao()), orchestrator)
             .also { viewModels.add(it) }
     }
 
