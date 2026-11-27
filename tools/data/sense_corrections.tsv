@@ -1,0 +1,157 @@
+# Corrections of Youdao's own text for words of the three preset books.
+#
+# Columns, tab-separated: word, part of speech, text to replace, replacement.
+# An empty replacement deletes the replaced text. A "*" in the third column
+# deletes the whole sense line of that part of speech.
+#
+# Every row was checked against the dictionary that owns the entry before it
+# was listed (2026-11-27): the defect is in Youdao's raw line, and the
+# replacement was confirmed by the source. Rows Youdao gets right were left
+# out. The build applies the rows after its other rules and stops when a row's
+# text is not found exactly once, so a changed Youdao line cannot slip through.
+
+advocate	n.	（一项事业或个组织的）	（一项事业或一个组织的）
+consumption	n.	食用，引用，吸入	食用，饮用，吸入
+deal	n.	冷衫木	冷杉木
+iron	n.	马蹬	马镫
+jargon	n.	烟色红皓石，黄皓石	（无色、淡黄或烟色的）锆石
+jewel	v.	宝石承轴	宝石轴承
+leave	n.	斯努克	斯诺克
+rake	n.	靶状物	耙状物
+relic	n.	痕记	痕迹
+supper	n.	（苏格兰）一种薯片伴特定事物的餐食	（苏格兰）炸薯条配某种食物的一餐
+swarm	v.	蜂涌	蜂拥
+tertiary	n.	会支	会士
+trust	n.	托拉斯托拉斯	托拉斯
+race	v.	参赛参赛	参赛
+master	n.	国业公会主管	同业公会主管
+marshal	n.	一些美国城市的）警察局长	（一些美国城市的）警察局长
+lock	n.	（或事）（（a lock）	（或事）（a lock）
+prescription	n.	（=positive prescription））	（=positive prescription）
+honey	v.	加蜜使甜；奉承，	加蜜使甜；奉承
+roar	v.	为……喝彩，为加油	为……喝彩，为……加油
+none	n.	第九个小时下午3点	第九个小时，即下午3点
+bias	n.	偏压，偏统	偏压
+molecule	n.	分子，摩尔	分子
+trivial	adj.	（人）务小的，浅薄的	（人）浅薄的
+swift	adv.	（文）（在组合形式以外为诗歌或文学用于）迅速	（文）迅速
+lodge	n.	用于名字中宅，舍，旅馆	（用于名称中）宅，舍，旅馆
+sticky	n.	告事贴	便利贴
+belly	n.	腹部猪肉切	（猪的）腹肉，五花肉
+stone	n.	CURLING STONE的简称	冰壶（curling stone）
+through	adj.	（房间）与楼两对面通透的	（房间）前后通透的
+promote	v.	使（卒）升格为（尤指后等）	使（兵）升变为其他棋子（尤指后）
+despite	prep.	尽管，即使；不由自主地，忍不住地	尽管，即使；不由自主地，忍不住地（despite oneself）
+outgoing	n.	（英）外出，离开物；（英）日常支出，开销（outgoings）	（英）外出，离去；（英）日常支出，开销（outgoings）
+armor	v.	（感情、社交或其他方面的）防御	给……装上装甲，为……加装防护层
+cream	v.	捈乳霜	涂乳霜
+cross	v.	银行帐户	银行账户
+machinery	n.	运转部份	运转部分
+mortal	adj.	想像得出	想象得出
+multilateral	adj.	有多个部份的	有多个部分的
+project	v.	想像（自己	想象（自己
+image	v.	幻想，想像	幻想，想象
+vision	v.	（罕）想像	（罕）想象
+vivid	adj.	（人的想像）	（人的想象）
+fancy	adj.	凭想像创作的，想像出来的	凭想象创作的，想象出来的
+pinch	v.	揑住，夹紧	捏住，夹紧
+peg	v.	挂鈎	挂钩
+beak	n.	鹰鈎鼻	鹰钩鼻
+staple	n.	主要部份	主要部分
+excite	v.	某部份	某部分
+flat	n.	平面部份	平面部分
+through	adv.	迳直	径直
+activate	v.	透过加热	通过加热
+argument	n.	自变数；主词，受词	自变量；主语，宾语
+compile	v.	电脑程式	计算机程序
+landscape	adj.	横向列印的	横向打印的
+online	adv.	利用网际网路（	利用互联网（
+procedure	n.	（电脑的）应用程式	（计算机的）过程，子程序
+patrol	v.	士兵或员警	士兵或警察
+rip	n.	光碟）复制本	光盘）复制本
+website	n.	全球资讯网	万维网
+digital	n.	数字电视，数位电视	数字电视
+window	n.	（计算机屏幕的）视窗	（计算机屏幕的）窗口
+pine	n.	（非正式）凤梨	（非正式）菠萝
+angle	v.	提供资讯	提供信息
+flame	v.	发送辱骂资讯	发送辱骂信息
+act	n.	；发现某人正在（做某事）	
+as	conj.	；（说明某事应完成的时间或发生的频率）	
+circumstance	v.	*	
+cruel	v.	*	
+irony	adj.	*	
+noisy	adj.	；（尤指电子设备的）干扰，干扰信息	
+onto	prep.	；【数】映射到的	
+pilot	adj.	；【电信】控制引导信号	
+sing	abbr.	*	
+unilateral	adj.	；舌边音	
+whoever	n.	*	
+which	n.	*	
+succeed	v.	；若一次不成功，要再接再厉	
+luggage	n.	；精神负担	
+stranger	n.	；用于表示希望很快再见到某人	
+interesting	adj.	；怪异的	
+affix	v.	；可固定	；（自身）能固定（或粘附）到……上
+bead	v.	缀珠状物于；	用珠子（或珠状物）装饰，缀珠于；
+bless	v.	（非正式）（表示惊奇）；	（旧，非正式）用于感叹，表示惊奇（如 Bless my soul）；
+cluster	n.	；基	
+decade	n.	；十进	
+bin	n.	；统计堆栈	
+bin	v.	；把（数据）归入统计堆	
+break	n.	双轮驱马大车（breaking cart 的原称）；	
+audit	n.	审计，查……的账目；	审计；
+breakfast	n.	；早餐的，早餐时用的	
+clock	n.	时钟，时钟的；	时钟；
+village	n.	在乡村的，乡村的；	
+wedding	n.	婚礼的；	
+wire	n.	用金属丝制的，用金属线制的；	
+whole	adj.	要点，主旨；	
+wish	v.	愿望，心愿；	
+team	v.	；（套在一起拉车的）一组牲口（尤指马）	
+avail	v.	利用，有益于；有益于	利用，有益于
+buy	v.	；买，购买	
+blond	adj.	（多指毛发）亚麻色的，金黄色的；（尤指人种）白肤金发的；浅色的；（多指毛发）亚麻色的，金黄色的，浅茶褐色的	（多指毛发）亚麻色的，金黄色的，浅茶褐色的；（尤指人种）白肤金发的；浅色的
+blanket	n.	橡皮布；（平版印刷的）橡皮	橡皮布
+disk	n.	（计算机的）磁盘，磁碟；（计算机的）磁盘，磁碟（=disc）	（计算机的）磁盘，磁碟（=disc）
+disgust	n.	反感，憎恶；厌恶，憎恶	反感，厌恶，憎恶
+exclusive	adj.	；高级的，昂贵的	
+fancy	v.	；爱恋，爱慕（常用于英式口语中）；（英，非正式）喜欢，想要（常用于英式口语中）；（英，非正式）爱恋，爱慕（常用于英式口语中）	
+fancy	n.	（旧）（无根据的）想法，空想；	
+farther	adj.	；另外的，更多的（far 的比较级形式）	
+finish	v.	使精疲力竭；	
+fleet	adj.	（文）快速的；快速的；	（文）快速的；
+flush	n.	；（突如其来的）大批，大量	
+flutter	v.	；（心脏等）怦怦乱跳	
+fool	adj.	愚蠢的，傻的；愚蠢的，傻的	愚蠢的，傻的
+forge	v.	；伪装，假冒	
+freshman	n.	；（美）新手；新手	；（美）新手
+frontier	n.	新领域；西部边疆，边远地区	新领域
+glance	n.	；（文）（光的）闪烁，闪耀	
+havoc	v.	严重破坏；（旧）严重破坏	严重破坏
+hit	n.	凶杀；很受欢迎的人（或事物）	凶杀
+hollow	adj.	空腹的；沉闷回荡的	空腹的
+grand	adj.	；壮丽的，富丽堂皇的	
+course	n.	一组同音弦；追踪狩猎（尤指野兔）	一组同音弦
+lab	abbr.	工党（Lab）；工党；	工党（Lab）；
+mode	n.	；【物理】模（式），波型；（模态命题的）式，形式	；【物理】模（式），波型
+nail	v.	性交；（外场手）把（跑垒者）杀出局	性交
+perfect	adj.	有性的；完成时的，完成式的	有性的
+pick	v.	；采，摘（花、果等）	
+pirate	v.	；（旧）劫掠（船只）	
+slow	adj.	；慢速的，低速的	
+suggestion	n.	；【心理】心理暗示（或提示）	
+sway	n.	；统治，影响	
+tack	n.	（系住帆角的）系帆索；	
+theatre	n.	戏剧演出；手术室；	戏剧演出；
+trousers	n.	；裤子，长裤（trouser 的复数）	
+lot	n.	（常sing.）一群，一批；	
+rainbow	n.	；多种颜色，五彩缤纷	
+inferior	adj.	下标的；低等的	下标的
+choke	v.	；窒息，噎住	
+coincidence	n.	；符合	
+mill	n.	，磨麪机	
+need	v.	；（古）需要	
+pyramid	v.	渐增，上涨；（使）渐增，（使）上涨	渐增，上涨
+sport	n.	（某项）体育运动；体育运动；	体育运动；
+yard	n.	（Yard）；（美）庭院花园	（Yard）
+dock	n.	供船只、卡车、火车等装卸货物用的）月台	（供船只、卡车、火车等装卸货物用的）月台

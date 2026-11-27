@@ -37,6 +37,6 @@ class PresetImportOrchestrator @Inject constructor(
         /** Increment whenever words.json changes; a stale stored version triggers an
          *  in-place refresh on launch. Installs from the pre-versioning era (boolean
          *  flag only) report 0 and refresh too. */
-        const val PRESET_VERSION: Long = 2L
+        const val PRESET_VERSION: Long = 3L
     }
 }

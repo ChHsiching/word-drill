@@ -162,6 +162,11 @@ Every preset word has content; the build fails otherwise (owner ruling,
   `UNTAGGED_NAME_ENTRIES` in the build script. Other words of the dictionary
   keep theirs, and usage notes that merely mention a name stay, such as
   title's （人名前表示地位、职业或婚姻状况的）头衔.
+- **Corrections.** `tools/data/sense_corrections.tsv` lists errors in Youdao's own text for
+  preset words: typos, garbled glosses, a sense that belongs to another word or part of
+  speech, a sense printed twice, and Taiwan wording. Each row was checked against the source
+  that owns the entry before it was listed (2026-11-27). The build applies the rows last and
+  stops when a row's text is not found exactly once.
 - **Repeated senses.** A sense segment that repeats an earlier one under the
   same part of speech is kept once (Youdao repeats senses inside one line; the
   copies differ only by whitespace).

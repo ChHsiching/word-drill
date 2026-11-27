@@ -46,6 +46,13 @@ entries are dropped instead (owner decision 2026-11-25): the line of its own
 and the entry Youdao appends to a sense, plus the place names listed with them.
 Other words keep theirs.
 
+Errors in Youdao's own text are corrected for preset words from a listed
+table (tools/data/sense_corrections.tsv, owner decision 2026-11-27): typos,
+garbled glosses, senses that belong to another word or part of speech,
+repeated senses and Taiwan wording. Every row of the table was checked against
+the dictionary that owns the entry before it was listed. The build applies the
+rows last and stops when a row's text is not found exactly once.
+
 Usage:
   python tools/build_youdao_dictionary.py [--state-dir DIR] [--out FILE]
       [--source-run-date YYYY-MM-DD]
@@ -127,6 +134,11 @@ NAME_TAG_RE = re.compile(r"(【名】)\1+")
 
 # ADR 0003 hard gate: the three preset-book word lists, files in tools/data/.
 PRESET_BOOK_FILES = ("cet4_2016.txt", "cet6_2016.txt", "kaoyan.txt")
+
+# Corrections of Youdao's own text for preset words, applied after every other
+# rule. The file's header says what a row means and how the rows were checked.
+CORRECTIONS_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "data", "sense_corrections.tsv")
 
 # Preset-book words whose Youdao entry genuinely carries no phonetic (no
 # ukphone AND no usphone, verified against live Youdao on 2026-11-20:
@@ -626,6 +638,51 @@ def apply_preset_aliases(entries):
     return entries + added, errors
 
 
+def load_corrections(path=CORRECTIONS_FILE):
+    """{(word, pos): [(text, replacement), ...]} in file order. A "*" text
+    stands for the whole sense line and its replacement is empty."""
+    corrections = {}
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.rstrip("\r\n")
+            if not line or line.startswith("#"):
+                continue
+            word, pos, old, new = line.split("\t")
+            corrections.setdefault((word, pos), []).append((old, new))
+    return corrections
+
+
+def apply_corrections(word, entries, corrections):
+    """The word's entries with its rows of the corrections table applied.
+    Returns (entries, applied, problems). applied lists the (word, pos) keys
+    the entries matched. A row whose text is found more or less than once
+    means Youdao's line no longer reads as it did when the row was checked;
+    that is a problem to report, not a row to skip."""
+    applied = []
+    problems = []
+    out = []
+    for entry in entries:
+        meaning = entry["meaning"]
+        rows = corrections.get((word, entry["pos"]))
+        if not rows:
+            out.append(entry)
+            continue
+        applied.append((word, entry["pos"]))
+        for old, new in rows:
+            if old == "*":
+                meaning = ""
+                continue
+            found = meaning.count(old)
+            if found != 1:
+                problems.append(
+                    f"correction of {word} [{entry['pos']}] applies {found} times, not once: {old!r}")
+                continue
+            meaning = meaning.replace(old, new)
+        if meaning:
+            out.append({**entry, "meaning": meaning})
+    return out, applied, problems
+
+
 def build_output(entries, source):
     return {"source": source, "words": entries}
 
@@ -656,13 +713,30 @@ def main(argv=None):
     for _, words in load_preset_books():
         preset_words |= words
 
+    corrections = load_corrections()
+    outside = sorted({w for w, _ in corrections} - preset_words)
+    correction_errors = [
+        f"corrections file: {w!r} is not a word of the preset books" for w in outside]
+
     entries = []
     misses = 0
+    corrected = 0
+    applied = set()
     for word in sorted(raw):
         word_entries = extract_entries(word, raw[word], drop_names=word in preset_words)
+        if word in preset_words:
+            before = word_entries
+            word_entries, hit, problems = apply_corrections(word, word_entries, corrections)
+            correction_errors += problems
+            applied.update(hit)
+            if hit and word_entries != before:
+                corrected += 1
         if not word_entries:
             misses += 1
         entries.extend(word_entries)
+    correction_errors += [
+        f"corrections file: no entry {w!r} [{pos}] to apply it to"
+        for w, pos in sorted(set(corrections) - applied)]
 
     fill_path = args.fill_file or os.path.join(
         args.state_dir, "wiktionary_fill.jsonl")
@@ -675,9 +749,10 @@ def main(argv=None):
     entries, alias_errors = apply_preset_aliases(entries)
 
     errors, report = validate_entries(entries, load_preset_books())
-    errors = alias_errors + errors
+    errors = correction_errors + alias_errors + errors
     print(f"raw words: {len(raw)} (no entries: {misses})")
     print(f"entries: {report['entries']} over {report['words']} words")
+    print(f"corrections: {corrected} words changed by the corrections table")
     print(f"phonetic coverage: {report['phonetic_coverage']:.1%} "
           f"(uk {report['uk_coverage']:.1%}, us {report['us_coverage']:.1%})")
     print(f"wiktionary fill: {fill_stats['gap_words']} gap words, filled "

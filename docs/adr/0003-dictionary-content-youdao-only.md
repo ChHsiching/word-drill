@@ -39,3 +39,18 @@ absolute, including origin-neutral data such as IPA.
   and tolerate partial fills (words neither source covers keep whatever they have).
 - The phonetic-preference fallback (word lacks the chosen variant) is: show the available
   variant, show nothing if neither exists.
+
+## Amendments
+
+- 2026-11-25, owner decision: the three preset books carry no person-name entries. Youdao
+  returns a name line for almost every spelling that exists as a surname. The build drops it
+  for preset words only; the other words of the dictionary keep theirs.
+- 2026-11-27, owner decision: errors in Youdao's own text are corrected for preset words, and
+  only those a source check confirms. The build applies a listed table,
+  `tools/data/sense_corrections.tsv`, after every other rule. A row enters the table only
+  when the defect is in Youdao's raw line and the replacement is confirmed by the dictionary
+  that owns the entry, or, for character forms and regional terms, by the 2002 variant-word
+  standard, the 2013 standard character table, the approved terms of the terminology
+  committee, or a dictionary. "No second source for meanings" still holds: no meaning is
+  taken from another source, a row only repairs Youdao's text. The build stops when a row no
+  longer matches, and a test fails when the bundled books do not carry the table.

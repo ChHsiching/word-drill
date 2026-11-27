@@ -5,6 +5,7 @@ domain-label normalization, ec parsing, entry extraction, and the validation
 rules. Fixtures are hand-trimmed from real API responses (2026-11).
 """
 
+import json
 import os
 import sys
 
@@ -13,10 +14,13 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_youdao_dictionary import (  # noqa: E402
     PHONETIC_GATE_EXCEPTIONS,
+    POS_PREFIXES,
     PRESET_LOOKUP_ALIASES,
+    apply_corrections,
     apply_phonetic_fill,
     apply_preset_aliases,
     extract_entries,
+    load_corrections,
     load_preset_books,
     normalize_meaning,
     parse_ec,
@@ -24,6 +28,9 @@ from build_youdao_dictionary import (  # noqa: E402
     validate_entries,
     wrap_phonetic,
 )
+
+WORDS_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
+                          "app", "src", "main", "assets", "words.json")
 
 ABANDON_TRIMMED = {
     "input": "abandon",
@@ -798,6 +805,82 @@ class TestLoadPresetBooks:
         assert set(books) == {"cet4_2016", "cet6_2016", "kaoyan"}
         assert "abandon" in books["cet4_2016"]
         assert all(len(words) > 3000 for words in books.values())
+
+
+class TestCorrections:
+    """The corrections table (tools/data/sense_corrections.tsv) and its applier."""
+
+    def sense(self, pos="n.", meaning="甲，乙；丙"):
+        return [{"word": "w", "pos": pos, "meaning": meaning,
+                 "phonetic": "/x/", "phonetic_us": None}]
+
+    def test_row_replaces_its_text_once(self):
+        out, applied, problems = apply_corrections(
+            "w", self.sense(), {("w", "n."): [("乙", "二")]})
+        assert [e["meaning"] for e in out] == ["甲，二；丙"]
+        assert applied == [("w", "n.")] and problems == []
+
+    def test_rows_of_one_sense_apply_in_order(self):
+        out, _, problems = apply_corrections(
+            "w", self.sense(), {("w", "n."): [("甲", "A"), ("丙", "C")]})
+        assert [e["meaning"] for e in out] == ["A，乙；C"] and problems == []
+
+    def test_star_deletes_the_whole_sense(self):
+        out, applied, problems = apply_corrections(
+            "w", self.sense(), {("w", "n."): [("*", "")]})
+        assert out == [] and applied == [("w", "n.")] and problems == []
+
+    def test_sense_emptied_by_its_rows_is_dropped(self):
+        out, _, _ = apply_corrections(
+            "w", self.sense(), {("w", "n."): [("甲，乙；丙", "")]})
+        assert out == []
+
+    def test_text_found_zero_or_two_times_is_reported_not_skipped(self):
+        _, _, problems = apply_corrections(
+            "w", self.sense(), {("w", "n."): [("丁", "t")]})
+        assert len(problems) == 1 and "applies 0 times" in problems[0]
+        _, _, problems = apply_corrections(
+            "w", self.sense(meaning="乙，乙"), {("w", "n."): [("乙", "二")]})
+        assert "applies 2 times" in problems[0]
+
+    def test_senses_without_rows_pass_through_untouched(self):
+        entries = self.sense() + [{"word": "w", "pos": "v.", "meaning": "丁"}]
+        out, applied, problems = apply_corrections(
+            "w", entries, {("w", "n."): [("乙", "二")]})
+        assert out[1] is entries[1]
+        assert applied == [("w", "n.")] and problems == []
+
+    def test_table_lists_preset_words_and_known_parts_of_speech(self):
+        corrections = load_corrections()
+        assert corrections
+        words = set().union(*(book for _, book in load_preset_books()))
+        assert {w for w, _ in corrections} <= words
+        assert all(pos in POS_PREFIXES for _, pos in corrections)
+
+    def test_shipped_books_carry_the_corrections(self):
+        # The bundled words.json is rebuilt with the table. A row that no
+        # longer shows in it means the asset was not rebuilt after the table
+        # changed, or Youdao's line moved on.
+        corrections = load_corrections()
+        with open(WORDS_JSON, encoding="utf-8") as f:
+            books = json.load(f)["books"]
+        senses = {}
+        for book in books:
+            for w in book["words"]:
+                senses.setdefault(w["text"], {}).update(
+                    {s["pos"]: s["meaning"] for s in w["senses"]})
+        for (word, pos), rows in corrections.items():
+            if any(old == "*" for old, _ in rows):
+                assert pos not in senses[word], (word, pos)
+                continue
+            meaning = senses[word][pos]
+            for old, new in rows:
+                if new:
+                    assert new in meaning, (word, pos, new)
+                # A row that adds a bracket or a phrase keeps its own text.
+                if not new or old not in new:
+                    assert old not in meaning, (word, pos, old)
+
 
 
 if __name__ == "__main__":
