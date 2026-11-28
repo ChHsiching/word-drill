@@ -10,14 +10,14 @@ import com.github.chsiching.worddrill.ui.theme.wordDrillColors
 @Composable
 fun Toggle(
     on: Boolean,
-    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
     val extended = MaterialTheme.wordDrillColors
     Switch(
         checked = on,
-        onCheckedChange = { onClick() },
+        // The switch only shows the state. The row around it is the tap target, see ToggleRow.
+        onCheckedChange = null,
         colors = SwitchDefaults.colors(
             checkedThumbColor = colors.surface,
             checkedTrackColor = colors.onSurface,

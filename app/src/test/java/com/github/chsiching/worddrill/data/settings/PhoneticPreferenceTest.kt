@@ -26,57 +26,51 @@ class PhoneticPreferenceTest {
         assertThat(PhoneticPreference.fromStorageName("us")).isEqualTo(PhoneticPreference.US)
     }
 
-    // --- Card display resolution (ADR 0003 fallback: missing variant falls back
+    // --- Display resolution (ADR 0003 fallback: missing variant falls back
     //     to the available one; neither means no phonetic) ---
 
     @Test
-    fun resolve_uk_returnsUk_whenBothExist() {
-        assertThat(PhoneticPreference.UK.resolve("/ʌk/", "/ʌs/")).isEqualTo("/ʌk/")
+    fun segments_singlePreference_showsOnlyTheChosenVariant() {
+        assertThat(PhoneticPreference.UK.segments("/ʌk/", "/ʌs/").map { it.text })
+            .containsExactly("/ʌk/")
+        assertThat(PhoneticPreference.US.segments("/ʌk/", "/ʌs/").map { it.text })
+            .containsExactly("/ʌs/")
     }
 
     @Test
-    fun resolve_us_returnsUs_whenBothExist() {
-        assertThat(PhoneticPreference.US.resolve("/ʌk/", "/ʌs/")).isEqualTo("/ʌs/")
+    fun segments_singlePreference_fallsBackToTheOtherVariant() {
+        assertThat(PhoneticPreference.US.segments("/ʌk/", null).map { it.text })
+            .containsExactly("/ʌk/")
+        assertThat(PhoneticPreference.UK.segments(null, "/ʌs/").map { it.text })
+            .containsExactly("/ʌs/")
     }
 
     @Test
-    fun resolve_both_joinsWithASingleSpace() {
-        assertThat(PhoneticPreference.BOTH.resolve("/ʌk/", "/ʌs/")).isEqualTo("/ʌk/ /ʌs/")
+    fun segments_both_showsUkThenUs_whenBothExist() {
+        assertThat(PhoneticPreference.BOTH.segments("/ʌk/", "/ʌs/").map { it.text })
+            .containsExactly("/ʌk/", "/ʌs/")
     }
 
     @Test
-    fun resolve_us_fallsBackToUk_whenUsMissing() {
-        assertThat(PhoneticPreference.US.resolve("/ʌk/", null)).isEqualTo("/ʌk/")
+    fun segments_both_showsTheAvailableVariant_whenOnlyOneExists() {
+        assertThat(PhoneticPreference.BOTH.segments("/ʌk/", null).map { it.text })
+            .containsExactly("/ʌk/")
+        assertThat(PhoneticPreference.BOTH.segments(null, "/ʌs/").map { it.text })
+            .containsExactly("/ʌs/")
     }
 
     @Test
-    fun resolve_uk_fallsBackToUs_whenUkMissing() {
-        assertThat(PhoneticPreference.UK.resolve(null, "/ʌs/")).isEqualTo("/ʌs/")
+    fun segments_areEmpty_whenNeitherVariantExists() {
+        assertThat(PhoneticPreference.UK.segments(null, null)).isEmpty()
+        assertThat(PhoneticPreference.US.segments(null, null)).isEmpty()
+        assertThat(PhoneticPreference.BOTH.segments(null, null)).isEmpty()
     }
 
     @Test
-    fun resolve_both_showsTheAvailableVariant_whenOnlyOneExists() {
-        assertThat(PhoneticPreference.BOTH.resolve("/ʌk/", null)).isEqualTo("/ʌk/")
-        assertThat(PhoneticPreference.BOTH.resolve(null, "/ʌs/")).isEqualTo("/ʌs/")
-    }
-
-    @Test
-    fun resolve_both_showsSingleCopy_whenVariantsAreIdentical() {
-        assertThat(PhoneticPreference.BOTH.resolve("/əˈbændən/", "/əˈbændən/"))
-            .isEqualTo("/əˈbændən/")
-    }
-
-    @Test
-    fun resolve_returnsNull_whenNeitherVariantExists() {
-        assertThat(PhoneticPreference.UK.resolve(null, null)).isNull()
-        assertThat(PhoneticPreference.US.resolve(null, null)).isNull()
-        assertThat(PhoneticPreference.BOTH.resolve(null, null)).isNull()
-    }
-
-    @Test
-    fun resolve_treatsBlankVariantsAsMissing() {
-        assertThat(PhoneticPreference.US.resolve("  ", "/ʌs/")).isEqualTo("/ʌs/")
-        assertThat(PhoneticPreference.US.resolve("", "")).isNull()
+    fun segments_treatsBlankVariantsAsMissing() {
+        assertThat(PhoneticPreference.US.segments("  ", "/ʌs/").map { it.text })
+            .containsExactly("/ʌs/")
+        assertThat(PhoneticPreference.US.segments("", "")).isEmpty()
     }
     @Test
     fun segments_bothDiffering_labelsEachVariant() {

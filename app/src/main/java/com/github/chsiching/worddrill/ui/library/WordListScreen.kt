@@ -169,7 +169,15 @@ fun WordListScreen(
         when {
             state.words.isEmpty() && state.searchQuery.isNotBlank() ->
                 EmptyState(stringResource(R.string.word_list_search_empty))
-            state.words.isEmpty() -> EmptyState(if (readOnly) stringResource(R.string.word_list_preset_readonly) else state.bookName)
+            state.words.isEmpty() -> EmptyState(
+                stringResource(
+                    when {
+                        state.isReviewBook -> R.string.word_list_empty_review
+                        readOnly -> R.string.word_list_preset_readonly
+                        else -> R.string.word_list_empty
+                    }
+                )
+            )
             else -> {
                 val listState = rememberLazyListState()
                 val scope = rememberCoroutineScope()
@@ -255,7 +263,7 @@ fun WordListScreen(
 
 /** Word entry in the book's list (variant A, owner-approved): line 1 pairs the
  *  word with its phonetic, resolved exactly like the drill card
- *  (PhoneticPreference.resolve; the hide toggle outranks it). Below it every sense
+ *  (PhoneticPreference.segments; the hide toggle outranks it). Below it every sense
  *  renders as its own block — dictionary typesetting: the meaning wraps inside the
  *  column that starts after its pos label, so continuation lines hang-indent to
  *  the meaning's first character. Rhythm comes from whitespace alone — no
@@ -277,24 +285,51 @@ private fun WordRow(
         verticalAlignment = Alignment.Top,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+            Row {
                 Text(
                     text = wordWithSenses.word.text,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.alignByBaseline(),
+                    modifier = Modifier
+                        .alignByBaseline()
+                        .padding(end = 9.dp),
                 )
-                val displayPhonetic =
-                    phoneticPreference.resolve(phonetic?.phoneticUk, phonetic?.phoneticUs)
-                if (displayPhonetic != null && !hidePhonetic) {
-                    Text(
-                        text = displayPhonetic,
-                        fontFamily = CharisSilFontFamily,
-                        fontSize = 12.5.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.alignByBaseline(),
-                    )
+                val segments =
+                    phoneticPreference.segments(phonetic?.phoneticUk, phonetic?.phoneticUs)
+                if (segments.isNotEmpty() && !hidePhonetic) {
+                    // Two variants side by side carry their 英/美 label, as on the drill
+                    // card, so they stay tellable apart. One phonetic needs no label.
+                    segments.forEachIndexed { index, segment ->
+                        val labelled = segments.size > 1 &&
+                            segment.kind != PhoneticPreference.Kind.SHARED
+                        if (labelled) {
+                            Text(
+                                text = stringResource(
+                                    when (segment.kind) {
+                                        PhoneticPreference.Kind.UK -> R.string.drill_phonetic_uk
+                                        else -> R.string.drill_phonetic_us
+                                    }
+                                ),
+                                fontSize = 10.sp,
+                                letterSpacing = 0.5.sp,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .alignByBaseline()
+                                    .padding(end = 3.dp),
+                            )
+                        }
+                        Text(
+                            text = segment.text,
+                            fontFamily = CharisSilFontFamily,
+                            fontSize = 12.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .alignByBaseline()
+                                .padding(end = if (index < segments.lastIndex) 9.dp else 0.dp),
+                        )
+                    }
                 }
             }
             Column(
@@ -349,9 +384,14 @@ private fun AddWordDialog(
     var posExpanded by remember { mutableStateOf(false) }
     // Once the form has a gap, each field reports only its own gap.
     val invalid = state.error != null
+    val duplicate = state.error == R.string.validation_word_duplicate
     val wordBlank = invalid && state.text.isBlank()
     val posBlank = invalid && state.pos.isBlank()
     val meaningBlank = invalid && state.meaning.isBlank()
+    // A word the dictionary knows is added with the dictionary's senses. The two fields
+    // then only preview the first sense and stay read-only, so the form never offers a
+    // combination that would not be saved.
+    val fromDictionary = state.fillSource == WordListFillSource.DICTIONARY
 
     WordDrillDialog(
         onDismissRequest = onDismiss,
@@ -363,25 +403,35 @@ private fun AddWordDialog(
                     onValueChange = onTextInput,
                     label = stringResource(R.string.word_list_text_hint),
                     singleLine = true,
-                    isError = wordBlank,
-                    supportingText = fieldMessage(wordBlank, R.string.validation_word_empty),
+                    isError = wordBlank || duplicate,
+                    supportingText = fieldMessage(duplicate, R.string.validation_word_duplicate)
+                        ?: fieldMessage(wordBlank, R.string.validation_word_empty)
+                        ?: if (fromDictionary) {
+                            { Text(stringResource(R.string.word_list_add_dictionary_note)) }
+                        } else {
+                            null
+                        },
                 )
                 ExposedDropdownMenuBox(
                     expanded = posExpanded,
-                    onExpandedChange = { posExpanded = it },
+                    onExpandedChange = { if (!fromDictionary) posExpanded = it },
                 ) {
                     DialogTextField(
                         value = state.pos,
                         onValueChange = {},
                         label = stringResource(R.string.word_list_pos_dropdown_label),
                         singleLine = true,
+                        enabled = !fromDictionary,
                         isError = posBlank,
                         readOnly = true,
                         supportingText = fieldMessage(posBlank, R.string.validation_pos_empty),
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(posExpanded)
+                        trailingIcon = if (fromDictionary) {
+                            null
+                        } else {
+                            { ExposedDropdownMenuDefaults.TrailingIcon(posExpanded) }
                         },
-                        modifier = Modifier
+                        modifier = if (fromDictionary) Modifier
+                        else Modifier
                             .menuAnchor()
                             .clickable { posExpanded = !posExpanded },
                     )
@@ -405,6 +455,7 @@ private fun AddWordDialog(
                     onValueChange = onMeaningInput,
                     label = stringResource(R.string.word_list_meaning_hint),
                     singleLine = true,
+                    enabled = !fromDictionary,
                     isError = meaningBlank,
                     supportingText = fieldMessage(meaningBlank, R.string.validation_meaning_empty),
                 )

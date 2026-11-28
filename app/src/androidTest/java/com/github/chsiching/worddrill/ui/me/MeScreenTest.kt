@@ -277,6 +277,18 @@ class MeScreenTest {
     }
 
     @Test
+    fun toggleRow_tapOnTheLabelTogglesTheSetting() = runBlocking {
+        settings.setHidePhonetic(false)
+        renderWithVm(vm())
+        // A tap on the label toggles the row.
+        composeRule.onNodeWithText("隐藏音标").performScrollTo().performClick()
+        assertThat(settings.hidePhonetic.first { it }).isTrue()
+        composeRule.onNodeWithText("隐藏音标").performClick()
+        assertThat(settings.hidePhonetic.first { !it }).isFalse()
+        Unit
+    }
+
+    @Test
     fun deckOrderingRow_inDisplayGroup_defaultsToAlphabetical_thenCyclesToShuffled() = runBlocking {
         settings.setDeckOrdering(DeckOrdering.ALPHABETICAL)
         renderWithVm(vm())
@@ -421,13 +433,13 @@ class MeScreenTest {
         composeRule.waitForIdle()
         // Expanding grows content below the tapped row; scroll the caption into view
         // so the display assertion holds on the CI emulator's shorter viewport.
-        composeRule.onNodeWithText("在学习页双击卡片开始或暂停").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("刷卡时双击卡片开始或暂停").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("1s", substring = false).assertIsDisplayed()
         composeRule.onNodeWithText("30s", substring = false).assertIsDisplayed()
 
         composeRule.onNodeWithText("自动连播间隔").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("在学习页双击卡片开始或暂停").assertIsNotDisplayed()
+        composeRule.onNodeWithText("刷卡时双击卡片开始或暂停").assertIsNotDisplayed()
     }
 
     @Test
@@ -454,7 +466,7 @@ class MeScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("自动连播间隔").performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("在学习页双击卡片开始或暂停").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("刷卡时双击卡片开始或暂停").performScrollTo().assertIsDisplayed()
 
         // Drag the thumb to the far right edge: the value updates live and clamps at 30 s.
         composeRule.onNodeWithTag(DwellSliderTestTag).performScrollTo().performTouchInput {

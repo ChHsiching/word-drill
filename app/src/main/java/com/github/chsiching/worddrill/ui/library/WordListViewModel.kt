@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
+import com.github.chsiching.worddrill.R
 import com.github.chsiching.worddrill.data.ProgressResetter
 import com.github.chsiching.worddrill.data.local.WordDrillDatabase
 import com.github.chsiching.worddrill.data.local.WordPhonetics
@@ -275,12 +276,30 @@ class WordListViewModel @Inject constructor(
         val pos = d.pos.trim()
         val meaning = d.meaning.trim()
         viewModelScope.launch {
+            var nothingToAdd = false
             db.withTransaction {
                 val wordId = wordDao.findOrInsertWord(text, null)
+                val inBook = bookDao.getDeleted(bookId, wordId) == false
+                val hasSense = wordDao.getSensesForWord(wordId).any { it.pos == pos }
+                // A word that is in the book with this part of speech has nothing to add.
+                // It is reported instead of the dialog closing as if it had been added.
+                // Another part of speech is a new sense and is added.
+                if (inBook && hasSense) {
+                    nothingToAdd = true
+                    return@withTransaction
+                }
+                if (!inBook) {
+                    bookDao.linkBookWord(BookWord(bookId = bookId, wordId = wordId))
+                    // A word that was removed from this book earlier comes back.
+                    bookDao.setDeleted(bookId, wordId, false)
+                }
                 wordDao.insertSense(Sense(wordId = wordId, pos = pos, meaning = meaning))
-                bookDao.linkBookWord(BookWord(bookId = bookId, wordId = wordId))
             }
-            _dialog.value = WordListDialog.None
+            _dialog.value = if (nothingToAdd) {
+                d.copy(error = R.string.validation_word_duplicate)
+            } else {
+                WordListDialog.None
+            }
         }
     }
 

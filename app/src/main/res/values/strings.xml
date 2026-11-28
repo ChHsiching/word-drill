@@ -22,12 +22,15 @@
     <string name="dialog_fact_recoverable">可从回收站恢复</string>
     <string name="library_delete_confirm">删除</string>
     <string name="word_list_add">新增词条</string>
+    <string name="word_list_add_dictionary_note">词典已收录，加入后采用词典的全部释义</string>
     <string name="word_list_edit">编辑释义</string>
     <string name="word_list_remove">从词书移除</string>
     <string name="word_list_text_hint">单词</string>
     <string name="word_list_pos_hint">词性</string>
     <string name="word_list_meaning_hint">释义</string>
     <string name="word_list_preset_readonly">预置词书不可编辑</string>
+    <string name="word_list_empty">还没有单词，点右上角的加号添加</string>
+    <string name="word_list_empty_review">还没有要复习的单词</string>
     <string name="word_list_delete">删除</string>
     <string name="word_list_delete_title">删除词条</string>
     <string name="word_list_delete_fact_word_label">单词</string>
@@ -61,6 +64,7 @@
     <string name="recycle_bin_empty">回收站为空</string>
     <string name="me_setting_recycle_bin">回收站</string>
     <string name="validation_word_empty">单词不能为空</string>
+    <string name="validation_word_duplicate">该单词已在本词书中</string>
     <string name="validation_pos_empty">词性不能为空</string>
     <string name="validation_meaning_empty">释义不能为空</string>
     <string name="validation_book_name_empty">名称不能为空</string>
@@ -139,7 +143,7 @@
     <string name="me_setting_dwell_value">%1$.1f 秒</string>
     <string name="me_setting_dwell_hint_min">1s</string>
     <string name="me_setting_dwell_hint_max">30s</string>
-    <string name="me_setting_dwell_caption">在学习页双击卡片开始或暂停</string>
+    <string name="me_setting_dwell_caption">刷卡时双击卡片开始或暂停</string>
     <string name="me_setting_deck_ordering">单词顺序</string>
     <string name="me_setting_deck_ordering_alphabetical">字母顺序</string>
     <string name="me_setting_deck_ordering_shuffled">随机顺序</string>

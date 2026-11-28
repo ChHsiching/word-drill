@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -57,6 +58,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -387,11 +389,17 @@ private fun InGroupSeparator() {
     )
 }
 
+/** Switch row. The whole row toggles. The label is most of its width and is where a finger lands. */
 @Composable
 private fun ToggleRow(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .toggleable(
+                value = on,
+                role = Role.Switch,
+                onValueChange = onToggle,
+            )
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -401,7 +409,7 @@ private fun ToggleRow(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
-        Toggle(on = on, onClick = { onToggle(!on) })
+        Toggle(on = on)
     }
 }
 

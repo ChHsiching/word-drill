@@ -5,9 +5,11 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -265,6 +267,108 @@ class WordListScreenTest {
         composeRule.onNodeWithText("apple").assertIsDisplayed()
         val deleted = runBlocking { db.bookDao().getDeleted(customBookId, 1L) }
         assertThat(deleted).isFalse()
+    }
+
+    @Test
+    fun addWord_sameWordAgain_keepsTheDialogAndSaysItIsAlreadyInTheBook() {
+        setContentFor(customBookId)
+        composeRule.onNodeWithContentDescription("新增词条").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("单词").performTextInput("apple")
+        selectPosFromDropdown("n.")
+        composeRule.onNodeWithText("释义").performTextInput("苹果")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("确定").performClick()
+
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(androidx.compose.ui.test.hasText("该单词已在本词书中"))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        // The dialog stays open and the book is not changed a second time.
+        composeRule.onNodeWithText("新增词条").assertIsDisplayed()
+        composeRule.onNodeWithText("确定").assertIsNotEnabled()
+        assertThat(runBlocking { db.bookDao().countWordsInBook(customBookId) }).isEqualTo(1)
+    }
+
+    @Test
+    fun addWord_wordRemovedFromTheBookEarlier_comesBack() {
+        setContentFor(customBookId)
+        composeRule.onNodeWithContentDescription("删除").performClick()
+        composeRule.waitForIdle()
+        composeRule.onAllNodes(androidx.compose.ui.test.hasText("删除", substring = false)).onFirst().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("apple").assertDoesNotExist()
+
+        composeRule.onNodeWithContentDescription("新增词条").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("单词").performTextInput("apple")
+        selectPosFromDropdown("n.")
+        composeRule.onNodeWithText("释义").performTextInput("苹果")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("确定").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("apple").assertIsDisplayed()
+        assertThat(runBlocking { db.bookDao().getDeleted(customBookId, 1L) }).isFalse()
+    }
+
+    @Test
+    fun addDialog_wordTheDictionaryKnows_keepsPosAndMeaningReadOnly() {
+        runBlocking {
+            db.dictionaryDao().insertAll(
+                listOf(
+                    com.github.chsiching.worddrill.data.local.entity.DictionaryEntry(
+                        word = "dog", pos = "n.", meaning = "狗",
+                    ),
+                )
+            )
+        }
+        setContentFor(customBookId)
+        composeRule.onNodeWithContentDescription("新增词条").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("单词").performTextInput("dog")
+        // The dictionary fills the two fields after its short debounce.
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodes(androidx.compose.ui.test.hasText("狗")).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // A dictionary word takes the dictionary's senses. The form says so and does not
+        // offer a combination of its own that would not be saved.
+        composeRule.onNodeWithText("词典已收录，加入后采用词典的全部释义").assertIsDisplayed()
+        composeRule.onNode(androidx.compose.ui.test.hasText("词性") and isEnabled().not()).assertIsDisplayed()
+        composeRule.onNode(androidx.compose.ui.test.hasText("释义") and isEnabled().not()).assertIsDisplayed()
+
+        composeRule.onNodeWithText("确定").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("dog").assertIsDisplayed()
+        composeRule.onNodeWithText("狗").assertIsDisplayed()
+    }
+
+    @Test
+    fun addDialog_fastTyping_keepsEveryCharacterInOrder() {
+        setContentFor(customBookId)
+        composeRule.onNodeWithContentDescription("新增词条").performClick()
+        composeRule.waitForIdle()
+        // One commit per character, the way a soft keyboard sends text, with no frame in between.
+        "qwertyuiopa".forEach { composeRule.onNodeWithText("单词").performTextInput(it.toString()) }
+        "testmeaning".forEach { composeRule.onNodeWithText("释义").performTextInput(it.toString()) }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("qwertyuiopa").assertIsDisplayed()
+        composeRule.onNodeWithText("testmeaning").assertIsDisplayed()
+    }
+
+    @Test
+    fun emptyCustomBook_saysHowToAddTheFirstWord() {
+        val emptyBookId = runBlocking { db.bookDao().insert(Book(name = "空词书", isPreset = false)) }
+        setContentFor(emptyBookId)
+        composeRule.onNodeWithText("还没有单词，点右上角的加号添加").assertIsDisplayed()
+    }
+
+    @Test
+    fun emptyReviewBook_saysThereIsNothingToReview() {
+        val reviewBookId = runBlocking { db.bookDao().insert(Book(name = "复习", isPreset = true)) }
+        setContentFor(reviewBookId)
+        composeRule.onNodeWithText("还没有要复习的单词").assertIsDisplayed()
     }
 
     @Test
@@ -602,6 +706,47 @@ class WordListScreenTest {
         setContentFor(customBookId, phoneticPreference = PhoneticPreference.UK)
         composeRule.onNodeWithText("/uk/", substring = false).assertIsDisplayed()
         composeRule.onNodeWithText("/us/", substring = false).assertDoesNotExist()
+        // One phonetic carries no label.
+        composeRule.onNodeWithText("英", substring = false).assertDoesNotExist()
+        composeRule.onNodeWithText("美", substring = false).assertDoesNotExist()
+        Unit
+    }
+
+    @Test
+    fun wordRow_phonetic_bothPreference_labelsEachVariant_onTheWordLine() {
+        runBlocking { seedAppleDictionaryPhonetics() }
+        setContentFor(customBookId, phoneticPreference = PhoneticPreference.BOTH)
+
+        // UK first, each variant right after its label, all after the word on one line.
+        val word = composeRule.onNodeWithText("apple", substring = false).fetchSemanticsNode()
+        val ukLabel = composeRule.onNodeWithText("英", substring = false).fetchSemanticsNode()
+        val uk = composeRule.onNodeWithText("/uk/", substring = false).fetchSemanticsNode()
+        val usLabel = composeRule.onNodeWithText("美", substring = false).fetchSemanticsNode()
+        val us = composeRule.onNodeWithText("/us/", substring = false).fetchSemanticsNode()
+        assertThat(ukLabel.positionInRoot.x).isAtLeast(word.positionInRoot.x + word.size.width)
+        assertThat(uk.positionInRoot.x).isGreaterThan(ukLabel.positionInRoot.x)
+        assertThat(usLabel.positionInRoot.x).isGreaterThan(uk.positionInRoot.x)
+        assertThat(us.positionInRoot.x).isGreaterThan(usLabel.positionInRoot.x)
+        assertThat(ukLabel.positionInRoot.y).isAtMost(word.positionInRoot.y + word.size.height)
+        assertThat(us.positionInRoot.y).isAtMost(word.positionInRoot.y + word.size.height)
+    }
+
+    @Test
+    fun wordRow_phonetic_bothPreference_identicalForms_showOnceWithoutLabel() {
+        runBlocking {
+            db.dictionaryDao().insertAll(
+                listOf(
+                    com.github.chsiching.worddrill.data.local.entity.DictionaryEntry(
+                        word = "apple", phonetic = "/ˈæpəl/", phoneticUs = "/ˈæpəl/",
+                        pos = "n.", meaning = "苹果",
+                    ),
+                )
+            )
+        }
+        setContentFor(customBookId, phoneticPreference = PhoneticPreference.BOTH)
+        composeRule.onNodeWithText("/ˈæpəl/", substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText("英", substring = false).assertDoesNotExist()
+        composeRule.onNodeWithText("美", substring = false).assertDoesNotExist()
         Unit
     }
 

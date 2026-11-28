@@ -41,13 +41,6 @@ enum class PhoneticPreference {
         }
     }
 
-    /** Plain joined string (compact surfaces like the word-list rows);
-     *  semantics identical to [segments]. */
-    fun resolve(phoneticUk: String?, phoneticUs: String?): String? =
-        segments(phoneticUk, phoneticUs)
-            .joinToString(" ") { it.text }
-            .ifEmpty { null }
-
     /** Setting-row tap cycle (issue #58): UK -> US -> BOTH -> UK. */
     fun next(): PhoneticPreference = when (this) {
         UK -> US

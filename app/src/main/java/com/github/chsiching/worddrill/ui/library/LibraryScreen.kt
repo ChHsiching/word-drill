@@ -25,7 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -274,7 +274,7 @@ private fun ImportBookButton(onClick: () -> Unit, modifier: Modifier = Modifier)
         shape = RoundedCornerShape(14.dp),
     ) {
         Icon(
-            imageVector = Icons.Outlined.FileUpload,
+            imageVector = Icons.Outlined.FileDownload,
             contentDescription = null,
             modifier = Modifier.size(18.dp),
         )

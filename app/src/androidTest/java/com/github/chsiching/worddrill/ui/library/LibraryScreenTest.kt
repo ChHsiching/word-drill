@@ -141,6 +141,17 @@ class LibraryScreenTest {
     }
 
     @Test
+    fun createDialog_fastTyping_keepsEveryCharacterInOrder() {
+        setContent()
+        composeRule.onNodeWithText("新建词书").performClick()
+        // One commit per character, the way a soft keyboard sends text, with no frame in between.
+        "qwertyuiopa".forEach { composeRule.onNode(hasText("词书名称")).performTextInput(it.toString()) }
+        composeRule.waitForIdle()
+        composeRule.onNode(hasText("qwertyuiopa")).assertIsDisplayed()
+        composeRule.onNodeWithText("取消").performClick()
+    }
+
+    @Test
     fun importButton_click_opensImportDialog() {
         setContent()
         composeRule.onNodeWithText("从文件导入").performClick()
